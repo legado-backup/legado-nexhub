@@ -107,11 +107,10 @@ dependency_overrides:
       path: "."
       ref: br_v0.2.2_ohos
   # 本地文件选择（导入源 JSON / 本地漫画）。8.0.7 满足 ^8.0.0，单包仓库。
+  # 注：上游分支原生 dir 方法返回 List，Dart 层按 String 强转会崩溃；本地补丁包
+  # （third_party/patched/file_picker，OHOS_PATCH.md 有说明）已做类型兼容。
   file_picker:
-    git:
-      url: https://gitcode.com/CPF-Flutter/fluttertpc_file_picker.git
-      path: "."
-      ref: br_v8.0.7_ohos
+    path: third_party/patched/file_picker
   # SQLite（cached_network_image / 缓存管理器的传递依赖）。2.4.2 与现解析版本一致。
   sqflite:
     git:

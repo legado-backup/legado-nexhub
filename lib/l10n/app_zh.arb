@@ -933,6 +933,7 @@
   "maxConcurrentDownloads": "最大同时下载数",
   "maxConcurrentDownloadsDesc": "同时进行的下载数量",
   "downloadPath": "下载路径",
+  "downloadPathOhosUnsupported": "鸿蒙版暂不支持自定义下载目录，文件将保存到应用目录",
   "downloadPathDesc": "D:/Downloads",
   "downloadPathSet": "下载路径已更新",
   "contentImportActions": "操作",

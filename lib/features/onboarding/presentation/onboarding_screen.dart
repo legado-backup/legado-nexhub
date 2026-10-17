@@ -524,6 +524,13 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
 
   Future<void> _pick() async {
     final l10n = widget.l10n;
+    // 鸿蒙：入口已隐藏，兜底再挡一次（原生选目录接口不可用）。
+    if (PlatformService.instance.isOHOS) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.downloadPathOhosUnsupported)),
+      );
+      return;
+    }
     if (Platform.isAndroid) {
       final SafDocumentFile? picked = await _saf.pickDirectory();
       if (picked == null || !mounted) return;
@@ -576,6 +583,35 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // 鸿蒙：原生目录选择接口不可用（插件把目录当文件读取，拿不到可写路径），
+    // 展示提示替代选择按钮（与设置页同款降级，规格 §6 入口可见性控制）。
+    if (PlatformService.instance.isOHOS) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.spaceMd,
+          vertical: AppTokens.spaceXs,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.folder_off_rounded,
+                size: 20, color: scheme.onSurfaceVariant),
+            const SizedBox(width: AppTokens.spaceSm),
+            Expanded(
+              child: Text(
+                widget.l10n.downloadPathOhosUnsupported,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return FutureBuilder<DownloadSettings>(
       future: DownloadSettingsStore().load(),
       builder: (context, snap) {

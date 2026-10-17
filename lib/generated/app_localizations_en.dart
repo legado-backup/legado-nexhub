@@ -2029,6 +2029,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadPath => 'Download Path';
 
   @override
+  String get downloadPathOhosUnsupported =>
+      'Custom download folder isn\'t supported on HarmonyOS yet. Files are saved to the app directory.';
+
+  @override
   String get downloadPathSet => 'Download path updated';
 
   @override

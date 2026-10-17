@@ -1994,6 +1994,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadPath => '下载路径';
 
   @override
+  String get downloadPathOhosUnsupported => '鸿蒙版暂不支持自定义下载目录，文件将保存到应用目录';
+
+  @override
   String get downloadPathSet => '下载路径已更新';
 
   @override

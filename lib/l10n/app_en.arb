@@ -946,6 +946,7 @@
   "maxConcurrentDownloads": "Max Concurrent Downloads",
   "maxConcurrentDownloadsDesc": "Number of simultaneous downloads",
   "downloadPath": "Download Path",
+  "downloadPathOhosUnsupported": "Custom download folder isn't supported on HarmonyOS yet. Files are saved to the app directory.",
   "downloadPathSet": "Download path updated",
   "contentImportActions": "Actions",
   "downloadPathDesc": "D:/Downloads",

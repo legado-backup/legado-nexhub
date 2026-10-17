@@ -382,6 +382,15 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 鸿蒙：原生目录选择接口不可用（插件把目录当文件读取，拿不到可写路径），
+    // 入口禁用并明确提示，下载统一落应用沙盒目录（阶段 5 再评估系统目录授权方案）。
+    if (PlatformService.instance.isOHOS) {
+      return SettingsTile(
+        icon: Icons.folder_rounded,
+        title: l10n.downloadPath,
+        subtitle: l10n.downloadPathOhosUnsupported,
+      );
+    }
     final String subtitle = _displayName.isNotEmpty ? _displayName : _path;
     return SettingsTile(
       icon: Icons.folder_rounded,
