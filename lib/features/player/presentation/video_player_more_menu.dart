@@ -158,17 +158,18 @@ extension _VideoMoreMenu on _VideoPlayerScreenState {
           },
         ),
       ),
-      // 画中画（从顶栏移入更多菜单）
-      _PlayerMenuEntry(
-        builder: (BuildContext ctx) => ListTile(
-          leading: const Icon(Icons.picture_in_picture_rounded),
-          title: Text(l10n.playerPip),
-          onTap: () {
-            Navigator.pop(ctx);
-            _togglePip(l10n);
-          },
+      // 画中画（从顶栏移入更多菜单）。鸿蒙无 floating 适配，入口隐藏（规格 §6）。
+      if (!AppPlatform.isOhos)
+        _PlayerMenuEntry(
+          builder: (BuildContext ctx) => ListTile(
+            leading: const Icon(Icons.picture_in_picture_rounded),
+            title: Text(l10n.playerPip),
+            onTap: () {
+              Navigator.pop(ctx);
+              _togglePip(l10n);
+            },
+          ),
         ),
-      ),
       // 解码模式（hwdec 属 mpv 属性系能力，Web / NoOp 后端隐藏）
       _PlayerMenuEntry(
         requiresCapability: PlayerCapability.hwdec,

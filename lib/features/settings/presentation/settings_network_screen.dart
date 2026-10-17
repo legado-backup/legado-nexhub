@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/model/network_config.dart';
 import '../../../core/network/model/network_validators.dart';
 import '../../../core/network/network_config_service.dart';
+import '../../../core/services/bangumi/bangumi_ech_proxy.dart';
 import '../../../core/network/runtime/dns_resolver.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_alert_dialog.dart';
@@ -724,6 +725,8 @@ class _SettingsNetworkScreenState extends State<SettingsNetworkScreen> {
   }
 
   Widget _buildEchCard(AppLocalizations l10n) {
+    // 无原生 ECH 引擎的平台（iOS / Web / 鸿蒙）：设置项隐藏，静默直连（规格 §6）。
+    if (!BangumiEchProxy.platformSupported) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return SettingsCard(
       key: const ValueKey<String>('network.ech'),

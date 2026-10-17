@@ -39,6 +39,13 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
   final TextEditingController _imageController = TextEditingController();
   BangumiProxyMode _proxyMode = BangumiProxyMode.direct;
 
+  /// 展示用连接模式：本平台无 ECH 引擎（iOS / Web / 鸿蒙）时，历史 ECH 选择
+  /// 回落为直连——设置项已隐藏，避免 SegmentedButton 选中值不在候选中触发断言。
+  BangumiProxyMode get _effectiveProxyMode =>
+      (!BangumiEchProxy.platformSupported && _proxyMode == BangumiProxyMode.ech)
+          ? BangumiProxyMode.direct
+          : _proxyMode;
+
   @override
   void initState() {
     super.initState();
@@ -259,6 +266,7 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
           Text(l10n.bangumiProxyTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: AppTokens.spaceMd),
           // ── 连接模式：直连 / 镜像 / ECH 三选一（对齐参考项目 ProxyMode）──
+          // 无原生 ECH 引擎的平台（iOS / Web / 鸿蒙）隐藏 ECH 选项，历史选择回落直连。
           SegmentedButton<BangumiProxyMode>(
             segments: <ButtonSegment<BangumiProxyMode>>[
               ButtonSegment<BangumiProxyMode>(
@@ -271,13 +279,14 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
                 label: Text(l10n.bangumiProxyMirror),
                 icon: const Icon(Icons.dns_rounded),
               ),
-              ButtonSegment<BangumiProxyMode>(
-                value: BangumiProxyMode.ech,
-                label: Text(l10n.bangumiProxyEch),
-                icon: const Icon(Icons.enhanced_encryption_rounded),
-              ),
+              if (BangumiEchProxy.platformSupported)
+                ButtonSegment<BangumiProxyMode>(
+                  value: BangumiProxyMode.ech,
+                  label: Text(l10n.bangumiProxyEch),
+                  icon: const Icon(Icons.enhanced_encryption_rounded),
+                ),
             ],
-            selected: <BangumiProxyMode>{_proxyMode},
+            selected: <BangumiProxyMode>{_effectiveProxyMode},
             onSelectionChanged: (s) => _switchProxyMode(s.first),
           ),
           if (_proxyMode == BangumiProxyMode.mirror) ...<Widget>[
@@ -320,7 +329,7 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
               label: Text(l10n.save),
             ),
           ],
-          if (_proxyMode == BangumiProxyMode.ech) ...<Widget>[
+          if (_effectiveProxyMode == BangumiProxyMode.ech) ...<Widget>[
             const SizedBox(height: AppTokens.spaceMd),
             Text(l10n.bangumiEchProxyHint, style: theme.textTheme.bodySmall),
             const SizedBox(height: AppTokens.spaceSm),

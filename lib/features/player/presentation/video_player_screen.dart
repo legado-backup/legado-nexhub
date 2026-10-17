@@ -62,6 +62,7 @@ import '../../../core/local/local_content_manager.dart' show isAndroidSafUri;
 import '../../../core/local/saf_bridge.dart' show resolveSafVideoFile;
 import '../../../core/widgets/app_error_state.dart';
 import '../../../core/player/player_runtime.dart';
+import '../../../core/platform/app_platform.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -4497,14 +4498,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                 ),
               ),
             ),
-            // 投屏
-            topBarBtn(
-              key: const Key('player_cast'),
-              icon: Icons.cast_rounded,
-              color: _isCasting ? Colors.amber : Colors.white,
-              tooltip: l10n.playerCast,
-              onPressed: () => _showCastSheet(l10n),
-            ),
+            // 投屏（鸿蒙无 cast/bonsoir 适配，入口隐藏，规格 §6）
+            if (!AppPlatform.isOhos)
+              topBarBtn(
+                key: const Key('player_cast'),
+                icon: Icons.cast_rounded,
+                color: _isCasting ? Colors.amber : Colors.white,
+                tooltip: l10n.playerCast,
+                onPressed: () => _showCastSheet(l10n),
+              ),
             // 字幕
             topBarBtn(
               key: const Key('player_subtitle'),

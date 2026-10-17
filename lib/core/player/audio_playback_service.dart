@@ -20,6 +20,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 
 import '../utils/app_log.dart';
+import '../platform/app_platform.dart';
 
 /// 一次后台播放会话：播放页注册的元数据、状态流与控制回调。
 ///
@@ -228,9 +229,10 @@ class AudioPlaybackService {
   /// 音频打断前是否在播放（打断结束据此决定是否恢复）。
   bool _playingBeforeInterruption = false;
 
-  /// 当前平台是否支持 audio_service（Windows / Web 不支持，静默降级）。
+  /// 当前平台是否支持 audio_service（Windows / Web / 鸿蒙不支持，静默降级）。
   bool get _supported =>
       !kIsWeb &&
+      !AppPlatform.isOhos &&
       (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
 
   /// 幂等初始化。main() 启动期调用一次；attach 内部也会兜底等待。
