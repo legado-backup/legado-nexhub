@@ -7,7 +7,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_js/flutter_js.dart';
+import '../js/js_runtime.dart';
+import '../js/js_runtime_factory.dart';
 
 import '../models/plugin_config.dart';
 import '../network/model/effective_network_profile.dart';
@@ -228,12 +229,13 @@ String _buildContextVarsInjection(Map<String, String> vars) {
 /// 基于 flutter_js (quickjs) 的真实引擎实现。
 class FlutterJsEngine implements JsEngine {
   FlutterJsEngine(this.bridge, {String? baseUrl}) {
-    _runtime = getJavascriptRuntime();
+    // 运行时按平台分派（鸿蒙用 QuickJS 原生桥，其余平台 flutter_js）。
     // 必须启用 Promise 处理：源脚本（如部分漫画源的 parseList）大量使用
     // `await ctx.http.get(...)`，即异步函数返回 Promise。未启用时 evaluateAsync
     // 不会 await，run() 拿到的只是 `[object Promise]`，导致脚本返回值永远为空
     // → 列表/详情/章节全空。对齐旧版 QuickJsRuntime2(..)..enableHandlePromises()。
-    _runtime.enableHandlePromises();
+    // （FlutterJsRuntime 在构造时内部完成；鸿蒙桥由原生微任务泵承担该语义。）
+    _runtime = createJsRuntime();
     _runtime.onMessage('flutterBridge', _onMessage);
     _runtime.evaluate(_jsContextPrelude);
     // 注入 context.baseUrl（当前激活镜像地址）
@@ -250,7 +252,7 @@ class FlutterJsEngine implements JsEngine {
 
   @override
   final JsHostBridge bridge;
-  late final JavascriptRuntime _runtime;
+  late final NexJsRuntime _runtime;
 
   /// 本实例已完整评估过的脚本（按内容去重）。
   ///

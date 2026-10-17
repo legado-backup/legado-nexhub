@@ -1,0 +1,27 @@
+
+{
+  "apiType": 'stageMode',
+  "buildOption": {
+    // 原生库：QuickJS 桥（third_party/quickjs_bridge）→ libnexhub_quickjs.so，
+    // 供书源 JS 沙箱的 dart:ffi 运行时加载。真机 arm64；模拟器调测再补 x86_64。
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "arguments": "",
+      "abiFilters": [
+        "arm64-v8a"
+      ],
+      "targets": [
+        "nexhub_quickjs_bridge"
+      ]
+    }
+  },
+  "targets": [
+    {
+      "name": "default",
+      "runtimeOS": "HarmonyOS"
+    },
+    {
+      "name": "ohosTest",
+    }
+  ]
+}

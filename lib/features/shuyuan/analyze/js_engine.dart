@@ -1,20 +1,24 @@
-/// JS 沙箱引擎：基于 flutter_js 执行书源内嵌的 `@js` / `<js>` 脚本。
+/// JS 沙箱引擎：执行书源内嵌的 `@js` / `<js>` 脚本。
+///
+/// 运行时按平台分派（lib/core/js/js_runtime_factory.dart）：安卓/桌面走
+/// flutter_js（QuickJS/JavaScriptCore），鸿蒙走随 HAP 打包的 QuickJS 原生桥。
 library;
 
-import 'package:flutter_js/flutter_js.dart';
+import '../../../core/js/js_runtime.dart';
+import '../../../core/js/js_runtime_factory.dart';
 
 import '../../../core/novel/novel_chinese_converter.dart';
 import '../../../core/utils/app_log.dart';
 
 class JsEngine {
-  JavascriptRuntime? _runtime;
+  NexJsRuntime? _runtime;
 
   /// 是否已注入全局预置脚本（繁简转换 t2s()/s2t()）。
   bool _preludeInjected = false;
 
-  JavascriptRuntime get runtime {
+  NexJsRuntime get runtime {
     if (_runtime == null) {
-      _runtime = getJavascriptRuntime();
+      _runtime = createJsRuntime();
       _injectPrelude();
     }
     return _runtime!;

@@ -158,3 +158,12 @@ dependency_overrides:
       url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
       path: packages/device_info_plus/device_info_plus
       ref: br_device_info_plus_v11.4.0_ohos
+  # ---------- 本地打补丁的纯 Dart UI 库 ----------
+  # 鸿蒙 Flutter fork 的 TargetPlatform 枚举新增 ohos 值，上游 material_ui /
+  # cupertino_ui 内的穷尽 switch 缺该分支 → 鸿蒙目标编译报「not exhaustively
+  # matched」。third_party/patched 下的副本由 tool/patch_target_platform_ohos.js
+  # 机械插入 `case TargetPlatform.ohos:`（空 case 落 Android，移动端语义）。
+  material_ui:
+    path: third_party/patched/material_ui
+  cupertino_ui:
+    path: third_party/patched/cupertino_ui
