@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
-import '../platform/app_platform.dart';
+import '../platform/platform_service.dart';
 
 /// 播放内核运行时闸门（平台初始化 + 内核可用性）。
 ///
@@ -15,7 +15,7 @@ abstract final class PlayerRuntime {
   /// 是否具备 media_kit 播放内核。
   ///
   /// 阶段 4 落地 AVPlayer/libmpv 后，此处按实际内核实现改写。
-  static bool get available => !AppPlatform.isOhos;
+  static bool get available => !PlatformService.instance.isOHOS;
 
   static bool _initialized = false;
 

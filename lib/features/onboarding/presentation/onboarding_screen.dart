@@ -532,16 +532,23 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
     }
     if (!kIsWeb) {
       String? result;
-      try {
-        result = await Isolate.run<String?>(() {
-          FilePicker.platform = FilePickerWindows();
-          return FilePicker.platform.getDirectoryPath();
-        });
-      } catch (_) {
-        result = await Isolate.run<String?>(() {
-          FilePicker.platform = FilePickerWindows();
-          return FilePicker.platform.getDirectoryPath();
-        });
+      if (PlatformService.instance.isOHOS) {
+        // 鸿蒙：下面桌面分支硬编码 FilePickerWindows（会加载 ole32.dll 崩溃），
+        // 且后台 isolate 无法使用 MethodChannel → 直接在主 isolate 走插件已注册
+        // 的 FilePickerIO（鸿蒙原生目录选择器）。
+        result = await FilePicker.platform.getDirectoryPath();
+      } else {
+        try {
+          result = await Isolate.run<String?>(() {
+            FilePicker.platform = FilePickerWindows();
+            return FilePicker.platform.getDirectoryPath();
+          });
+        } catch (_) {
+          result = await Isolate.run<String?>(() {
+            FilePicker.platform = FilePickerWindows();
+            return FilePicker.platform.getDirectoryPath();
+          });
+        }
       }
       if (result == null || !mounted) return;
       await _save(result, l10n);

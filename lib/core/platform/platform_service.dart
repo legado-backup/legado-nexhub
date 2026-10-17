@@ -50,10 +50,14 @@ class PlatformService {
 
   /// 是否为 HarmonyOS NEXT（Flutter-OH）。
   ///
-  /// 编译期由 Flutter-OH 工具链注入 `kIsOHOS` 编译常量；当前原生 SDK 未接入时恒为
-  /// `false`。接入鸿蒙时改为 `bool get isOHOS => kIsOHOS;` 并补充 `pubspec.yaml`
-  /// 的 `dependency_overrides`（media_kit / flutter_inappwebview 替换为鸿蒙适配版）。
-  bool get isOHOS => false;
+  /// 鸿蒙 Flutter fork 的 `Platform.operatingSystem` 返回 `'ohos'`。
+  /// Web 平台访问 `Platform` 会抛错，故以 [kIsWeb] 守卫。
+  bool get isOHOS => !kIsWeb && Platform.operatingSystem == 'ohos';
+
+  /// 能力轴：触屏 / 移动系交互（相册、WebView、震动、移动端手势等）。
+  ///
+  /// 鸿蒙手机与 Android / iOS 同属移动能力集（规格 §4）。
+  bool get isMobile => isAndroid || isIOS || isOHOS;
 
   /// 当前平台枚举（用于 UI 自适应与路由决策）。
   AppPlatform get current {
@@ -66,6 +70,10 @@ class PlatformService {
     return AppPlatform.linux;
   }
 
-  /// 是否使用桌面布局（≥ 断点走 NavigationRail）。
+  /// 形态轴：传统桌面窗口（窗口管理 / 滚动条 / 悬浮窗）。
   bool get isDesktop => isWindows || isMacOS || isLinux;
+
+  /// 形态轴（含未来鸿蒙 PC）：当前与 [isDesktop] 一致，
+  /// 鸿蒙 PC 判定（deviceType）接入后在此扩展。
+  bool get isDesktopForm => isDesktop;
 }

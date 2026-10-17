@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/download/download_format_preferences.dart';
 import '../../../core/download/download_manager.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/download/download_settings.dart';
 import '../../../core/download/download_task.dart';
@@ -327,23 +328,34 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
     }
     // file_picker 在 Windows 上是主线程同步弹 COM 对话框，会卡死 UI；
     // 放到后台 isolate 跑，UI 保持响应。
+    // 鸿蒙例外：桌面分支硬编码 FilePickerWindows（加载 ole32.dll 会崩溃），且
+    // 后台 isolate 无法使用 MethodChannel → 主 isolate 走插件注册的 FilePickerIO。
     String? result;
-    try {
-      result = await Isolate.run<String?>(() {
-        // FilePicker._instance 是 isolate-private late，主 isolate 初始化不
-        // 会同步到新 isolate —— 必须在这里显式赋值。
-        FilePicker.platform = FilePickerWindows();
-        return FilePicker.platform.getDirectoryPath(
-          initialDirectory: initialDir,
-        );
-      });
-    } catch (_) {
-      // file_picker_windows 对 initialDirectory 的解析较脆弱（例如
-      // SHCreateItemFromParsingName 报 E_INVALIDARG）。退回不带初始目录再试。
-      result = await Isolate.run<String?>(() {
-        FilePicker.platform = FilePickerWindows();
-        return FilePicker.platform.getDirectoryPath();
-      });
+    if (PlatformService.instance.isOHOS) {
+      result = await FilePicker.platform.getDirectoryPath(
+        initialDirectory: initialDir,
+      );
+      if (result == null && initialDir != null) {
+        result = await FilePicker.platform.getDirectoryPath();
+      }
+    } else {
+      try {
+        result = await Isolate.run<String?>(() {
+          // FilePicker._instance 是 isolate-private late，主 isolate 初始化不
+          // 会同步到新 isolate —— 必须在这里显式赋值。
+          FilePicker.platform = FilePickerWindows();
+          return FilePicker.platform.getDirectoryPath(
+            initialDirectory: initialDir,
+          );
+        });
+      } catch (_) {
+        // file_picker_windows 对 initialDirectory 的解析较脆弱（例如
+        // SHCreateItemFromParsingName 报 E_INVALIDARG）。退回不带初始目录再试。
+        result = await Isolate.run<String?>(() {
+          FilePicker.platform = FilePickerWindows();
+          return FilePicker.platform.getDirectoryPath();
+        });
+      }
     }
     if (result == null || !mounted) return;
     final String picked = result;

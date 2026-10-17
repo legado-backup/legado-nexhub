@@ -159,7 +159,7 @@ extension _VideoMoreMenu on _VideoPlayerScreenState {
         ),
       ),
       // 画中画（从顶栏移入更多菜单）。鸿蒙无 floating 适配，入口隐藏（规格 §6）。
-      if (!AppPlatform.isOhos)
+      if (!PlatformService.instance.isOHOS)
         _PlayerMenuEntry(
           builder: (BuildContext ctx) => ListTile(
             leading: const Icon(Icons.picture_in_picture_rounded),
