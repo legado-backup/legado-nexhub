@@ -707,11 +707,9 @@ packages:
   flutter_secure_storage:
     dependency: "direct main"
     description:
-      path: flutter_secure_storage
-      ref: "br_v9.2.4_ohos"
-      resolved-ref: "67c7b82e85b08a649dfd4f2bb0c455011a9384fa"
-      url: "https://gitcode.com/CPF-Flutter/fluttertpc_flutter_secure_storage.git"
-    source: git
+      path: "third_party/patched/flutter_secure_storage"
+      relative: true
+    source: path
     version: "9.2.4"
   flutter_secure_storage_linux:
     dependency: transitive

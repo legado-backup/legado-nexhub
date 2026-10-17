@@ -31,6 +31,8 @@ class RssNotificationService {
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
       linux: LinuxInitializationSettings(defaultActionName: '打开'),
+      // 鸿蒙：插件强制要求提供该平台设置，否则 initialize 抛参数错误。
+      ohos: OhosInitializationSettings('app_icon'),
     );
     try {
       await _plugin.initialize(settings);

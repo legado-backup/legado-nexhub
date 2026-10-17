@@ -84,12 +84,11 @@ dependency_overrides:
       path: permission_handler_ohos
       ref: br_permission_handler_v11.3.1_ohos
   # 敏感凭据存储（WebDAV 密码）。9.2.4 满足 ^9.0.0。
-  # 注：主包是非联邦插件 + 独立原生实现包，pubspec.yaml 已显式追加 _ohos 依赖。
+  # 注：上游 ohos 分支的原生包可用，但主包 Dart 层 _selectOptions 缺 ohos 分支会抛
+  # unsupported_platform；本地补丁包（third_party/patched/flutter_secure_storage，
+  # OHOS_PATCH.md 有说明）已补该分支。原生实现仍走 git 的 flutter_secure_storage_ohos。
   flutter_secure_storage:
-    git:
-      url: https://gitcode.com/CPF-Flutter/fluttertpc_flutter_secure_storage.git
-      path: flutter_secure_storage
-      ref: br_v9.2.4_ohos
+    path: third_party/patched/flutter_secure_storage
   flutter_secure_storage_ohos:
     git:
       url: https://gitcode.com/CPF-Flutter/fluttertpc_flutter_secure_storage.git
