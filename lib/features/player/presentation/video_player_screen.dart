@@ -3887,7 +3887,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // 还原系统亮度（避免退出后保留手势调节值）。
     // 注意：resetScreenBrightness 是异步方法，其 PlatformException 在后续微任务抛出，
     // 同步 try/catch 捕获不到，会形成「Uncaught zone error」；故用 .catchError 兜底。
-    _brightnessPlugin.resetScreenBrightness().catchError((Object _) {});
+    _brightnessPlugin.resetApplicationScreenBrightness().catchError((Object _) {});
     // 仍在桌面 PiP 时直接退出播放器（返回/Esc/路由替换），兜底恢复
     // 窗口原状（标题栏/尺寸/位置/最大化/置顶），否则小窗状态会残留到其他页面。
     if (_desktopPipActive) {

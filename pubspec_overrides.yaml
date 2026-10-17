@@ -158,6 +158,13 @@ dependency_overrides:
       url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
       path: packages/device_info_plus/device_info_plus
       ref: br_device_info_plus_v11.4.0_ohos
+  # ---------- C 类核实后的升级项（官方包已内置 ohos 平台）----------
+  # 音量控制：2.0.2 起官方 pub 版内置 ohos 平台（2.0.1 无），pin 到 ^2.0.2 直接可用。
+  flutter_volume_controller: ^2.0.2
+  # 屏幕亮度：2.1.11 起官方 pub 版内置 ohos 平台（0.2.x 无）。
+  # 注意：2.x 为破坏性 API 改名（setScreenBrightness → setApplicationScreenBrightness
+  # 等），调用点已同步迁移（阅读器/播放器手势共 4 文件）。
+  screen_brightness: ^2.1.11
   # ---------- 本地打补丁的纯 Dart UI 库 ----------
   # 鸿蒙 Flutter fork 的 TargetPlatform 枚举新增 ohos 值，上游 material_ui /
   # cupertino_ui 内的穷尽 switch 缺该分支 → 鸿蒙目标编译报「not exhaustively

@@ -754,11 +754,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     try {
       final defaults = await ReaderDefaultSettingsStore().load();
       _brightness = defaults.novelBrightness.clamp(0.0, 1.0);
-      await _brightnessPlugin.setScreenBrightness(_brightness);
+      await _brightnessPlugin.setApplicationScreenBrightness(_brightness);
     } on Object {
       _brightness = 0.5;
     }
-    _brightnessSub = _brightnessPlugin.onCurrentBrightnessChanged.listen(
+    _brightnessSub = _brightnessPlugin.onApplicationScreenBrightnessChanged.listen(
       (double value) {
         if (!_brightnessChangedByUs && mounted) {
           setState(() => _brightness = value);
@@ -1889,7 +1889,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _brightnessSub?.cancel();
     // 异步方法，异常在后续微任务抛出，同步 try/catch 抓不到；用 .catchError 兜底，
     // 避免「Uncaught zone error」在 release 下升级为进程崩溃。
-    _brightnessPlugin.resetScreenBrightness().catchError((Object _) {});
+    _brightnessPlugin.resetApplicationScreenBrightness().catchError((Object _) {});
     _tts.removeListener(_onTtsChanged);
     // 退出阅读器释放通知栏媒体会话（若朗读仍在后台，系统通知随之移除）。
     if (_ttsAudioToken != null) {
@@ -4237,7 +4237,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _brightnessChangedByUs = true;
     if (mounted) setState(() {});
     try {
-      await _brightnessPlugin.setScreenBrightness(value);
+      await _brightnessPlugin.setApplicationScreenBrightness(value);
     } on Object {
       // 部分平台可能不支持亮度调节，静默忽略。
     }

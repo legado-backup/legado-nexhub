@@ -23,7 +23,7 @@ extension _VideoGestures on _VideoPlayerScreenState {
     final l10n = AppLocalizations.of(context);
     _brightness = clamped;
     try {
-      await _brightnessPlugin.setScreenBrightness(clamped);
+      await _brightnessPlugin.setApplicationScreenBrightness(clamped);
     } on Object {
       // 平台不支持时静默忽略。
     }

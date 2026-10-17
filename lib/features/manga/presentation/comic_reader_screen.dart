@@ -4244,13 +4244,13 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
         _dimBrightnessActive = false;
         // 正值：写入系统亮度（失败静默降级）。
         unawaited(_brightnessPlugin
-            .setScreenBrightness(v.clamp(0.0, 1.0))
+            .setApplicationScreenBrightness(v.clamp(0.0, 1.0))
             .catchError((Object _) {}));
       } else {
         // 负值：压暗系统亮度 + 黑遮罩。
         _dimBrightnessActive = true;
         unawaited(_brightnessPlugin
-            .setScreenBrightness(0.0)
+            .setApplicationScreenBrightness(0.0)
             .catchError((Object _) {}));
       }
       if (mounted) setState(() {});
@@ -4262,7 +4262,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 退出阅读器 / 关闭亮度设置时恢复系统原亮度（异步，失败静默忽略）。
   void _resetBrightness() {
     _dimBrightnessActive = false;
-    _brightnessPlugin.resetScreenBrightness().catchError((Object _) {});
+    _brightnessPlugin.resetApplicationScreenBrightness().catchError((Object _) {});
   }
 
   /// 沉浸全屏：进入阅读器时切到 immersiveSticky；dispose 时恢复 edgeToEdge。
