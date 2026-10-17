@@ -32,6 +32,8 @@ doc/api/
 # 内置嗅探钩子是手写 JS 源码资产（pubspec assets/sniffer/ 声明、rootBundle 加载），
 # 非 dart2js 生成物——上面的 *.js 一刀切规则会误伤，显式反排除。
 !assets/sniffer/sniffer_hook.js
+# 维护工具脚本（Node 编写，非构建产物）：平台枚举补丁脚本等。
+!tool/*.js
 
 .flutter-plugins
 .flutter-plugins-dependencies
