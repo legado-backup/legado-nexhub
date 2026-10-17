@@ -33,6 +33,8 @@ TtsSentencePlayer buildDefaultTtsSentencePlayer({
     final file = File('${dir.path}/sentence.mp3');
     try {
       await file.writeAsBytes(bytes);
+      // TODO(ohos): 鸿蒙暂无播放内核，TTS 朗读在阶段 5 走查接入降级入口
+      // （此处 Player 创建会因原生库缺失失败）。
       final player = Player();
       try {
         await player.open(Media(file.path));

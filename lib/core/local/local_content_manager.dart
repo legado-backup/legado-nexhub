@@ -10,6 +10,8 @@ import 'dart:typed_data';
 import 'dart:io' show Directory, File, FileSystemException;
 
 import 'package:media_kit/media_kit.dart';
+
+import '../player/player_runtime.dart';
 import 'package:nexhub/core/local/archive_extractor.dart';
 import 'package:nexhub/core/local/local_novel_parser.dart';
 import 'package:nexhub/core/local/pdf_util.dart';
@@ -413,7 +415,7 @@ String? _findFolderCover(String videoPath) {
 Future<String?> extractVideoThumbnail(String path) async {
   Player? player;
   try {
-    MediaKit.ensureInitialized();
+    PlayerRuntime.ensureInitialized();
     player = Player(configuration: const PlayerConfiguration(muted: true));
     try {
       final platform = player.platform;

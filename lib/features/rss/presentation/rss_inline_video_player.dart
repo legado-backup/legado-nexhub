@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/media/media_kit_network.dart';
+import '../../../core/player/player_runtime.dart';
 import '../../../core/player/player_controller.dart';
 import '../../../core/player/widgets/seek_bar.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -71,7 +72,7 @@ class _RssInlineVideoPlayerState extends State<RssInlineVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    MediaKit.ensureInitialized();
+    PlayerRuntime.ensureInitialized();
   }
 
   /// 进度记忆（重开续播）：按视频 URL 持久化播放位置，dispose 时保存；

@@ -21,6 +21,7 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/media/media_kit_network.dart';
+import '../../../core/player/player_runtime.dart';
 import '../../../core/rss/rss_feed.dart';
 import '../../../core/theme/app_tokens.dart';
 
@@ -67,8 +68,10 @@ class _RssPodcastPlayerState extends State<RssPodcastPlayer> {
   @override
   void initState() {
     super.initState();
-    // 幂等：main 已调用过，重复调用安全。
-    MediaKit.ensureInitialized();
+    // 幂等：main 已调用过，重复调用安全（鸿蒙侧自动跳过）。
+    PlayerRuntime.ensureInitialized();
+    // TODO(ohos): 阶段 5 走查为播客页补降级 UI（鸿蒙暂无播放内核，
+    // 当前会因 Player 创建失败返回上级页面）。
     _player = Player();
     // libmpv 自主联网不吃应用代理，须显式注入（否则代理环境音频永远 0:00）。
     applyAppProxyToPlayer(_player);

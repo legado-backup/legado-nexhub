@@ -1119,6 +1119,7 @@
   "playerPlayInfo": "Play info",
   "playerExternalPlay": "External play",
   "playerVideoExpired": "Video link expired, please retry",
+  "playerOhosUnsupported": "Video playback isn't supported on HarmonyOS yet. This feature is being adapted.",
   "playerEpisodeSwitchFailed": "Failed to switch episode, please retry",
   "playerStallDetected": "Playback stalled, reconnecting…",
   "playerRetry": "Retry",

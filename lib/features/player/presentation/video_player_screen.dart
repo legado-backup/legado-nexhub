@@ -61,6 +61,7 @@ import '../../../core/utils/app_log.dart';
 import '../../../core/local/local_content_manager.dart' show isAndroidSafUri;
 import '../../../core/local/saf_bridge.dart' show resolveSafVideoFile;
 import '../../../core/widgets/app_error_state.dart';
+import '../../../core/player/player_runtime.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
@@ -843,6 +844,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   }
 
   Future<void> _init() async {
+    // 鸿蒙阶段 4 前无播放内核（media_kit/libmpv）：不得创建 Player 与
+    // VideoController（原生库缺失会异常），直接走统一错误页展示降级提示。
+    if (!PlayerRuntime.available) {
+      throw const PlayerUnavailableException();
+    }
     // 本次打开视为一次新的「播放自动全屏」机会（手动重试路径复用 _init）。
     _autoFullscreenDone = false;
     // 缓存播放位置管理器引用：context 仅在页面存活期有效，dispose 时
@@ -3926,19 +3932,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           if (snap.hasError || _videoController == null) {
             // 本地 / 直链模式直接打开失败（如 media_kit 打开超时、文件不可读）
             // 时，展示具体错误而非"视频已失效"，让用户能看懂原因并重试。
-            final String msg = (_isDirectMode && snap.error != null)
-                ? snap.error.toString()
-                : l10n.playerVideoExpired;
+            final bool unavailable = snap.error is PlayerUnavailableException;
+            final String msg = unavailable
+                ? l10n.playerOhosUnsupported
+                : (_isDirectMode && snap.error != null)
+                    ? snap.error.toString()
+                    : l10n.playerVideoExpired;
             return _buildErrorPage(
               AppErrorState(
                 message: msg,
                 // 注意：setState 的回调必须是 void，不能写 `() => _initFuture = _init()`
                 // （赋值表达式会返回 _init() 这个 Future，触发「setState callback returned a Future」崩溃）。
-                onRetry: () {
-                  setState(() {
-                    _initFuture = _init();
-                  });
-                },
+                // 内核不可用（鸿蒙降级）时重试必然失败，不提供重试按钮。
+                onRetry: unavailable
+                    ? null
+                    : () {
+                        setState(() {
+                          _initFuture = _init();
+                        });
+                      },
               ),
             );
           }

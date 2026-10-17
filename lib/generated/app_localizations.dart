@@ -4694,6 +4694,12 @@ abstract class AppLocalizations {
   /// **'Video link expired, please retry'**
   String get playerVideoExpired;
 
+  /// No description provided for @playerOhosUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Video playback isn\'t supported on HarmonyOS yet. This feature is being adapted.'**
+  String get playerOhosUnsupported;
+
   /// No description provided for @playerEpisodeSwitchFailed.
   ///
   /// In en, this message translates to:

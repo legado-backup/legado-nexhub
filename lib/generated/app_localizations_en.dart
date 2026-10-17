@@ -2427,6 +2427,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerVideoExpired => 'Video link expired, please retry';
 
   @override
+  String get playerOhosUnsupported =>
+      'Video playback isn\'t supported on HarmonyOS yet. This feature is being adapted.';
+
+  @override
   String get playerEpisodeSwitchFailed =>
       'Failed to switch episode, please retry';
 

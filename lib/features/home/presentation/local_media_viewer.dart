@@ -80,6 +80,8 @@ class _LocalMediaViewerState extends State<LocalMediaViewer> {
           // 复用与在线播放一致的 PlayerController（含默认 mpv 属性与安全的原生
           // surface 释放顺序）。裸 Player() 打开本地 / SAF 缓存文件时曾出现「无限加载」，
           // 统一走 PlayerController 修复。
+          // TODO(ohos): 阶段 5 走查为本地视频补降级提示（鸿蒙暂无播放内核，
+          // PlayerController 创建会因原生库缺失失败）。
           await PlayerController.pendingDisposal;
           if (_disposed) break;
           _controller = PlayerController();

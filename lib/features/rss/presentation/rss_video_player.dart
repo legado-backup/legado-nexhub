@@ -25,9 +25,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/media/media_kit_network.dart';
 import '../../../core/player/player_controller.dart';
+import '../../../core/player/player_runtime.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/utils/app_log.dart';
+import '../../../core/widgets/app_error_state.dart';
 import '../../browser/presentation/http_browser_screen.dart';
 import 'rss_inline_video_player.dart' show RssVideoControls;
 
@@ -78,6 +80,7 @@ class _RssVideoPlayerState extends State<RssVideoPlayer> {
 
   late final PlayerController _pc;
   late final VideoController _vc;
+  bool _unsupported = false;
   bool _failed = false;
   bool _immersive = false;
   Timer? _loadTimer;
@@ -87,7 +90,13 @@ class _RssVideoPlayerState extends State<RssVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    MediaKit.ensureInitialized();
+    // 鸿蒙阶段 4 前无播放内核：不创建 PlayerController / VideoController
+    // （缺原生库会异常），build 展示降级提示。
+    if (!PlayerRuntime.available) {
+      _unsupported = true;
+      return;
+    }
+    PlayerRuntime.ensureInitialized();
     // 与主播放器同款封装：PlayerController 负责 Player 生命周期与 open。
     _pc = PlayerController();
     _vc = VideoController(_pc.player);
@@ -152,13 +161,20 @@ class _RssVideoPlayerState extends State<RssVideoPlayer> {
     _loadTimer?.cancel();
     _errorSub?.cancel();
     _durSub?.cancel();
-    _pc.dispose();
+    // 未创建播放器（鸿蒙降级）时不得触碰 late 字段。
+    if (!_unsupported) _pc.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l10n = AppLocalizations.of(context);
+    if (_unsupported) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.title ?? '')),
+        body: AppErrorState(message: l10n.playerOhosUnsupported),
+      );
+    }
     return Scaffold(
       appBar: _immersive
           ? null

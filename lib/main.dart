@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:media_kit/media_kit.dart';
+import 'core/player/player_runtime.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/network/runtime/nexhub_http_overrides.dart';
 import 'core/debug/crash_log.dart';
@@ -113,11 +113,9 @@ void main() {
     // 兜底：若原生内核加载失败（如 Windows 桌面 mpv 原生库缺失或损坏，常见为
     // 构建时该原生库下载为 0 字节），绝不因此让整个应用崩溃黑屏——仅视频播放
     // 不可用，浏览 / 阅读等核心功能仍应正常启动。失败原因打到终端便于排查。
-    try {
-      MediaKit.ensureInitialized();
-    } catch (e, st) {
-      debugPrint('MediaKit.ensureInitialized failed: $e\n$st');
-    }
+    // 播放内核初始化统一收口到 PlayerRuntime（幂等）：
+    // 鸿蒙暂无内核时自动跳过；其余平台失败只打日志，不阻塞启动。
+    PlayerRuntime.ensureInitialized();
 
     // 桌面端窗口控制（全屏 / F11）必须在 runApp 之前完成初始化——这是
     // window_manager 的硬性要求。若改到运行期（如阅读器 initState）再调

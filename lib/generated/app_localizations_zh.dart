@@ -2388,6 +2388,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerVideoExpired => '视频链接已失效，请重试';
 
   @override
+  String get playerOhosUnsupported => '鸿蒙版暂不支持视频播放，该功能正在适配中';
+
+  @override
   String get playerEpisodeSwitchFailed => '切换该剧集失败，请重试';
 
   @override

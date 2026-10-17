@@ -2,6 +2,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'media_kit_backend.dart';
 import 'no_op_player_backend.dart';
+import 'player_runtime.dart';
 import 'video_player_backend.dart';
 
 /// 播放器后端工厂。
@@ -20,10 +21,10 @@ class PlayerFactory {
   /// [player] 可选外部传入的 [Player] 实例（如测试用 mock），
   /// 为 null 时由工厂内部创建。
   static VideoPlayerBackend createBackend({Player? player}) {
-    // 当前仅 media_kit 后端；后续可在此按平台/编译标记切换：
-    // - Web 平台：WebMediaKitBackend 或 NoOpPlayerBackend
-    // - 纯音频：just_audio 后端
-    // - 无 media_kit：NoOpPlayerBackend
+    // 鸿蒙在阶段 4 前没有 libmpv 内核：直接返回降级占位，严禁创建 Player。
+    if (!PlayerRuntime.available) {
+      return NoOpPlayerBackend();
+    }
     try {
       return MediaKitBackend(player ?? Player());
     } on Object {
