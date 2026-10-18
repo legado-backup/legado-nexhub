@@ -104,7 +104,15 @@ jobs:
             --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} \
             --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} \
             --dart-define=BANGUMI_CLIENT_SECRET=${{ secrets.BANGUMI_CLIENT_SECRET }} \
-            2>&1 | tee ohos_build.log || { echo "=== OHOS BUILD FAILED ===" && tail -n 500 ohos_build.log; exit 1; }
+            2>&1 | tee ohos_build.log || {
+              echo "=== OHOS BUILD FAILED ==="
+              tail -n 500 ohos_build.log
+              # 关键错误行写入 error annotation（check-run annotations 可匿名
+              # 经 API 读取，便于无 token 环境远程定位失败原因）。
+              grep -naE "ERROR|error:|Error:|Exception|FAILURE|FAILED|not found|No such" ohos_build.log \
+                | tail -n 30 | cut -c1-380 \
+                | while IFS= read -r line; do echo "::error::${line//%/[0m%25}"; done
+              exit 1; }
 
       - name: 收集产物
         shell: bash
