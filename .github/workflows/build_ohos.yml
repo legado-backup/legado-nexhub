@@ -242,7 +242,6 @@ jobs:
                   print("::notice::%s OK: %s" % (name, dart_file))
               else:
                   print("::error::%s lib missing: %s (rootUri=%s)" % (name, dart_file, ru))
-                  missing = True
                   try:
                       import subprocess
                       norm = local.replace("\\", "/")
@@ -264,15 +263,19 @@ jobs:
                                   break
                               cur = nxt
                           # 自愈：.git 完整而工作树残缺时，重置工作树即可恢复
+                          # （长路径文件可能仍失败，但关键包通常可恢复）
                           if os.path.isdir(os.path.join(repo_root, ".git")):
                               r = subprocess.run(["git", "-C", repo_root, "checkout", "HEAD", "--", "."],
                                                  capture_output=True, text=True, timeout=300)
                               print("::notice::self-heal git checkout rc=%s stderr=%s" % (r.returncode, (r.stderr or "")[:120]))
-                          healed = os.path.exists(dart_file)
-                          print("::%s::self-heal %s: lib %s" % ("notice" if healed else "error", name, "restored" if healed else "STILL MISSING"))
-                          if healed:
-                              missing = self_healed = True
+                      healed = os.path.exists(dart_file)
+                      if healed:
+                          print("::notice::self-heal %s: lib restored" % name)
+                      else:
+                          missing = True
+                          print("::error::self-heal %s: STILL MISSING" % name)
                   except Exception as e:
+                      missing = True
                       print("::error::diagnosis failed: %s" % e)
           if bad or missing:
               sys.exit(1)
