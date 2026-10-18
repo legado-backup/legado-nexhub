@@ -104,7 +104,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PYEOF'
-          import json, os, sys
+          import json, os, sys, urllib.request
           p = os.path.join(".dart_tool", "package_config.json")
           with open(p, encoding="utf-8") as f:
               cfg = json.load(f)
@@ -115,21 +115,26 @@ jobs:
           for pkg in cfg.get("packages", []):
               ru = pkg.get("rootUri", "")
               if ru.startswith("../") or ru.startswith("./"):
-                  c1 = os.path.normpath(os.path.join(base_dd, ru))
-                  c2 = os.path.normpath(os.path.join(base_root, ru))
-                  if os.path.exists(c1):
-                      abs_path = c1
-                  elif os.path.exists(c2):
-                      abs_path = c2
+                  cands = [os.path.normpath(os.path.join(b, ru)) for b in (base_dd, base_root)]
+                  hit = None
+                  for c in cands:
+                      if os.path.exists(os.path.join(c, "pubspec.yaml")):
+                          hit = c
+                          break
+                  if hit is not None:
+                      pkg["rootUri"] = "file:///" + hit.replace("\\", "/")
+                      if pkg.get("name") in ("shared_preferences", "url_launcher"):
+                          print("::notice::resolved %s -> %s" % (pkg["name"], hit))
                   else:
-                      abs_path = c1
                       bad += 1
-                      print("::error::unresolvable %s | tried: %s AND %s" % (ru[:70], c1, c2))
-                  pkg["rootUri"] = "file:///" + abs_path.replace("\\", "/")
-                  n += 1
+                      print("::error::%s unresolvable: %s | c1=%s | c2=%s" % (pkg.get("name"), ru[:60], cands[0], cands[1]))
+              elif ru.startswith("file:///"):
+                  ok_abs = os.path.exists(os.path.normpath(urllib.request.url2pathname(ru[8:])))
+                  if not ok_abs and pkg.get("name") in ("shared_preferences", "url_launcher"):
+                      print("::error::%s absolute rootUri target missing: %s" % (pkg["name"], ru))
           with open(p, "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2)
-          print("rewrote %d entries, %d unresolved" % (n, bad))
+          print("normalized %d relative, %d unresolvable" % (n, bad))
           if bad:
               sys.exit(1)
           PYEOF
