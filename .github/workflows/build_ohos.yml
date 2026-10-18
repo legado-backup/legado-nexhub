@@ -95,11 +95,37 @@ jobs:
           ls -la lib/generated 2>&1 || true
           grep -n "class AppLocalizations" lib/generated/app_localizations.dart 2>&1 || true
 
+      - name: 归一化 package_config 路径
+        # pub 同盘缓存会把 git 依赖 rootUri 写成相对路径（../pub-cache/...），
+        # 而 hvigor 调起的 Dart 前端解析相对路径的基准错位一层导致
+        # "cannot find path"（本机形态为绝对 file:/// URI，故从不踩此坑）。
+        # 这里把所有相对 rootUri 改写为绝对 URI，与本地成功形态一致；
+        # 随后 build 用 --no-pub 防止 pub 重写覆盖。
+        shell: bash
+        run: |
+          python - <<'PYEOF'
+          import json, os
+          p = os.path.join(".dart_tool", "package_config.json")
+          with open(p, encoding="utf-8") as f:
+              cfg = json.load(f)
+          base = os.path.abspath(".dart_tool")
+          n = 0
+          for pkg in cfg.get("packages", []):
+              ru = pkg.get("rootUri", "")
+              if ru.startswith("../") or ru.startswith("./"):
+                  abs_path = os.path.abspath(os.path.join(base, ru)).replace("\\", "/")
+                  pkg["rootUri"] = "file:///" + abs_path
+                  n += 1
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(cfg, f, indent=2)
+          print(f"rewrote {n} relative rootUri entries to absolute")
+          PYEOF
+
       - name: 编译 HAP（release，未签名）
         shell: bash
         run: |
           set -o pipefail
-          flutter.bat build hap --release --target-platform ohos-arm64 \
+          flutter.bat build hap --release --no-pub --target-platform ohos-arm64 \
             --dart-define=DANMAKU_APP_ID=${{ secrets.DANMAKU_APP_ID }} \
             --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} \
             --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} \
