@@ -163,6 +163,33 @@ dependency_overrides:
   # 注意：2.x 为破坏性 API 改名（setScreenBrightness → setApplicationScreenBrightness
   # 等），调用点已同步迁移（阅读器/播放器手势共 4 文件）。
   screen_brightness: ^2.1.11
+  # ---------- 鸿蒙播放内核（阶段 4）----------
+  # media_kit 上游无 ohos 平台，改用社区 fork 的 feat-ohos-hdr 分支：
+  # - media_kit 1.2.3 / media_kit_video 2.0.1（pubspec 已声明 ohos 插件）
+  # - libs/ohos/media_kit_libs_ohos 1.0.0：CMake 按 URL+SHA256 下载预编译
+  #   libmpv.so（arm64）解压到 ohos/libs/arm64-v8a；目录非空则跳过下载。
+  # 注意：override 对本分支的所有平台生效（含 Android），分支内构建 Android
+  # 时同样走 1.2.3；发布构建请从主分支出。
+  media_kit:
+    git:
+      url: https://github.com/p1nbored/media-kit.git
+      path: media_kit
+      ref: feat-ohos-hdr
+  media_kit_video:
+    git:
+      url: https://github.com/p1nbored/media-kit.git
+      path: media_kit_video
+      ref: feat-ohos-hdr
+  media_kit_libs_ohos:
+    git:
+      url: https://github.com/p1nbored/media-kit.git
+      path: libs/ohos/media_kit_libs_ohos
+      ref: feat-ohos-hdr
+  # media_kit_video 的 ohos 分支依赖 wakelock_plus_ohos ^0.0.3，而 pub 上该版本
+  # 的 SDK 约束是 <3.0.0（与本项目 Dart 3.13 冲突）→ 本地放宽约束的补丁副本。
+  wakelock_plus_ohos:
+    path: third_party/patched/wakelock_plus_ohos
+
   # ---------- 本地打补丁的纯 Dart UI 库 ----------
   # 鸿蒙 Flutter fork 的 TargetPlatform 枚举新增 ohos 值，上游 material_ui /
   # cupertino_ui 内的穷尽 switch 缺该分支 → 鸿蒙目标编译报「not exhaustively

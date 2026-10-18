@@ -87,6 +87,9 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
+  # 鸿蒙播放内核：随 HAP 打进 libs/arm64-v8a/libmpv.so（仅 ohos 平台有声明，
+  # 其它平台不参与构建）。实际启用由构建开关 NEXHUB_OHOS_PLAYER 控制。
+  media_kit_libs_ohos: ^1.0.0
   # 系统通知（OS 通知）。注意：Windows 平台 flutter_local_notifications 无官方后端，
   # 故代码中做平台降级——仅 Android / iOS / Linux / macOS 发 OS 通知，Windows 跳过并
   # 保留应用内未读 badge（与 RssUpdateChecker 既有设计一致）。

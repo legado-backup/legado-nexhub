@@ -199,3 +199,8 @@ _tmp_index
 task8_validate.ps1
 .git.bak/ 
 _tmp_legado/
+
+# ohos 构建 / 依赖产物（ohpm/hvigor 会写入包目录）
+ohos/**/oh_modules/
+third_party/patched/*/ohos/oh_modules/
+third_party/patched/*/ohos/oh-package-lock.json5
