@@ -3110,8 +3110,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   /// resolve 当前网络 / 设备条件并应用到 mpv demuxer 缓存。
   Future<void> _applyDemuxerCachePolicy() async {
     try {
+      final bool metered = await _cachePolicyResolver.isMeteredNetwork();
+      final bool lowMem = await _cachePolicyResolver.isLowMemoryDevice();
       final profile = await _cachePolicyResolver.resolve();
       await _controller.applyDemuxerCacheProfile(profile);
+      AppLog.instance.i(
+        '[播放缓存] 档位=${profile.name}（计费网络=$metered，低内存=$lowMem）',
+      );
+      // 一次性回读实际解码器：软/硬解是「播放卡顿」类反馈的首要排查项
+      // （鸿蒙若 mpv 硬解后端缺失会静默回退软解），延迟数秒等 demuxer 就绪。
+      Future<void>.delayed(const Duration(seconds: 5), () async {
+        try {
+          final String? hwdec =
+              await _controller.backend.getProperty('hwdec-current');
+          AppLog.instance.i('[播放解码] hwdec-current=${hwdec ?? '未知'}');
+        } on Object {
+          // 属性查询失败不影响播放。
+        }
+      });
     } on Object {
       // 解析或应用失败保持现状（后端默认标准档），不影响播放。
     }
