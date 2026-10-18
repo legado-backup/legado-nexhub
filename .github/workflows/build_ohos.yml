@@ -137,6 +137,7 @@ jobs:
           with open(p, "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2)
           print("normalized %d relative, %d unresolvable" % (n, bad))
+          print("::notice::PUB_CACHE env = %s" % os.environ.get("PUB_CACHE", "<unset>"))
           # 关键包自检：改写后的绝对路径必须真实存在其 Dart 库文件，
           # 否则 kernel 阶段才失败的报错无法归因。失败时 annotation
           # 配额全空，此处诊断完整可见。
@@ -160,6 +161,17 @@ jobs:
               else:
                   print("::error::%s lib missing: %s (rootUri=%s)" % (name, dart_file, ru))
                   missing = True
+                  try:
+                      norm = local.replace("\\", "/")
+                      gi = norm.find("/git/")
+                      if gi >= 0:
+                          after = norm[gi + 5:]
+                          repo_root = norm[:gi + 5] + after.split("/")[0]
+                          cache_git = norm[:gi + 4]
+                          print("::error::checkout-root %s listing: %s" % (repo_root, sorted(os.listdir(repo_root))[:14]))
+                          print("::error::git-dir %s listing: %s" % (cache_git, sorted(os.listdir(cache_git))[:14]))
+                  except Exception as e:
+                      print("::error::listing failed: %s" % e)
           if bad or missing:
               sys.exit(1)
           PYEOF
