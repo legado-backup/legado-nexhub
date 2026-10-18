@@ -43,13 +43,14 @@ on:
 permissions:
   contents: write
 
-# PUB_CACHE 必须与项目同盘且值内不得含 ".."：实测（实验 C，2026-10-18）
-# 干净值下 pub 写绝对 rootUri 且与实际下载位置一致；含 ".." 的值（如
-# workspace/../pub-cache）会导致 git 依赖 rootUri 指向 normalize 后位置、
-# 实际下载落别处，kernel 编译报整批符号未定义。指向 workspace 内目录
-# 同时满足 hvigor 对插件 srcPath 的相对路径要求（同盘）。
+# PUB_CACHE 与项目同盘（满足 hvigor 对插件 srcPath 的相对路径要求），且路径
+# 必须尽量短：flutter_packages 等 monorepo 存在深层示例文件（如
+# webview_flutter_platform_interface/example/android/app/src/main/...），
+# 在 Windows MAX_PATH 260 限制下，git checkout 会在超长文件处静默中断，
+# 导致 checkout 工作树残缺（字母序靠后的包全部缺失）——kernel 编译报整批
+# 符号未定义。配合同步开启的 git core.longpaths 双保险。
 env:
-  PUB_CACHE: ${{ github.workspace }}\pub-cache
+  PUB_CACHE: D:\pc
 
 jobs:
   ohos:
@@ -57,6 +58,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: 开启 git 长路径支持
+        # Windows MAX_PATH 260 限制：flutter_packages 等 monorepo 含深层示例
+        # 路径，git checkout 会在超长文件处中断并留下残缺工作树。
+        # core.longpaths 让 git 走 \\?\ 前缀 API 绕过限制（对 pub 调起的
+        # 所有 git 子进程生效）。
+        shell: bash
+        run: |
+          git config --global core.longpaths true
+          git config --global --get core.longpaths
 
       - name: Setup HarmonyOS toolchain
         uses: ErBWs/setup-ohos@v2
@@ -83,7 +94,7 @@ jobs:
         # 以 pubspec.lock 哈希为 key 缓存整个 pub cache，后续 run 直接命中。
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}\pub-cache
+          path: D:\pc
           key: pub-cache-ohos-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             pub-cache-ohos-
@@ -116,7 +127,7 @@ jobs:
           urls = set()
           with open("pubspec.lock", encoding="utf-8") as f:
               for line in f:
-                  m = re.search(r'url:\s*"?((?:https?)://[^"\s]+)"?', line)
+                  m = re.search(r'url:\s*"?((?:https?)://[^"\s]+\.git)"?', line)
                   if m:
                       urls.add(m.group(1))
           print("::notice::git deps found: %d" % len(urls))
