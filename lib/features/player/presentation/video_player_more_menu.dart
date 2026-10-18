@@ -341,21 +341,23 @@ extension _VideoMoreMenu on _VideoPlayerScreenState {
           },
         ),
       ),
-      // 截图保存路径设置
-      _PlayerMenuEntry(
-        builder: (BuildContext ctx) => ListTile(
-          leading: const Icon(Icons.folder_open_rounded),
-          title: Text(l10n.screenshotPathSetting),
-          subtitle: _customScreenshotDir != null
-              ? Text(_customScreenshotDir!,
-                  maxLines: 1, overflow: TextOverflow.ellipsis)
-              : Text(l10n.screenshotPathDefault),
-          onTap: () {
-            Navigator.pop(ctx);
-            _pickScreenshotDirectory(l10n);
-          },
+      // 截图保存路径设置。鸿蒙：目录选择接口不可用（已知缺陷 U2），
+      // 入口隐藏，截图按默认位置/系统相册保存。
+      if (!PlatformService.instance.isOHOS)
+        _PlayerMenuEntry(
+          builder: (BuildContext ctx) => ListTile(
+            leading: const Icon(Icons.folder_open_rounded),
+            title: Text(l10n.screenshotPathSetting),
+            subtitle: _customScreenshotDir != null
+                ? Text(_customScreenshotDir!,
+                    maxLines: 1, overflow: TextOverflow.ellipsis)
+                : Text(l10n.screenshotPathDefault),
+            onTap: () {
+              Navigator.pop(ctx);
+              _pickScreenshotDirectory(l10n);
+            },
+          ),
         ),
-      ),
       // 跳过片头/片尾设置
       _PlayerMenuEntry(
         builder: (BuildContext ctx) => ListTile(

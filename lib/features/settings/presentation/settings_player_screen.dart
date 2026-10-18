@@ -8,6 +8,7 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/player_settings.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_glass_bar.dart';
@@ -503,21 +504,24 @@ class _SettingsPlayerScreenState extends State<SettingsPlayerScreen> {
                               ),
                             ),
                             const SizedBox(width: AppTokens.spaceSm),
-                            IconButton(
-                              icon: const Icon(Icons.folder_open_rounded),
-                              tooltip: l10n.screenshotPathSetting,
-                              onPressed: () async {
-                                final dir = await FilePicker.platform
-                                    .getDirectoryPath();
-                                if (dir != null && mounted) {
-                                  setState(() => _screenshotDir = dir);
-                                  final prefs =
-                                      await SharedPreferences.getInstance();
-                                  await prefs.setString(
-                                      'screenshot_custom_dir', dir);
-                                }
-                              },
-                            ),
+                            // 鸿蒙：目录选择接口不可用（已知缺陷 U2），隐藏
+                            // 自定义截图目录入口，截图按默认位置/系统相册保存。
+                            if (!PlatformService.instance.isOHOS)
+                              IconButton(
+                                icon: const Icon(Icons.folder_open_rounded),
+                                tooltip: l10n.screenshotPathSetting,
+                                onPressed: () async {
+                                  final dir = await FilePicker.platform
+                                      .getDirectoryPath();
+                                  if (dir != null && mounted) {
+                                    setState(() => _screenshotDir = dir);
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.setString(
+                                        'screenshot_custom_dir', dir);
+                                  }
+                                },
+                              ),
                           ],
                         ),
                       ),

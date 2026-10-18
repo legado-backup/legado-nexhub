@@ -12,7 +12,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../core/platform/platform_service.dart';
 import '../../../core/services/backup_archive.dart';
 import '../../../core/settings/data_export_config.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -241,6 +243,15 @@ class _SettingsImportExportScreenState
   Future<void> _showFolderThenExport() async {
     final l10n = AppLocalizations.of(context);
     String? folder = _exportFolder.isNotEmpty ? _exportFolder : null;
+    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），跳过目录询问，直接导出到
+    // 应用文档目录并调起系统分享（用户可在分享面板把文件保存出去）。
+    if (PlatformService.instance.isOHOS) {
+      final dir = await getApplicationDocumentsDirectory();
+      final exportDir = Directory('${dir.path}/NexHub/Exports');
+      if (!exportDir.existsSync()) exportDir.createSync(recursive: true);
+      await _doExport(exportDir.path);
+      return;
+    }
     if (folder == null) {
       // 未设置自定义目录：询问默认 or 自定义
       final choice = await showModalBottomSheet<String>(
@@ -358,6 +369,10 @@ class _SettingsImportExportScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _snack(l10n.backupExported(count));
+      // 鸿蒙：导出文件在应用沙箱内，调起系统分享让用户保存到可见位置。
+      if (PlatformService.instance.isOHOS) {
+        await Share.shareXFiles(<XFile>[XFile(filePath)]);
+      }
     } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();

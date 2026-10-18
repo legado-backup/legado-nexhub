@@ -7,8 +7,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../core/platform/platform_service.dart';
 import '../../../core/services/source_repository.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_empty_state.dart';
@@ -50,6 +53,23 @@ class _PluginManagementScreenState extends State<PluginManagementScreen> {
     final List<Map<String, dynamic>> exportList =
         all.map((c) => c.toJson()).toList();
     final jsonString = jsonEncode(exportList);
+
+    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），走系统分享保存——写应用
+    // 文档目录后调起分享面板，由用户选择保存位置（与 AI 配置导出同款）。
+    if (PlatformService.instance.isOHOS) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      try {
+        final docs = await getApplicationDocumentsDirectory();
+        final file = File(
+            '${docs.path}/nexhub/nexhub_plugins_export_${DateTime.now().millisecondsSinceEpoch}.json');
+        await file.create(recursive: true);
+        await file.writeAsString(jsonString);
+        await Share.shareXFiles(<XFile>[XFile(file.path)]);
+      } on Object catch (e) {
+        messenger?.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
 
     // 选择导出目录
     final dir = await FilePicker.platform.getDirectoryPath();

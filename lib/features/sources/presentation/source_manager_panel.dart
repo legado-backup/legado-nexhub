@@ -28,6 +28,7 @@ import 'source_mirror_screen.dart';
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import 'package:nexhub/core/widgets/app_alert_dialog.dart';
 import '../../../core/local/local_content_manager.dart' show isAndroidSafUri;
+import '../../../core/platform/platform_service.dart';
 import '../../../core/local/saf_bridge.dart'
     show listFolderSourceFilesSaf, pickFolderPath, readSourceText, safBaseName;
 import '../../../core/utils/app_haptics.dart';
@@ -128,13 +129,16 @@ class _SourceManagerPanelState extends State<SourceManagerPanel> {
               ),
             ),
             const SizedBox(width: AppTokens.spaceSm),
-            Expanded(
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.folder_rounded),
-                label: Text(l10n.selectFolder),
-                onPressed: _previewMode ? null : _pickLocalFolder,
+            // 鸿蒙：目录选择接口不可用（已知缺陷 U2），隐藏文件夹导入入口，
+            // 源 JSON 走「选择文件」逐个导入。
+            if (!PlatformService.instance.isOHOS)
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.folder_rounded),
+                  label: Text(l10n.selectFolder),
+                  onPressed: _previewMode ? null : _pickLocalFolder,
+                ),
               ),
-            ),
           ],
         ),
       ),

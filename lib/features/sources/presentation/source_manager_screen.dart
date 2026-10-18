@@ -42,6 +42,7 @@ import 'package:nexhub/core/widgets/app_alert_dialog.dart';
 import 'library_sources_screen.dart';
 import 'collect_api_import_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/platform/platform_service.dart';
 
 enum _SourceTab { list, library, network, local }
 
@@ -1721,11 +1722,14 @@ class _SourceManagerScreenState extends State<SourceManagerScreen>
                   icon: const Icon(Icons.file_open_rounded, size: 18),
                   label: Text(l10n.selectFile),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _pickLocalFolder,
-                  icon: const Icon(Icons.folder_rounded, size: 18),
-                  label: Text(l10n.selectFolder),
-                ),
+                // 鸿蒙：目录选择接口不可用（已知缺陷 U2），隐藏文件夹导入
+                // 入口，源 JSON 走「选择文件」逐个导入。
+                if (!PlatformService.instance.isOHOS)
+                  OutlinedButton.icon(
+                    onPressed: _pickLocalFolder,
+                    icon: const Icon(Icons.folder_rounded, size: 18),
+                    label: Text(l10n.selectFolder),
+                  ),
               ],
             ),
 
