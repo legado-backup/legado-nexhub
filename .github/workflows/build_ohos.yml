@@ -43,6 +43,13 @@ on:
 permissions:
   contents: write
 
+# PUB_CACHE 必须与项目同盘：flutter_ohos 为插件的 ohos 目录生成 hvigor
+# 模块引用时要求相对路径（hvigor 00303231 拒绝绝对路径），跨盘（项目 D: /
+# pub cache 默认 C:）时无法计算相对路径导致构建失败。指到工作区父目录
+# （同盘）即恢复与本地构建（项目与 cache 同盘）一致的行为。
+env:
+  PUB_CACHE: ${{ github.workspace }}/../pub-cache
+
 jobs:
   ohos:
     name: HarmonyOS HAP (unsigned)
@@ -105,6 +112,15 @@ jobs:
           cp ohos/entry/build/default/outputs/default/entry-default-unsigned.hap \
             NexHub-ohos-arm64-unsigned.hap
           ls -la NexHub-ohos-arm64-unsigned.hap
+
+      - name: 上传构建日志（失败时）
+        # 编译失败时把完整构建日志作为 artifact，便于匿名 API 拉取排查。
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohos-build-log
+          path: ohos_build.log
+          if-no-files-found: ignore
 
       - name: 上传产物（手动试跑）
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
