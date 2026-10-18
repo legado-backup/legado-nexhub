@@ -2,6 +2,7 @@
 # NexHub 自动打包 + 发布工作流（v22 — APK 单架构分包; Windows 直装/安装包留待下版）
 # -----------------------------------------------------------------------------
 # 触发：推送 v* 标签自动发布；也支持网页手动 Run workflow 试跑。
+#       标签名含 "ohos" 时本工作流全部 job 跳过（鸿蒙包由 build-ohos.yml 单独发布）。
 #
 # 修复记录：
 #   v1: 初始版（全部失败：flutter pub get exit code 1）
@@ -204,6 +205,7 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -476,6 +478,7 @@ jobs:
   windows:
     name: Windows
     runs-on: windows-2022
+    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -606,6 +609,7 @@ jobs:
   linux:
     name: Linux
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - name: 安装 Linux 编译依赖（更完整）
@@ -818,6 +822,7 @@ jobs:
   macos:
     name: macOS
     runs-on: macos-latest
+    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -873,7 +878,7 @@ jobs:
     name: 发布到 GitHub Releases
     needs: [android, windows, linux, macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'ohos')
     permissions:
       contents: write
     steps:
