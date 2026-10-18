@@ -78,6 +78,77 @@ jobs:
           flutter.bat --version
           flutter.bat doctor || true
 
+      - name: 缓存 pub cache
+        # 11 个 gitcode 依赖首次克隆成本高且易受网络随机挂死影响；
+        # 以 pubspec.lock 哈希为 key 缓存整个 pub cache，后续 run 直接命中。
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\pub-cache
+          key: pub-cache-ohos-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-cache-ohos-
+
+      - name: 配置 npm/ohpm 镜像与重试
+        # 参考同类项目经验：hvigor 内部 npm install pnpm / ohpm 拉包偶发
+        # ECONNRESET，华为云镜像 + 重试参数可显著降低抖动导致的失败。
+        shell: bash
+        run: |
+          npm config set registry https://repo.huaweicloud.com/repository/npm/ || true
+          npm config set fetch-retries 5 || true
+          npm config set fetch-retry-mintimeout 20000 || true
+          npm config set fetch-retry-maxtimeout 120000 || true
+          npm config set fetch-timeout 300000 || true
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/ || true
+          ohpm config set strict_ssl false || true
+
+      - name: 预热 git 依赖 mirror
+        # 解析 pubspec.lock 的 git 依赖，逐个 clone --mirror 到 pub cache
+        # （mirror 目录名 = <repo>-<sha1(url)>，与 pub 内部命名一致）。
+        # 单 repo 独立重试 + 超时，隔离随机挂死；pub 惰性 fetch，mirror
+        # 命中后 pub get 的 git 部分零网络。失败仅告警，pub get 在线兜底。
+        shell: bash
+        run: |
+          python - <<'PYEOF'
+          import hashlib, os, re, shutil, subprocess
+          cache = os.environ.get("PUB_CACHE") or os.path.join(os.path.expanduser("~"), "Pub", "Cache")
+          cachedir = os.path.join(cache, "git", "cache")
+          os.makedirs(cachedir, exist_ok=True)
+          urls = set()
+          with open("pubspec.lock", encoding="utf-8") as f:
+              for line in f:
+                  m = re.search(r'url:\s*"?((?:https?)://[^"\s]+)"?', line)
+                  if m:
+                      urls.add(m.group(1))
+          print("::notice::git deps found: %d" % len(urls))
+          failed = []
+          for u in sorted(urls):
+              name = re.sub(r"\.git$", "", u.rstrip("/").split("/")[-1])
+              digest = hashlib.sha1(u.encode()).hexdigest()
+              mirror = os.path.join(cachedir, "%s-%s" % (name, digest))
+              if os.path.isdir(mirror):
+                  print("::notice::mirror hit %s" % name)
+                  continue
+              ok = False
+              for attempt in range(1, 4):
+                  try:
+                      r = subprocess.run(["git", "clone", "--mirror", u, mirror],
+                                         capture_output=True, text=True, timeout=300)
+                      rc, err = r.returncode, (r.stderr or "")
+                  except subprocess.TimeoutExpired:
+                      rc, err = -1, "timeout 300s"
+                  if rc == 0 and os.path.isdir(mirror):
+                      ok = True
+                      print("::notice::mirror ok %s (attempt %d)" % (name, attempt))
+                      break
+                  print("::warning::clone %s attempt %d rc=%s err=%s" % (name, attempt, rc, err[:140]))
+                  shutil.rmtree(mirror, ignore_errors=True)
+              if not ok:
+                  failed.append(name)
+                  print("::error::mirror FAILED %s -> %s" % (name, u))
+          if failed:
+              print("::warning::%d mirrors failed (will fall back to online clone): %s" % (len(failed), ",".join(failed)))
+          PYEOF
+
       - name: 获取依赖
         shell: bash
         run: |
