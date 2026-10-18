@@ -282,7 +282,9 @@ jobs:
           # 报 "Invalid SDK hash"（宿主 kernel 读取与 gen_snapshot 批次不一致，
           # 上游 release 验证仅覆盖 debug 档）。关闭图标树摇只影响体积
           # （Material 图标字体全量打包，约多 1-2MB），AOT 编译本身不受影响。
-          flutter build hap --release --no-pub --no-tree-shake-icons --target-platform ohos-arm64 \
+          # --no-codesign：跳过签名配置校验，产出 entry-default-unsigned.hap
+          # （发布物统一零签名，安装签名由下载用户自行完成）。
+          flutter build hap --release --no-pub --no-tree-shake-icons --no-codesign --target-platform ohos-arm64 \
             --dart-define=DANMAKU_APP_ID=${{ secrets.DANMAKU_APP_ID }} \
             --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} \
             --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} \
