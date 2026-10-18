@@ -68,6 +68,15 @@ class DandanplayService implements DanmakuSource {
     await _loadConfig();
   }
 
+  /// 凭据是否已配置（AppId / Secret 均非空）。
+  ///
+  /// 匹配器在逐集请求前先用它短路：未配置时整体跳过匹配，
+  /// 避免每个条目都走一遍「构造请求 → 抛凭据异常 → 记日志」的无效循环。
+  Future<bool> hasCredentials() async {
+    final cfg = await _loadConfig();
+    return cfg.isConfigured;
+  }
+
   /// 搜索番剧。
   ///
   /// 对应 `GET /api/v2/search/anime?keyword={keyword}`。
@@ -148,6 +157,13 @@ class DandanplayService implements DanmakuSource {
       final data = response.data;
       if (data == null) return const <DandanplayMatchEpisode>[];
       return DandanplayMatchEpisode.parseList(data);
+    } on StateError catch (e) {
+      // 凭据未配置等本地前置缺失：静默返回空（匹配器已在入口整体短路，
+      // 这里是兜底路径），不刷日志——播放页每集都会走到这里。
+      if (!e.message.contains('credentials not configured') && kDebugMode) {
+        debugPrint('DandanPlay matchFile failed: $e');
+      }
+      return const <DandanplayMatchEpisode>[];
     } on Object catch (e, st) {
       if (kDebugMode) {
         debugPrint('DandanPlay matchFile failed: $e\n$st');

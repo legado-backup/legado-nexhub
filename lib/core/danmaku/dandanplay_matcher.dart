@@ -40,6 +40,10 @@ class DandanplayMatcher {
     if (title.isEmpty || episodes.isEmpty) return const <int, int>{};
     try {
       await _dandanplay.refreshAvailability();
+      // 凭据未配置：整体跳过（不逐集发请求、不刷日志）。
+      if (!await _dandanplay.hasCredentials()) {
+        return const <int, int>{};
+      }
       final map = <int, int>{};
 
       // 1) match 文件识别：逐集构造文件名。
