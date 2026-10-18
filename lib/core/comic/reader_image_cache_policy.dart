@@ -28,7 +28,7 @@ int resolveComicImageCacheBytes(int? totalMemBytes) {
 }
 
 /// 探测设备物理内存总量；仅移动系平台（Android / 鸿蒙）读 `/proc/meminfo`，
-/// 其余平台返回 null。鸿蒙内核同为 Linux，节点存在且可读，失败时由下方
+/// 其余平台返回 null。鸿蒙内核同为 Linux，预期可读；若沙箱拒绝访问，由下方
 /// catch 兜底为 null（调用方即退回默认预算）。
 Future<int?> probeDeviceTotalMemBytes() async {
   if (kIsWeb) return null;
