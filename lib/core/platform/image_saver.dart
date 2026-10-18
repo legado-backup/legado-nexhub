@@ -10,8 +10,8 @@
 /// 直写公共 `Pictures/NexHub` 并触发媒体扫描；
 /// - 桌面（Windows/macOS/Linux）：系统「下载」目录（`getDownloadsDirectory`，
 /// 不可用时回退应用文档目录）；
-/// - iOS / 鸿蒙 / Web：维持旧行为——应用文档目录（iOS 相册授权流程不在此展开；
-///   鸿蒙缺相册写入通道，见 [_saveToAppDocuments] 注释）。
+/// - iOS / 鸿蒙 / Web：鸿蒙走系统相册确认框（免权限）；iOS 与 Web 维持
+///   旧行为——应用文档目录（iOS 相册授权流程不在此展开）。
 library;
 
 import 'dart:io' show Directory, File;
@@ -70,6 +70,23 @@ class ImageSaver {
       }
       return saved;
     }
+    if (PlatformService.instance.isOHOS) {
+      // 鸿蒙：原生 MediaStorePlugin（nexhub/media_store）调系统
+      // 「保存到相册」确认框（photoAccessHelper.showAssetsCreationDialog，
+      // API 12+，免存储权限）；用户取消返回空串。
+      final String? saved = await _channel.invokeMethod<String>(
+        'saveImage',
+        <String, dynamic>{
+          'bytes': bytes,
+          'fileName': fileName,
+          'mime': _mimeFor(fileName),
+        },
+      );
+      if (saved == null || saved.isEmpty) {
+        throw StateError('saveImage declined by user');
+      }
+      return saved;
+    }
     if (PlatformService.instance.isDesktopForm) {
       final Directory? downloads = await getDownloadsDirectory();
       final Directory dir = downloads ??
@@ -83,11 +100,9 @@ class ImageSaver {
     return _saveToAppDocuments(bytes, fileName);
   }
 
-  /// 旧行为兜底：应用文档目录 `reader_images/`（iOS / 鸿蒙 / 未知平台）。
+  /// 旧行为兜底：应用文档目录 `reader_images/`（iOS / 未知平台）。
   ///
-  /// 鸿蒙暂无写入系统相册的通道（需原生 photoAccessHelper），先落应用文档
-  /// 目录保证功能可用，用户可在「文件管理 → 应用」内找到；系统相册写入
-  /// 待后续原生补齐。
+  /// 鸿蒙已改走系统相册确认框（见 [saveImage]），此兜底仅剩 iOS 等。
   static Future<String> _saveToAppDocuments(
     Uint8List bytes,
     String fileName,

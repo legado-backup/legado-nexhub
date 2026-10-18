@@ -1,10 +1,13 @@
 
 import { FlutterAbility, FlutterEngine } from '@ohos/flutter_ohos';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
+import MediaStorePlugin from '../plugins/MediaStorePlugin';
 
 export default class EntryAbility extends FlutterAbility {
   configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     GeneratedPluginRegistrant.registerWith(flutterEngine)
+    // 应用级原生通道：保存图片到系统相册（见 MediaStorePlugin 注释）。
+    flutterEngine.getPlugins()?.add(new MediaStorePlugin())
   }
 }
