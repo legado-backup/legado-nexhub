@@ -123,6 +123,7 @@ jobs:
                           break
                   if hit is not None:
                       pkg["rootUri"] = "file:///" + hit.replace("\\", "/")
+                      n += 1
                       if pkg.get("name") in ("shared_preferences", "url_launcher"):
                           print("::notice::resolved %s -> %s" % (pkg["name"], hit))
                   else:
@@ -135,7 +136,30 @@ jobs:
           with open(p, "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2)
           print("normalized %d relative, %d unresolvable" % (n, bad))
-          if bad:
+          # 关键包自检：改写后的绝对路径必须真实存在其 Dart 库文件，
+          # 否则 kernel 阶段才失败的报错无法归因。失败时 annotation
+          # 配额全空，此处诊断完整可见。
+          missing = False
+          for name, libf in (("shared_preferences", "lib/shared_preferences.dart"),
+                              ("url_launcher", "lib/url_launcher.dart")):
+              entry = next((x for x in cfg.get("packages", []) if x.get("name") == name), None)
+              if entry is None:
+                  print("::error::package %s missing from package_config" % name)
+                  missing = True
+                  continue
+              ru = entry.get("rootUri", "")
+              local = ru[8:] if ru.startswith("file:///") else None
+              if local is None:
+                  print("::error::%s rootUri not absolute: %s" % (name, ru))
+                  missing = True
+                  continue
+              dart_file = os.path.normpath(os.path.join(local, libf))
+              if os.path.exists(dart_file):
+                  print("::notice::%s OK: %s" % (name, dart_file))
+              else:
+                  print("::error::%s lib missing: %s (rootUri=%s)" % (name, dart_file, ru))
+                  missing = True
+          if bad or missing:
               sys.exit(1)
           PYEOF
 
@@ -151,10 +175,11 @@ jobs:
             2>&1 | tee ohos_build.log || {
               echo "=== OHOS BUILD FAILED ==="
               tail -n 500 ohos_build.log
-              # 关键错误行写入 error annotation（check-run annotations 可匿名
-              # 经 API 读取，便于无 token 环境远程定位失败原因）。
-              grep -naE "ERROR|error:|Error:|Exception|FAILURE|FAILED|not found|No such" ohos_build.log \
-                | tail -n 30 | cut -c1-380 \
+              # 首现的 import 解析错误优先（定位路径类根因），符号错误限量，
+              # 为归一化/自检诊断 annotation 留出每 job 10 条的配额。
+              grep -naE "Error when reading|Unable to read" ohos_build.log | head -n 6 | cut -c1-380 \
+                | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
+              grep -naE "error:|Error:" ohos_build.log | tail -n 8 | cut -c1-380 \
                 | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
               exit 1; }
 
@@ -166,12 +191,16 @@ jobs:
           ls -la NexHub-ohos-arm64-unsigned.hap
 
       - name: 上传构建日志（失败时）
-        # 编译失败时把完整构建日志作为 artifact，便于匿名 API 拉取排查。
+        # 编译失败时把完整构建日志与 hvigor 详细日志（含 frontend_server
+        # 真实参数与路径）作为 artifact；注：artifact 下载需认证，匿名侧
+        # 依赖上方 annotation 通道。
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ohos-build-log
-          path: ohos_build.log
+          path: |
+            ohos_build.log
+            ohos/.hvigor/outputs/build-logs/
           if-no-files-found: ignore
 
       - name: 上传产物（手动试跑）
