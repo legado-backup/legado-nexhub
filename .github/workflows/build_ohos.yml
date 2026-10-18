@@ -9,14 +9,20 @@
 # 产物：未签名 HAP（unsigned）——发布物一律不带签名，安装签名由下载用户
 #       自行完成（侧载惯例，端侧签名安装工具可直接安装 unsigned 包）。
 #
-# 平台说明（2026-10-18 实测定案）：必须使用 Windows runner。
-#   flutter-ohos 3.47.7-ohos-1.0.0 的 Release 只发布了 Windows 定制 Dart SDK
-#   （Linux x64 定制 SDK 未发布，Linux runner 引导回落官方 SDK 后因
-#   Abi.ohos* 成员缺失而失败）；Windows 引导已在本机构建验证。
+# 平台说明（2026-10-18 实测定案）：必须使用 macOS(arm64) runner。
+#   flutter-ohos 3.47 线的宿主侧 AOT 工件只发布了 darwin-arm64 版
+#   （3.47.5 Release Notes：「宿主 gen_snapshot 三档均为 Mach-O 64-bit
+#   arm64」；3.47.7 的工件为 3.47.5 逐字节副本）。Windows/Linux 宿主缺少
+#   配套 gen_snapshot，会回落到旧内核档（kernel 130）而报
+#   「Can't load Kernel binary: Invalid kernel binary format version
+#   (expected 130, found 138)」。macOS runner 同时具备：
+#   - dart-sdk-darwin-arm64-ohos.zip（定制 Dart SDK 3.13.4/3.13.3）
+#   - ohos-arm64-*-darwin-x64/arm64 gen_snapshot（release AOT 可用）
+#   - setup-ohos 的 ohos-sdk-mac-arm64 包（DevEco 命令行工具）
 #
 # 依赖事实（2026-10-18 核实）：
-#   - ErBWs/setup-ohos@v2 支持 Windows runner（README：macOS/Windows 须用
-#     v2 + CLI 6.1.1.280 以上；26.0.0.821 提供 windows-amd64 SDK 包，
+#   - ErBWs/setup-ohos@v2 支持 macOS runner（README：macOS/Windows 须用
+#     v2 + CLI 6.1.1.280 以上；26.0.0.821 提供 mac-arm64 SDK 包，
 #     对齐工程 compatibleSdkVersion 26.0.0）。
 #   - flutter-ohos SDK：atomgit oh-flutter/flutter_flutter tag
 #     3.47.7-ohos-1.0.0（本机同源实测；gitcode 无 3.47 线 tag）。
@@ -26,10 +32,8 @@
 #     CI 直连无墙，无需预置。
 #
 # 已知风险：
-#   - gitcode 镜像随机挂死（本地经验）→ pub get 包 GNU timeout + 重试；
-#     若仍偶发挂起，再引入预拉镜像步骤。
-#   - Windows runner 全步骤显式 shell: bash（历史教训：默认 PowerShell
-#     不兼容 bash 语法）。
+#   - gitcode 镜像随机挂死（本地经验）→ 预置 mirror 预热 + pub get 重试。
+#   - macOS runner 无 GNU timeout，先装 coreutils 使用 gtimeout。
 # =============================================================================
 
 name: build-ohos
@@ -43,31 +47,17 @@ on:
 permissions:
   contents: write
 
-# PUB_CACHE 与项目同盘（满足 hvigor 对插件 srcPath 的相对路径要求），且路径
-# 必须尽量短：flutter_packages 等 monorepo 存在深层示例文件（如
-# webview_flutter_platform_interface/example/android/app/src/main/...），
-# 在 Windows MAX_PATH 260 限制下，git checkout 会在超长文件处静默中断，
-# 导致 checkout 工作树残缺（字母序靠后的包全部缺失）——kernel 编译报整批
-# 符号未定义。配合同步开启的 git core.longpaths 双保险。
+# PUB_CACHE 置于工作区内：与项目同盘（macOS 单根文件系统天然满足 hvigor 对
+# 插件 srcPath 的相对路径要求），并便于 actions/cache 持久化。
 env:
-  PUB_CACHE: D:\pc
+  PUB_CACHE: ${{ github.workspace }}/pc
 
 jobs:
   ohos:
     name: HarmonyOS HAP (unsigned)
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 开启 git 长路径支持
-        # Windows MAX_PATH 260 限制：flutter_packages 等 monorepo 含深层示例
-        # 路径，git checkout 会在超长文件处中断并留下残缺工作树。
-        # core.longpaths 让 git 走 \\?\ 前缀 API 绕过限制（对 pub 调起的
-        # 所有 git 子进程生效）。
-        shell: bash
-        run: |
-          git config --global core.longpaths true
-          git config --global --get core.longpaths
 
       - name: Setup HarmonyOS toolchain
         uses: ErBWs/setup-ohos@v2
@@ -81,20 +71,26 @@ jobs:
           git clone --depth 1 -b 3.47.7-ohos-1.0.0 \
             https://atomgit.com/oh-flutter/flutter_flutter.git "$HOME/flutter-ohos"
           ls "$HOME/flutter-ohos/bin" | head -5
-          echo "$(cygpath -w "$HOME/flutter-ohos/bin")" >> "$GITHUB_PATH"
+          echo "$HOME/flutter-ohos/bin" >> "$GITHUB_PATH"
 
       - name: Flutter doctor
         shell: bash
         run: |
-          flutter.bat --version
-          flutter.bat doctor || true
+          flutter --version
+          flutter doctor || true
+
+      - name: 安装 coreutils（gtimeout）
+        shell: bash
+        run: |
+          brew install coreutils 2>&1 | tail -2 || true
+          which gtimeout || echo "gtimeout missing (fallback without timeout)"
 
       - name: 缓存 pub cache
         # 11 个 gitcode 依赖首次克隆成本高且易受网络随机挂死影响；
         # 以 pubspec.lock 哈希为 key 缓存整个 pub cache，后续 run 直接命中。
         uses: actions/cache@v4
         with:
-          path: D:\pc
+          path: ${{ github.workspace }}/pc
           key: pub-cache-ohos-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             pub-cache-ohos-
@@ -119,7 +115,7 @@ jobs:
         # 命中后 pub get 的 git 部分零网络。失败仅告警，pub get 在线兜底。
         shell: bash
         run: |
-          python - <<'PYEOF'
+          python3 - <<'PYEOF'
           import hashlib, os, re, shutil, subprocess
           cache = os.environ.get("PUB_CACHE") or os.path.join(os.path.expanduser("~"), "Pub", "Cache")
           cachedir = os.path.join(cache, "git", "cache")
@@ -163,8 +159,10 @@ jobs:
       - name: 获取依赖
         shell: bash
         run: |
+          TO=""
+          if command -v gtimeout >/dev/null 2>&1; then TO="gtimeout 900"; fi
           for i in 1 2 3; do
-            timeout 900 flutter.bat pub get 2>&1 && exit 0
+            $TO flutter pub get 2>&1 && exit 0
             echo "pub get failed or hung (attempt $i), retrying..."
             sleep 10
           done
@@ -173,20 +171,19 @@ jobs:
       - name: 生成国际化资源
         shell: bash
         run: |
-          flutter.bat gen-l10n 2>&1
+          flutter gen-l10n 2>&1
           echo "== generated l10n files =="
           ls -la lib/generated 2>&1 || true
           grep -n "class AppLocalizations" lib/generated/app_localizations.dart 2>&1 || true
 
       - name: 归一化 package_config 路径
-        # pub 同盘缓存会把 git 依赖 rootUri 写成相对路径，而 hvigor 调起的
-        # Dart 前端解析相对路径的基准错位导致 "cannot find path"（本机形态
-        # 为绝对 file:/// URI，从不踩此坑）。相对基准存在歧义（项目根 or
-        # .dart_tool），故对每个相对 rootUri 做双基准存在性探测，取真实
-        # 存在者改写为绝对 URI；两者皆不存在则早失败并输出诊断。
+        # pub 可能把 git 依赖 rootUri 写成相对路径，而 hvigor 调起的 Dart
+        # 前端解析相对路径的基准可能错位。对每个相对 rootUri 做双基准
+        # 探测（以目录下存在 pubspec.yaml 为命中判据）并改写为绝对 URI；
+        # 随后对关键包做 lib 文件自检与 git 自愈。
         shell: bash
         run: |
-          python - <<'PYEOF'
+          python3 - <<'PYEOF'
           import json, os, sys, urllib.request
           p = os.path.join(".dart_tool", "package_config.json")
           with open(p, encoding="utf-8") as f:
@@ -212,17 +209,11 @@ jobs:
                   else:
                       bad += 1
                       print("::error::%s unresolvable: %s | c1=%s | c2=%s" % (pkg.get("name"), ru[:60], cands[0], cands[1]))
-              elif ru.startswith("file:///"):
-                  ok_abs = os.path.exists(os.path.normpath(urllib.request.url2pathname(ru[8:])))
-                  if not ok_abs and pkg.get("name") in ("shared_preferences", "url_launcher"):
-                      print("::error::%s absolute rootUri target missing: %s" % (pkg["name"], ru))
           with open(p, "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2)
           print("normalized %d relative, %d unresolvable" % (n, bad))
           print("::notice::PUB_CACHE env = %s" % os.environ.get("PUB_CACHE", "<unset>"))
-          # 关键包自检：改写后的绝对路径必须真实存在其 Dart 库文件，
-          # 否则 kernel 阶段才失败的报错无法归因。失败时 annotation
-          # 配额全空，此处诊断完整可见。
+          # 关键包自检：改写后的绝对路径必须真实存在其 Dart 库文件。
           missing = False
           for name, libf in (("shared_preferences", "lib/shared_preferences.dart"),
                               ("url_launcher", "lib/url_launcher.dart")):
@@ -250,7 +241,6 @@ jobs:
                           after = norm[gi + 5:]
                           repo_root = norm[:gi + 5] + after.split("/")[0]
                           rel_parts = after.split("/")[1:]
-                          # 逐层定位断点：checkout 从哪一层开始缺失
                           cur = repo_root
                           for i, part in enumerate(rel_parts):
                               nxt = os.path.join(cur, part)
@@ -262,8 +252,6 @@ jobs:
                                   print("::error::break at level %d: %r missing under %s (listing=%s)" % (i, part, cur, listing))
                                   break
                               cur = nxt
-                          # 自愈：.git 完整而工作树残缺时，重置工作树即可恢复
-                          # （长路径文件可能仍失败，但关键包通常可恢复）
                           if os.path.isdir(os.path.join(repo_root, ".git")):
                               r = subprocess.run(["git", "-C", repo_root, "checkout", "HEAD", "--", "."],
                                                  capture_output=True, text=True, timeout=300)
@@ -285,7 +273,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flutter.bat build hap --release --no-pub --target-platform ohos-arm64 \
+          flutter build hap --release --no-pub --target-platform ohos-arm64 \
             --dart-define=DANMAKU_APP_ID=${{ secrets.DANMAKU_APP_ID }} \
             --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} \
             --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} \
@@ -293,8 +281,6 @@ jobs:
             2>&1 | tee ohos_build.log || {
               echo "=== OHOS BUILD FAILED ==="
               tail -n 500 ohos_build.log
-              # 首现的 import 解析错误优先（定位路径类根因），符号错误限量，
-              # 为归一化/自检诊断 annotation 留出每 job 10 条的配额。
               grep -naE "Error when reading|Unable to read" ohos_build.log | head -n 6 | cut -c1-380 \
                 | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
               grep -naE "error:|Error:" ohos_build.log | tail -n 8 | cut -c1-380 \
@@ -309,9 +295,8 @@ jobs:
           ls -la NexHub-ohos-arm64-unsigned.hap
 
       - name: 上传构建日志（失败时）
-        # 编译失败时把完整构建日志与 hvigor 详细日志（含 frontend_server
-        # 真实参数与路径）作为 artifact；注：artifact 下载需认证，匿名侧
-        # 依赖上方 annotation 通道。
+        # 编译失败时把完整构建日志与 hvigor 详细日志作为 artifact；
+        # 注：artifact 下载需认证，匿名侧依赖上方 annotation 通道。
         if: failure()
         uses: actions/upload-artifact@v4
         with:
