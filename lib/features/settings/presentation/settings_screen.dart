@@ -14,6 +14,7 @@ import '../../../core/widgets/app_glass_bar.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import '../../../core/settings/general_settings.dart';
+import '../../../core/platform/platform_service.dart';
 import './widgets/hero_carousel.dart';
 import './widgets/settings_widgets.dart';
 import './settings_hero_screen.dart';
@@ -203,13 +204,15 @@ class SettingsScreen extends StatelessWidget {
         builder: (_) => const SettingsAppearanceScreen(),
         scrollKeyId: 'appearance.theme',
       ),
-      _SettingEntry(
-        icon: Icons.auto_awesome_rounded,
-        title: l10n.useMonet,
-        keywords: const <String>['动态色彩', 'monet', '动态取色'],
-        builder: (_) => const SettingsAppearanceScreen(),
-        scrollKeyId: 'appearance.theme',
-      ),
+      // 鸿蒙：莫奈取色恒回退默认主题（见外观页注释），搜索入口同步隐藏。
+      if (!PlatformService.instance.isOHOS)
+        _SettingEntry(
+          icon: Icons.auto_awesome_rounded,
+          title: l10n.useMonet,
+          keywords: const <String>['动态色彩', 'monet', '动态取色'],
+          builder: (_) => const SettingsAppearanceScreen(),
+          scrollKeyId: 'appearance.theme',
+        ),
       _SettingEntry(
         icon: Icons.color_lens_rounded,
         title: l10n.appearanceColorsSection,

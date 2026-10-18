@@ -16,7 +16,6 @@
 /// [DownloadManager]）由上层 MultiProvider 注入，可直接取用。
 library;
 
-import 'dart:io';
 import 'dart:isolate' show Isolate;
 
 import 'package:file_picker/file_picker.dart' hide FilePickerWindows;
@@ -531,7 +530,7 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
       );
       return;
     }
-    if (Platform.isAndroid) {
+    if (PlatformService.instance.isAndroid) {
       final SafDocumentFile? picked = await _saf.pickDirectory();
       if (picked == null || !mounted) return;
       await _save(picked.uri, l10n);

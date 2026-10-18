@@ -7,10 +7,10 @@ part of 'video_player_screen.dart';
 const Size _kWindowMaxUnconstrained = Size(10000, 10000);
 
 extension _VideoCastPip on _VideoPlayerScreenState {
-  /// 是否桌面平台（Windows/macOS/Linux）。
+  /// 是否桌面形态平台（Windows/macOS/Linux）。
   bool get _isDesktop {
     try {
-      return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+      return PlatformService.instance.isDesktopForm;
     } on Object {
       return false;
     }

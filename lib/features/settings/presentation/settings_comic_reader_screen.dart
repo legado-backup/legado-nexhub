@@ -3,12 +3,12 @@
 /// 持久化到 SharedPreferences（key: `reader_default_settings_v1`）。
 library;
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/comic/models/reader_preferences.dart';
 import '../../../core/comic/manga_upscale.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/reader_default_settings.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/app_haptics.dart';
@@ -190,11 +190,8 @@ class _SettingsComicReaderScreenState extends State<SettingsComicReaderScreen> {
     };
   }
 
-  /// 是否显示「音量键翻页」设置：仅 Android。
-  bool get _showVolumeKey {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.android;
-  }
+  /// 是否显示「音量键翻页」设置：仅 Android（原生拦截通道 Android 专有）。
+  bool get _showVolumeKey => PlatformService.instance.isAndroid;
 
   /// 阅读模式切换联动：切到竖排 / 长条时双页拆分不再生效，自动关闭。
   /// （与阅读器内联面板行为一致）
@@ -207,14 +204,8 @@ class _SettingsComicReaderScreenState extends State<SettingsComicReaderScreen> {
     ));
   }
 
-  /// 是否显示「鼠标滚轮」设置分组：仅桌面平台。
-  bool get _showMouseWheel {
-    final TargetPlatform p = defaultTargetPlatform;
-    return p == TargetPlatform.windows ||
-        p == TargetPlatform.macOS ||
-        p == TargetPlatform.linux ||
-        p == TargetPlatform.fuchsia;
-  }
+  /// 是否显示「鼠标滚轮」设置分组：仅桌面形态平台。
+  bool get _showMouseWheel => PlatformService.instance.isDesktopForm;
 
   @override
   Widget build(BuildContext context) {

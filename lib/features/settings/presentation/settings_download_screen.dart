@@ -4,7 +4,7 @@
 /// 项 12/13：下载器选择 / 漫画格式 / 小说格式改为弹窗选择，移除子页入口。
 library;
 
-import 'dart:io' show Directory, Platform;
+import 'dart:io' show Directory;
 import 'dart:isolate' show Isolate;
 // 用于在后台 isolate 里手动初始化 FilePicker.platform（late static 是
 // isolate-private，主 isolate 的初始化不会传到新 isolate）。
@@ -297,7 +297,7 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
 
     // Android：file_picker 没有可用的目录选择器，改用系统 SAF 目录选择器
     // （ACTION_OPEN_DOCUMENT_TREE），返回 content:// 树 URI，权限默认持久化。
-    if (Platform.isAndroid) {
+    if (PlatformService.instance.isAndroid) {
       final SafDocumentFile? picked = await _saf.pickDirectory();
       if (picked == null || !mounted) return;
       try {

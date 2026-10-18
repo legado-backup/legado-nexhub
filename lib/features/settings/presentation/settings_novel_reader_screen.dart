@@ -4,7 +4,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,6 +15,7 @@ import '../../../core/novel/novel_http_tts_config.dart';
 import '../../../core/novel/novel_page_animation.dart';
 import '../../../core/novel/novel_pre_download_preferences.dart';
 import '../../../core/novel/novel_reader_preferences.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/reader_default_settings.dart';
 import '../../../core/novel/novel_export_template.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -363,7 +363,7 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
       onTap: () async {
         String? path;
         try {
-          if (Platform.isAndroid) {
+          if (PlatformService.instance.isAndroid) {
             try {
               // ignore: depend_on_referenced_packages
               // await Permission.storage.request();

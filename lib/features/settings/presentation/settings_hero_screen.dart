@@ -3,6 +3,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/app_theme.dart';
@@ -244,7 +245,7 @@ class _HeroItem extends StatelessWidget {
 
   bool _isLocal(String s) =>
       s.startsWith('/') ||
-      (Platform.isWindows && s.contains(':\\')) ||
+      (PlatformService.instance.isWindows && s.contains(':\\')) ||
       s.startsWith('file://');
 
   @override

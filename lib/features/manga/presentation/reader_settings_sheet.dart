@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/comic/models/reader_preferences.dart';
 import '../../../core/comic/manga_upscale.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../settings/presentation/widgets/motion_effects_adjustments.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -78,11 +78,9 @@ class _FlatSettingsSheetState extends State<_FlatSettingsSheet> {
     widget.onChanged?.call(next);
   }
 
-  /// 是否显示「音量键翻页」设置：仅 Android（iOS / 桌面没有物理音量键翻页语义）。
-  bool get _showVolumeKey {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.android;
-  }
+  /// 是否显示「音量键翻页」设置：仅 Android（原生拦截通道 Android 专有，
+  /// iOS / 桌面 / 鸿蒙没有该通道）。
+  bool get _showVolumeKey => PlatformService.instance.isAndroid;
 
   // ──────────────────── 构建辅助 ────────────────────
 

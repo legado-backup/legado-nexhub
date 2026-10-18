@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/platform/platform_service.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_animations.dart';
 
@@ -59,7 +60,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   bool _isLocalPath(String url) {
     return url.startsWith('/') ||
-        (Platform.isWindows && url.contains(':\\')) ||
+        (PlatformService.instance.isWindows && url.contains(':\\')) ||
         url.startsWith('file://');
   }
 

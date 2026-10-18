@@ -38,6 +38,7 @@ import '../../../core/models/media_item.dart';
 import '../../../core/models/novel_block.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../core/utils/volume_key_listener.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/models/plugin_config.dart';
 import '../../../core/download/download_manager.dart';
 import '../../../core/download/local_to_online.dart';
@@ -3841,8 +3842,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// TTS 状态变化（朗读中不拦截，音量键恢复系统调音量）。
   Future<void> _syncVolumeKey() async {
     final bool ttsActive = _tts.state != NovelTtsState.stopped;
+    // 音量键拦截走 Android 原生通道（nexhub/volume_control），鸿蒙暂无实现。
     final bool want =
-        _prefs.volumeKeyPageTurn && !kIsWeb && Platform.isAndroid && !ttsActive;
+        _prefs.volumeKeyPageTurn && PlatformService.instance.isAndroid && !ttsActive;
     try {
       if (want) {
         await _volumeKeyListener.start(
@@ -9651,9 +9653,8 @@ class _NovelInlineSettings extends StatelessWidget {
                           onChanged(prefs.copyWith(scrollWheelInverted: v));
                         },
                       ),
-                      // 音量键翻页（仅 Android 有物理音量键翻页语义）。
-                      if (!kIsWeb &&
-                          defaultTargetPlatform == TargetPlatform.android)
+                      // 音量键翻页（仅 Android 有原生音量键拦截通道）。
+                      if (PlatformService.instance.isAndroid)
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(l10n.readerVolumeKeyPageTurn),
@@ -10215,7 +10216,7 @@ class _NovelInlineSettings extends StatelessWidget {
       onTap: () async {
         String? path;
         try {
-          if (Platform.isAndroid) {
+          if (PlatformService.instance.isAndroid) {
             // 读外部字体文件可能需要存储权限；被拒也继续尝试（部分设备用系统选择器即可）。
             try {
               await Permission.storage.request();

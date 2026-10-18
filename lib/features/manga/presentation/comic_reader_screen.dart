@@ -34,6 +34,7 @@ import '../../../core/theme/reader_tokens.dart';
 import '../../../core/navigation/app_page_route.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../core/utils/volume_key_listener.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/comic/models/motion_effect_settings.dart';
 import 'package:comic_motion_flutter/comic_motion_flutter.dart'
     show MotionGifView;
@@ -824,10 +825,9 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 整目录递归删除——此前解压产物平铺在系统临时目录、只靠 OS 兜底清理。
   final List<String> _archiveTempDirs = <String>[];
 
-  /// 桌面平台（Windows / Linux / macOS，非 Web）：启用 window_manager 真实全屏与
-  /// 键盘快捷键。移动端走 SystemChrome。
-  bool get _isDesktop =>
-      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+  /// 桌面形态平台（Windows / Linux / macOS，非 Web）：启用 window_manager 真实
+  /// 全屏与键盘快捷键。移动端（含鸿蒙手机）走 SystemChrome。
+  bool get _isDesktop => PlatformService.instance.isDesktopForm;
 
   /// 进入阅读器期间上调 Flutter 图片缓存预算（资源/内存）：按设备物理内存
   /// 100–500MB；退出阅读器在 dispose 恢复默认 100MB，不挤占其他页面。
@@ -3700,7 +3700,9 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 音量条弹出），否则停止并恢复系统默认音量键行为。调用点：[_init]、
   /// [_applySettingsAuto]、[_onPrefsChanged]（偏好变化后即时生效）。
   Future<void> _syncVolumeKey() async {
-    final bool want = _prefs.volumeKeyPageTurn && !kIsWeb && Platform.isAndroid;
+    // 音量键拦截走 Android 原生通道（nexhub/volume_control），鸿蒙暂无实现。
+    final bool want =
+        _prefs.volumeKeyPageTurn && PlatformService.instance.isAndroid;
     if (want) {
       // Bug1 修复：async + try/catch，启动失败（原生通道未就绪/订阅异常）不再被
       // unawaited 静默吞掉，写日志便于实机排查。
@@ -6877,9 +6879,8 @@ class _MangaPageImageState extends State<MangaPageImage> {
       },
       child: rotated,
     );
-    // 桌面端（非 kIsWeb 且 Windows/macOS/Linux）添加光标反馈。
-    if (!kIsWeb &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    // 桌面形态（Windows/macOS/Linux）添加光标反馈。
+    if (PlatformService.instance.isDesktopForm) {
       return MouseRegion(
         cursor: isZoomed ? SystemMouseCursors.grab : SystemMouseCursors.click,
         child: zoomed,

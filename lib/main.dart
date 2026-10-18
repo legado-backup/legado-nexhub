@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'core/player/player_runtime.dart';
+import 'core/platform/platform_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/network/runtime/nexhub_http_overrides.dart';
 import 'core/debug/crash_log.dart';
@@ -122,7 +122,7 @@ void main() {
     // ensureInitialized，其原生侧会在已运行的消息循环中重挂窗口钩子，与 Flutter
     // 渲染管道相互等待，表现为「进入 / 退出阅读器画面完全冻结，只有手动 resize
     // 窗口才能恢复」，且此后 setFullScreen / isFullScreen 全部失效（F11、Esc 无反应）。
-    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    if (PlatformService.instance.isDesktopForm) {
       try {
         await windowManager.ensureInitialized();
       } catch (e, st) {
