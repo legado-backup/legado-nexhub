@@ -286,6 +286,10 @@ jobs:
             2>&1 | tee ohos_build.log || {
               echo "=== OHOS BUILD FAILED ==="
               tail -n 500 ohos_build.log
+              # 无条件输出日志尾部（兜底：错误不匹配任何模式时也能定位）；
+              # 再按模式优先输出首现解析错误与尾部错误行。
+              tail -n 10 ohos_build.log | cut -c1-380 \
+                | while IFS= read -r line; do echo "::error::tail: ${line//%/%25}"; done
               grep -naE "Error when reading|Unable to read" ohos_build.log | head -n 6 | cut -c1-380 \
                 | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
               grep -naE "error:|Error:" ohos_build.log | tail -n 8 | cut -c1-380 \
