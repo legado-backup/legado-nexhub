@@ -101,12 +101,14 @@ jobs:
           if-no-files-found: error
 
       - name: 发布到 GitHub Releases
-        # 与 build.yml 的 release job 联动：HAP 追加到同一 Release；
-        # 不传 body/body_path，保留 build.yml 写入的发布说明正文。
+        # ohos 标签时本工作流是唯一发布流（build.yml 各 job 对 ohos 标签跳过），
+        # 由本步骤创建 Release 并写入正文；与 build.yml 共用同一份
+        # RELEASE_BODY.md，两个工作流先后更新同一正文内容一致，互不冲突。
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: NexHub ${{ github.ref_name }}
+          body_path: RELEASE_BODY.md
           allowUpdates: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
