@@ -44,6 +44,7 @@ class _RssPodcastPlayerState extends State<RssPodcastPlayer> {
   static const Duration _loadTimeout = Duration(seconds: 20);
 
   late final Player _player;
+  bool _playerReady = false;
   int _index = 0;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -70,9 +71,15 @@ class _RssPodcastPlayerState extends State<RssPodcastPlayer> {
     super.initState();
     // 幂等：main 已调用过，重复调用安全（鸿蒙侧自动跳过）。
     PlayerRuntime.ensureInitialized();
-    // TODO(ohos): 阶段 5 走查为播客页补降级 UI（鸿蒙暂无播放内核，
-    // 当前会因 Player 创建失败返回上级页面）。
-    _player = Player();
+    // 鸿蒙内核默认随包可用；用户显式关内核（NEXHUB_OHOS_PLAYER=false）时
+    // 创建会抛错，转失败态展示（复用既有 _failed UI）。
+    try {
+      _player = Player();
+      _playerReady = true;
+    } on Object {
+      _failed = true;
+      return;
+    }
     // libmpv 自主联网不吃应用代理，须显式注入（否则代理环境音频永远 0:00）。
     applyAppProxyToPlayer(_player);
     _posSub = _player.stream.position.listen((Duration d) {
@@ -191,7 +198,7 @@ class _RssPodcastPlayerState extends State<RssPodcastPlayer> {
     _bufferingSub?.cancel();
     _completedSub?.cancel();
     _errorSub?.cancel();
-    _player.dispose();
+    if (_playerReady) _player.dispose();
     super.dispose();
   }
 

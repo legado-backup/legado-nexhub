@@ -5699,6 +5699,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 可配置的槽位。配置入口移至内联设置面板（见 _NovelInlineSettings）。
     final slots = _prefs.bottomToolbarSlots.take(6).where((tool) {
       if (tool == NovelBottomTool.bookmarkList) return false;
+      // 鸿蒙：离线朗读引擎（flutter_tts）无 ohos 实现，入口隐藏（规格 §6）。
+      // 在线 TTS 走 media_kit，内核可用后可单独评估放开。
+      if (tool == NovelBottomTool.tts && PlatformService.instance.isOHOS) {
+        return false;
+      }
       // 本地模式无章节导航时隐藏 toc / prevChapter / nextChapter。
       // 聚合本地模式（多文件合成一整本）与单 EPUB（已解析出章节）保留。
       final hasChapters =
@@ -9669,12 +9674,14 @@ class _NovelInlineSettings extends StatelessWidget {
                     ],
                   ),
                   // ── 朗读组 ──
-                  _buildSettingsGroup(
-                    context,
-                    l10n.novelSectionTts,
-                    searchQuery: searchController.text,
-                    leading: Icons.record_voice_over_rounded,
-                    searchTerms: _kNovelSecTtsTerms,
+                  // 鸿蒙：离线朗读引擎（flutter_tts）无 ohos 实现，整组隐藏。
+                  if (!PlatformService.instance.isOHOS)
+                    _buildSettingsGroup(
+                      context,
+                      l10n.novelSectionTts,
+                      searchQuery: searchController.text,
+                      leading: Icons.record_voice_over_rounded,
+                      searchTerms: _kNovelSecTtsTerms,
                     children: <Widget>[
                       ListenableBuilder(
                         listenable: tts,
