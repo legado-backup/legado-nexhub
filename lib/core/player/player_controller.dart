@@ -1008,7 +1008,12 @@ class PlayerController extends ChangeNotifier {
  /// 网络切换时由播放器侧重新 resolve 后再次应用。
   Future<void> applyDemuxerCacheProfile(DemuxerCacheProfile profile) async {
     try {
-      await _backend.setDemuxerCacheBudget(profile.maxBytes, profile.maxBackBytes);
+      await _backend.setDemuxerCacheBudget(
+        profile.maxBytes,
+        profile.maxBackBytes,
+        profile.cacheSecs,
+        profile.hysteresisSecs,
+      );
     } on Object {
    // 后端不支持（NoOp 降级），忽略。
     }

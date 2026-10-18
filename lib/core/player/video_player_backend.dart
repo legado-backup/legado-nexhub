@@ -39,10 +39,15 @@ abstract class VideoPlayerBackend {
     throw UnsupportedError('setUpscaleShaders is not supported by this backend');
   }
 
-  /// 设置 demuxer 前向 / 后向缓存预算（缓存策略降级）。
+  /// 应用 demuxer 缓存档位（字节预算 + 秒数上限 + 缓冲迟滞，缓存策略降级）。
   ///
   /// 默认实现抛出 [UnsupportedError]，子类按需覆写。
-  Future<void> setDemuxerCacheBudget(int maxBytes, int maxBackBytes) async {
+  Future<void> setDemuxerCacheBudget(
+    int maxBytes,
+    int maxBackBytes,
+    double cacheSecs,
+    double hysteresisSecs,
+  ) async {
     throw UnsupportedError('setDemuxerCacheBudget is not supported by this backend');
   }
 

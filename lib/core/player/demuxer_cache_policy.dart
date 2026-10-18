@@ -1,8 +1,11 @@
 /// demuxer 缓存降级策略。
 ///
-/// 移动网络或低内存设备自动把 mpv demuxer 前向缓存从 1500MiB 降到 2MiB，
-/// 避免计费流量下后台大量拉流、低端机上 demux 缓存挤占前台内存。
-/// 网络变化时由播放器侧重新 resolve 并应用。
+/// 计费网络或低内存设备自动收缩 mpv demuxer 缓存，避免后台大量拉流、
+/// 低端机缓存挤占前台内存；网络变化时由播放器侧重新 resolve 并应用。
+///
+/// 数值对齐「同一内核（libmpv）在鸿蒙出货应用」的参考配方（4MiB + 16s +
+/// 迟滞 10.7s）：省流档的旧值（2MiB 且无秒数上限）缓冲仅 4–8 秒，带宽
+/// 稍有波动就 underrun，表现为肉眼可见的轻微卡顿。
 library;
 
 import 'dart:io';
@@ -14,19 +17,43 @@ import '../platform/platform_service.dart';
 
 /// demuxer 缓存档位。
 enum DemuxerCacheProfile {
-  /// 标准档：大预算，长视频拖动顺滑（默认）。
-  standard(maxBytes: 1500 * 1024 * 1024, maxBackBytes: 750 * 1024 * 1024),
+  /// 标准档：Wi-Fi / 大内存。32MiB + 预读上限 120s（封顶值不是预分配，
+  /// 实际内存随带宽增长到封顶为止），拖动与抗波动余量充足。
+  standard(
+    maxBytes: 32 * 1024 * 1024,
+    maxBackBytes: 32 * 1024 * 1024,
+    cacheSecs: 120,
+    hysteresisSecs: 80,
+  ),
 
-  /// 低内存档：移动网络 / 低内存设备降级，几乎不驻留 demux 缓存。
-  low(maxBytes: 2 * 1024 * 1024, maxBackBytes: 1024 * 1024);
+  /// 省流档：计费网络 / 低内存设备。与参考实现一致：4MiB + 16s 迟滞 10.7s，
+  /// 足以吸收带宽抖动，又不至于后台偷跑流量。
+  low(
+    maxBytes: 4 * 1024 * 1024,
+    maxBackBytes: 4 * 1024 * 1024,
+    cacheSecs: 16,
+    hysteresisSecs: 10.7,
+  );
 
-  const DemuxerCacheProfile({required this.maxBytes, required this.maxBackBytes});
+  const DemuxerCacheProfile({
+    required this.maxBytes,
+    required this.maxBackBytes,
+    required this.cacheSecs,
+    required this.hysteresisSecs,
+  });
 
   /// 前向缓存预算（字节，mpv `demuxer-max-bytes`）。
   final int maxBytes;
 
   /// 后向缓存预算（字节，mpv `demuxer-max-back-bytes`）。
   final int maxBackBytes;
+
+  /// 预读秒数上限（mpv `cache-secs`；与字节数取先到者）。
+  final double cacheSecs;
+
+  /// 缓冲重启迟滞（mpv `demuxer-hysteresis-secs`：低于该秒数才开始
+  /// 重新拉流，避免频繁「停一下、缓冲一下」的锯齿行为）。
+  final double hysteresisSecs;
 }
 
 /// 缓存策略解析器：按网络与设备内存决定档位。

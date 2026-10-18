@@ -1,5 +1,6 @@
 import 'package:media_kit/media_kit.dart';
 
+import 'demuxer_cache_policy.dart';
 import 'player_capability.dart';
 import 'video_player_backend.dart';
 
@@ -90,25 +91,40 @@ class MediaKitBackend extends VideoPlayerBackend {
 
   /// 初始化默认 mpv 属性，优化网络流播放体验。
   Future<void> _applyDefaultProperties() async {
-    await _setProperty('cache-secs', '120');
-    await _setProperty('demuxer-readahead-secs', '120');
+    await _setProperty('cache', 'yes');
+    await _setProperty('cache-secs', '${DemuxerCacheProfile.standard.cacheSecs}');
+    await _setProperty(
+      'demuxer-hysteresis-secs',
+      '${DemuxerCacheProfile.standard.hysteresisSecs}',
+    );
     await _setProperty('network-timeout', '60');
     await _setProperty('force-seekable', 'yes');
-    // 标准档 demuxer 前向缓存预算（mpv 默认仅 128MiB，加大后长视频
-    // 拖动更顺滑）；移动网络 / 低内存时经 [setDemuxerCacheBudget] 降到
-    // 低内存档，避免后台 demux 缓存挤占前台内存。
-    await _setProperty('demuxer-max-bytes', '1500MiB');
-    await _setProperty('demuxer-max-back-bytes', '750MiB');
+    // 标准档 demuxer 缓存预算（字节数与秒数取先到者；封顶值不是预分配）。
+    // 计费网络 / 低内存时经 [setDemuxerCacheBudget] 降到省流档。
+    await _setProperty('demuxer-max-bytes', '${DemuxerCacheProfile.standard.maxBytes}');
+    await _setProperty(
+      'demuxer-max-back-bytes',
+      '${DemuxerCacheProfile.standard.maxBackBytes}',
+    );
     // 注：mpv / FFmpeg lavf 的网络自动重连选项（reconnect 等）本可在此追加以减少
     // 应用层重连，但 `stream-lavf-o` 须用逗号分隔且不同源兼容性不一，易在 open() 阶段
     // 引发解码失败（黑屏）。应用层重连已改为同一实例 re-open 自愈，故此处不启用，
     // 待后续单独验证后再按需加入。
   }
 
-  /// 设置 demuxer 前向 / 后向缓存预算（字节）。
+  /// 应用 demuxer 缓存档位（字节预算 + 秒数上限 + 缓冲迟滞）。
   ///
-  /// 移动网络或低内存设备降级调用（如 2MiB / 1MiB），非原生平台静默忽略。
-  Future<void> setDemuxerCacheBudget(int maxBytes, int maxBackBytes) async {
+  /// 计费网络 / 低内存设备降级调用（省流档 4MiB / 16s，对齐参考配方）；
+  /// 非原生平台静默忽略。`cache=yes` 必须同设：秒数上限仅在缓存开启时生效。
+  Future<void> setDemuxerCacheBudget(
+    int maxBytes,
+    int maxBackBytes,
+    double cacheSecs,
+    double hysteresisSecs,
+  ) async {
+    await _setProperty('cache', 'yes');
+    await _setProperty('cache-secs', '$cacheSecs');
+    await _setProperty('demuxer-hysteresis-secs', '$hysteresisSecs');
     await _setProperty('demuxer-max-bytes', '$maxBytes');
     await _setProperty('demuxer-max-back-bytes', '$maxBackBytes');
   }
