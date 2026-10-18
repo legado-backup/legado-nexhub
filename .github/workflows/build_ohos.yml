@@ -162,16 +162,36 @@ jobs:
                   print("::error::%s lib missing: %s (rootUri=%s)" % (name, dart_file, ru))
                   missing = True
                   try:
+                      import subprocess
                       norm = local.replace("\\", "/")
                       gi = norm.find("/git/")
                       if gi >= 0:
                           after = norm[gi + 5:]
                           repo_root = norm[:gi + 5] + after.split("/")[0]
-                          cache_git = norm[:gi + 4]
-                          print("::error::checkout-root %s listing: %s" % (repo_root, sorted(os.listdir(repo_root))[:14]))
-                          print("::error::git-dir %s listing: %s" % (cache_git, sorted(os.listdir(cache_git))[:14]))
+                          rel_parts = after.split("/")[1:]
+                          # 逐层定位断点：checkout 从哪一层开始缺失
+                          cur = repo_root
+                          for i, part in enumerate(rel_parts):
+                              nxt = os.path.join(cur, part)
+                              if not os.path.exists(nxt):
+                                  try:
+                                      listing = sorted(os.listdir(cur))[:10]
+                                  except Exception as le:
+                                      listing = repr(le)
+                                  print("::error::break at level %d: %r missing under %s (listing=%s)" % (i, part, cur, listing))
+                                  break
+                              cur = nxt
+                          # 自愈：.git 完整而工作树残缺时，重置工作树即可恢复
+                          if os.path.isdir(os.path.join(repo_root, ".git")):
+                              r = subprocess.run(["git", "-C", repo_root, "checkout", "HEAD", "--", "."],
+                                                 capture_output=True, text=True, timeout=300)
+                              print("::notice::self-heal git checkout rc=%s stderr=%s" % (r.returncode, (r.stderr or "")[:120]))
+                          healed = os.path.exists(dart_file)
+                          print("::%s::self-heal %s: lib %s" % ("notice" if healed else "error", name, "restored" if healed else "STILL MISSING"))
+                          if healed:
+                              missing = self_healed = True
                   except Exception as e:
-                      print("::error::listing failed: %s" % e)
+                      print("::error::diagnosis failed: %s" % e)
           if bad or missing:
               sys.exit(1)
           PYEOF
