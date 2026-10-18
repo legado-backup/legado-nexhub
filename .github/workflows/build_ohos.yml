@@ -1,0 +1,90 @@
+# =============================================================================
+# NexHub 鸿蒙（OHOS）构建工作流
+# -----------------------------------------------------------------------------
+# 产物：未签名 HAP（unsigned）——发布物一律不带签名，安装签名由下载用户
+#       自行完成（侧载惯例，端侧签名安装工具可直接安装 unsigned 包）。
+#
+# 触发：仅网页手动触发。不挂 v* 标签自动发布，避免与 build.yml 的自动发布流
+#       冲突；构建完成后产物作为 artifact 供人工下载，核对后手动挂到 Release。
+#
+# 可选输入 tag：留空构建分支 HEAD；填 tag 名则构建对应提交。
+#
+# 依赖事实（2026-10-18 核实）：
+#   - 社区 action ErBWs/setup-ohos@v1 安装 DevEco 命令行工具（26.0.0.821
+#     对齐工程 compatibleSdkVersion 26.0.0），支持缓存；同类 Flutter 鸿蒙
+#     应用现役发布工作流同款。
+#   - flutter-ohos SDK：atomgit oh-flutter/flutter_flutter tag
+#     3.47.7-ohos-1.0.0（阶段 1 本机同源实测）。
+#   - 仓库版 ohos/build-profile.json5 signingConfigs 为空数组 → CI 产物
+#     天然 unsigned，无需任何签名材料。
+#   - libmpv 内核由 media_kit_libs_ohos 的 CMake 构建期从 GitHub 下载校验，
+#     CI 直连无墙，无需预置。
+#
+# 已知风险：
+#   - gitcode 镜像随机挂死（本地经验）→ pub get 包 GNU timeout + 重试；
+#     若仍偶发挂起，再引入预拉镜像步骤。
+#   - setup-ohos 为第三方 action，若失效可改为手动下载命令行工具包解压。
+# =============================================================================
+
+name: build-ohos
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "构建的 tag（留空 = 分支 HEAD）"
+        required: false
+        default: ""
+
+jobs:
+  build_ohos:
+    name: Build unsigned HAP (ohos-arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag != '' && inputs.tag || github.ref }}
+
+      - name: Setup HarmonyOS toolchain
+        uses: ErBWs/setup-ohos@v1
+        with:
+          version: "26.0.0.821"
+          cache: true
+
+      - name: Setup flutter-ohos SDK
+        run: |
+          git clone --depth 1 -b 3.47.7-ohos-1.0.0 \
+            https://atomgit.com/oh-flutter/flutter_flutter.git "$HOME/flutter-ohos"
+          echo "$HOME/flutter-ohos/bin" >> "$GITHUB_PATH"
+
+      - name: Flutter doctor
+        run: |
+          flutter --version
+          flutter doctor || true
+
+      - name: Pub get
+        run: |
+          for i in 1 2 3; do
+            timeout 900 flutter pub get && exit 0
+            echo "pub get failed or hung (attempt $i), retrying..."
+            sleep 10
+          done
+          exit 1
+
+      - name: Build HAP (release, unsigned)
+        run: flutter build hap --release --target-platform ohos-arm64
+
+      - name: Collect artifact
+        run: |
+          version=$(grep -m1 '^version:' pubspec.yaml | awk '{print $2}')
+          cp ohos/entry/build/default/outputs/default/entry-default-unsigned.hap \
+            "NexHub_${version}_ohos_arm64_unsigned.hap"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohos-unsigned-hap
+          path: NexHub_*_ohos_arm64_unsigned.hap
+          if-no-files-found: error
