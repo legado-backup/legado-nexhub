@@ -67,13 +67,6 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 
 **Installation (sideload)**: download `NexHub-ohos-arm64-unsigned.hap` from the Releases page → sign it yourself with an on-device signing tool and install (or install via DevEco Studio / hdc). Release artifacts are consistently unsigned; signing is left to the user.
 
-### HarmonyOS: to-do
-
-1. **Full on-device verification**: itemized checks across the reading chain, playback engine, persistence migration, and system capabilities;
-2. **Switch to the official stable SDK**: currently based on the community-maintained Flutter OHOS port (3.47 line); will switch and re-verify when the official stable release lands (expected December 2026);
-3. **First CI build verification**: the HarmonyOS packaging workflow is ready, pending its first run;
-4. **Recovery evaluation for degraded features**: directory picking, clipboard images, offline TTS, etc., to be restored depending on upstream progress or in-house plans.
-
 ### HarmonyOS: known issues / platform differences (preview)
 
 | Feature | Status on HarmonyOS | Workaround / notes |
