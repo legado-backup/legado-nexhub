@@ -525,11 +525,12 @@ packages:
   floating:
     dependency: "direct main"
     description:
-      name: floating
-      sha256: e51ce1dbcab3ea83da0ad1b07f2091b99c0e8680184c780a000567f41234d454
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "6.0.0"
+      path: "."
+      ref: "3eefccb759c4ea8114e722f1511fe1dbce70dc9f"
+      resolved-ref: "3eefccb759c4ea8114e722f1511fe1dbce70dc9f"
+      url: "https://github.com/qinshah/floating.git"
+    source: git
+    version: "3.0.0"
   flutter:
     dependency: "direct main"
     description: flutter

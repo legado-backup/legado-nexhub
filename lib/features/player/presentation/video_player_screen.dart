@@ -465,6 +465,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       // PiP 小窗内例外：小窗放不下控制层，强制显示会铺满整个小窗。
       if (!p && !_inPip) _uiVisible = true;
     });
+    // 鸿蒙 PiP 控制面板的播放/暂停按钮图标随实际播放态同步（Android 通道
+    // 无此需求——动作列表进入时下发；该调用在 Android 原生侧无实现，静默无效）。
+    if (PlatformService.instance.isOHOS) {
+      unawaited(Floating().updatePipControlStatus(playing: p));
+    }
     // 播放 → 启动自动隐藏倒计时；暂停 → 取消倒计时保持常显。
     if (p) {
       _scheduleUiHide();

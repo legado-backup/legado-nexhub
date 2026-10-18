@@ -158,9 +158,9 @@ extension _VideoMoreMenu on _VideoPlayerScreenState {
           },
         ),
       ),
-      // 画中画（从顶栏移入更多菜单）。鸿蒙无 floating 适配，入口隐藏（规格 §6）。
-      if (!PlatformService.instance.isOHOS)
-        _PlayerMenuEntry(
+      // 画中画（从顶栏移入更多菜单）。floating 社区版支持 Android + 鸿蒙
+      // （鸿蒙可用性由插件运行时检测，不可用时点击提示降级）。
+      _PlayerMenuEntry(
           builder: (BuildContext ctx) => ListTile(
             leading: const Icon(Icons.picture_in_picture_rounded),
             title: Text(l10n.playerPip),

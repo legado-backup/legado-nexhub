@@ -155,14 +155,6 @@ extension _VideoCastPip on _VideoPlayerScreenState {
   }
 
   Future<void> _togglePip(AppLocalizations l10n) async {
-    // 鸿蒙：系统 PiP（floating）无适配、桌面窗口 PiP 也不适用——直接提示。
-    // 菜单入口已在鸿蒙隐藏（video_player_more_menu），此处为二次兜底。
-    if (PlatformService.instance.isOHOS) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.pipNotSupportedOnDevice)),
-      );
-      return;
-    }
     // 桌面端：用 window_manager 缩小窗口置顶，实现应用内 PiP。
     if (_isDesktop) {
       // 进出进行中忽略再次点击：防止并发进入把 PiP 小尺寸存成「原始尺寸」。
@@ -174,7 +166,8 @@ extension _VideoCastPip on _VideoPlayerScreenState {
       }
       return;
     }
-    // Android 系统 PiP。
+    // Android / 鸿蒙系统 PiP：floating 社区版两平台均支持（鸿蒙原生
+    // FloatingPlugin 自动检测可用性，无需额外工程配置）。
     final floating = Floating();
     try {
       final bool available = await floating.isPipAvailable;
@@ -205,11 +198,17 @@ extension _VideoCastPip on _VideoPlayerScreenState {
         }
         return;
       }
-      // 窗口三动作（播放/暂停、快退 10s、快进 30s）：进入前下发动作列表。
-      await _configurePipActions(l10n);
-      _pipActionSub ??=
-          PipActionsBridge.instance.actionStream.listen(_onPipEvent);
-      await floating.enable(ImmediatePiP());
+      if (PlatformService.instance.isOHOS) {
+        // 鸿蒙：进/出小窗与控制面板按钮经 floating 回调推送（原生自动
+        // 检测可用性，无需下发动作列表），接线见 _wireOhosPipCallbacks。
+        _wireOhosPipCallbacks();
+      } else {
+        // Android：窗口三动作（播放/暂停、快退 10s、快进 30s）进入前下发。
+        await _configurePipActions(l10n);
+        _pipActionSub ??=
+            PipActionsBridge.instance.actionStream.listen(_onPipEvent);
+      }
+      await floating.enable(EnableManual());
     } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -217,6 +216,36 @@ extension _VideoCastPip on _VideoPlayerScreenState {
         );
       }
     }
+  }
+
+  /// 鸿蒙 PiP 回调接线（Floating 为单例，重复进入不重复挂）：
+  /// - onPipModeChanged：进/出小窗推送，转成与 Android 通道同款的
+  ///   `pip:enabled` / `pip:disabled` 事件复用既有 UI 切换与续播逻辑；
+  /// - onPipAction：控制面板按钮（VIDEO_PLAY 模板），播放/暂停按请求态
+  ///   直接设置，快进/快退按应用侧约定取 30s / 10s。
+  void _wireOhosPipCallbacks() {
+    final Floating floating = Floating();
+    floating.onPipModeChanged ??= (bool inPip) {
+      _onPipEvent(inPip ? 'pip:enabled' : 'pip:disabled');
+    };
+    floating.onPipAction ??= (String event, int? status) {
+      switch (event) {
+        case 'playbackStateChanged':
+          // status：1 = 请求播放，0 = 请求暂停。
+          if (status == 1) {
+            unawaited(_controller.play());
+          } else {
+            unawaited(_controller.pause());
+          }
+        case 'fastForward':
+          _onPipEvent('action:forward_30');
+        case 'fastBackward':
+          _onPipEvent('action:rewind_10');
+        default:
+          // nextVideo / previousVideo：播放器无上一/下一集语义，忽略。
+          break;
+      }
+    };
   }
 
   /// 桌面 PiP：隐藏标题栏 + 缩小窗口置顶播放。

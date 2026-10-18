@@ -190,6 +190,18 @@ dependency_overrides:
   wakelock_plus_ohos:
     path: third_party/patched/wakelock_plus_ohos
 
+  # ---------- 画中画（阶段 5 恢复）----------
+  # 上游 floating 6.0.0 仅 Android。社区 fork 在该 commit 起支持 Android +
+  # HarmonyOS（原生 FloatingPlugin 自动检测可用性，鸿蒙走系统 PiP 窗口）。
+  # API 改名：ImmediatePiP → EnableManual、OnLeavePiP → AutoEnable，
+  # 调用点已同步迁移；鸿蒙另有 onPipModeChanged / onPipAction 回调与
+  # updatePipControlStatus 图标同步（video_player_cast_pip 接线）。
+  # fork 声明版本仍为 3.0.0，依赖 override 不受主约束 ^6.0.0 限制。
+  floating:
+    git:
+      url: https://github.com/qinshah/floating.git
+      ref: 3eefccb759c4ea8114e722f1511fe1dbce70dc9f
+
   # ---------- 本地打补丁的纯 Dart UI 库 ----------
   # 鸿蒙 Flutter fork 的 TargetPlatform 枚举新增 ohos 值，上游 material_ui /
   # cupertino_ui 内的穷尽 switch 缺该分支 → 鸿蒙目标编译报「not exhaustively
