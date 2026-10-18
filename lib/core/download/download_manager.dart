@@ -14,7 +14,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -28,6 +27,7 @@ import '../services/source_repository.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/novel_export_upload_service.dart';
 import '../utils/app_log.dart';
+import '../platform/platform_service.dart';
 import '../local/saf_bridge.dart' show normalizeSafTreeUri;
 import '../novel/novel_chinese_converter.dart';
 import '../novel/novel_reader_preferences.dart';
@@ -179,7 +179,7 @@ class DownloadManager extends ChangeNotifier {
   /// 对文件管理器可见。用户一旦主动设置过（路径变为 `content://` 或真实
   /// 路径）即不再触发。
   bool get needsPublicDownloadDir =>
-      Platform.isAndroid &&
+      PlatformService.instance.isAndroid &&
       _settings.downloadPath == DownloadSettings.defaults().downloadPath;
 
   /// 正在执行中的下载数量（受 maxConcurrent 约束）。

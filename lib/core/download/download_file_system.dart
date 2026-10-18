@@ -9,6 +9,8 @@ import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/platform_service.dart';
+
 /// 平台相关的默认下载基路径。
 ///
 /// - Android：优先应用私有外部存储 `<pkg>/files/Download`（可被 dart:io 直接
@@ -17,9 +19,15 @@ import 'package:path_provider/path_provider.dart';
 /// 返回 null，此时回落应用文档目录（内部存储，始终可写），**绝不**回落到
 /// Windows 专属的 `D:/Downloads`——那在 Android 上是相对路径，写入必然失败
 /// （Android 高版本「所有下载都失败」的根因之一）。
-/// - 其它平台：沿用桌面默认 `D:/Downloads`。
+/// - 鸿蒙：应用文档目录（沙箱内唯一稳定可写路径；系统公共目录需原生文件
+///   授权，暂未接入），同样不使用 `D:/Downloads`。
+/// - 其它平台（桌面）：沿用桌面默认 `D:/Downloads`。
 Future<String> defaultDownloadPath() async {
-  if (Platform.isAndroid) {
+  if (PlatformService.instance.isOHOS) {
+    final Directory docs = await getApplicationDocumentsDirectory();
+    return '${docs.path}${docs.path.endsWith('/') ? '' : '/'}Download';
+  }
+  if (PlatformService.instance.isAndroid) {
     final Directory? dir = await getExternalStorageDirectory();
     if (dir != null) {
       return '${dir.path}${dir.path.endsWith('/') ? '' : '/'}Download';

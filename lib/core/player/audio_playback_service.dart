@@ -13,7 +13,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -233,7 +232,9 @@ class AudioPlaybackService {
   bool get _supported =>
       !kIsWeb &&
       !PlatformService.instance.isOHOS &&
-      (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+      (PlatformService.instance.isAndroid ||
+          PlatformService.instance.isIOS ||
+          PlatformService.instance.isMacOS);
 
   /// 幂等初始化。main() 启动期调用一次；attach 内部也会兜底等待。
   Future<void> initialize() {

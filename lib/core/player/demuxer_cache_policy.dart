@@ -10,6 +10,8 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
+import '../platform/platform_service.dart';
+
 /// demuxer 缓存档位。
 enum DemuxerCacheProfile {
   /// 标准档：大预算，长视频拖动顺滑（默认）。
@@ -58,13 +60,16 @@ class DemuxerCachePolicyResolver {
 
   /// 是否为低内存设备（阈值 3GB 物理内存）。
   ///
-  /// Android 读 `/proc/meminfo`；其余平台无轻量通道，返回 false
-  /// （桌面端内存普遍充裕，false 正是期望值）。
+  /// 移动系平台（Android / 鸿蒙）读 `/proc/meminfo`；其余平台无轻量通道，
+  /// 返回 false（桌面端内存普遍充裕，false 正是期望值）。
   Future<bool> isLowMemoryDevice() async {
     final cached = _cachedLowMemoryDevice;
     if (cached != null) return cached;
     var low = false;
-    if (!kIsWeb && Platform.isAndroid) {
+    final bool canProbe = !kIsWeb &&
+        (PlatformService.instance.isAndroid ||
+            PlatformService.instance.isOHOS);
+    if (canProbe) {
       try {
         final meminfo = await File('/proc/meminfo').readAsString();
         final match =

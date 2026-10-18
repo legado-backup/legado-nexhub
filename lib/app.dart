@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:provider/provider.dart';
 import 'package:saf/saf.dart';
 import 'core/locale/locale_controller.dart';
+import 'core/platform/platform_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/download/download_manager.dart';
@@ -102,7 +101,7 @@ class _AppBootstrapState extends State<_AppBootstrap> {
   /// 让用户选一个公开文件夹（如 Download/NexHub），之后下载对其可见。
   /// 用户选过一次（路径变为 content:// 或真实路径）即不再触发。
   Future<void> _maybePromptPublicDownloadDir() async {
-    if (!Platform.isAndroid) return;
+    if (!PlatformService.instance.isAndroid) return;
     final manager = context.read<DownloadManager>();
     if (!manager.needsPublicDownloadDir) return;
     // 等首帧构建完成，确保 dialog/picker 的 context 已就绪且叠加在主界面之上。

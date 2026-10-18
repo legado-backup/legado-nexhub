@@ -19,6 +19,7 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../platform/platform_service.dart';
 import 'update_settings.dart';
 
 /// 更新检查结果（从 GitHub Releases API 解析）。
@@ -468,10 +469,14 @@ class UpdateManager extends ChangeNotifier {
   }
 
   /// 获取当前平台的安装包资产（Windows/Android/Linux/macOS）。
+  ///
+  /// 鸿蒙返回 null：HAP 需系统包管理器签名安装，无法像 APK 一样由应用内下载后
+  /// 直接拉起安装器，故统一走「浏览器打开发布页」路径（见 [downloadInstaller]）。
   UpdateAsset? _selectAssetForPlatform(List<UpdateAsset> assets) {
     if (assets.isEmpty) return null;
     if (kIsWeb) return null;
-    if (Platform.isWindows) {
+    if (PlatformService.instance.isOHOS) return null;
+    if (PlatformService.instance.isWindows) {
       // 优先 .exe 安装包，其次 .msix / .zip
       for (final a in assets) {
         final n = a.name.toLowerCase();
@@ -481,17 +486,17 @@ class UpdateManager extends ChangeNotifier {
         final n = a.name.toLowerCase();
         if (n.endsWith('.msix') || n.endsWith('.zip')) return a;
       }
-    } else if (Platform.isAndroid) {
+    } else if (PlatformService.instance.isAndroid) {
       for (final a in assets) {
         final n = a.name.toLowerCase();
         if (n.endsWith('.apk')) return a;
       }
-    } else if (Platform.isLinux) {
+    } else if (PlatformService.instance.isLinux) {
       for (final a in assets) {
         final n = a.name.toLowerCase();
         if (n.endsWith('.appimage') || n.endsWith('.deb')) return a;
       }
-    } else if (Platform.isMacOS) {
+    } else if (PlatformService.instance.isMacOS) {
       for (final a in assets) {
         final n = a.name.toLowerCase();
         if (n.endsWith('.dmg')) return a;
@@ -684,6 +689,14 @@ class UpdateManager extends ChangeNotifier {
     bool silent = false,
     void Function(double progress)? onProgress,
   }) async {
+    // 鸿蒙：HAP 无法应用内安装，等价于「关闭应用内下载」——直接开浏览器发布页。
+    if (PlatformService.instance.isOHOS) {
+      final bool ok = await openReleaseInBrowser(release);
+      _lastError = ok ? 'opened-in-browser' : 'cannot-open-browser';
+      _status = UpdateStatus.idle;
+      notifyListeners();
+      return null;
+    }
     // 应用内下载开关关闭：交给浏览器。
     if (!_settings.inAppDownload) {
       final bool ok = await openReleaseInBrowser(release);
@@ -1059,7 +1072,8 @@ class UpdateManager extends ChangeNotifier {
 
     try {
       if (kIsWeb) return false;
-      if (Platform.isWindows || Platform.isLinux) {
+      if (PlatformService.instance.isWindows ||
+          PlatformService.instance.isLinux) {
         // 启动安装程序（不等待完成）
         await Process.start(
           path,
@@ -1067,11 +1081,11 @@ class UpdateManager extends ChangeNotifier {
           mode: ProcessStartMode.detachedWithStdio,
         );
         return true;
-      } else if (Platform.isMacOS) {
+      } else if (PlatformService.instance.isMacOS) {
         final Uri uri = Uri.file(path);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return true;
-      } else if (Platform.isAndroid) {
+      } else if (PlatformService.instance.isAndroid) {
         // Android：经 MethodChannel 用 FileProvider 生成 content:// URI 交给系统安装器
         // （Android 7+ 禁止共享 file:// URI）。
         const MethodChannel channel = MethodChannel('nexhub/update_install');

@@ -10,6 +10,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../platform/platform_service.dart';
+
 /// 默认预算（字节）：与 Flutter 引擎默认值一致（100MB）。
 const int kComicImageCacheDefaultBytes = 100 << 20;
 
@@ -25,9 +27,14 @@ int resolveComicImageCacheBytes(int? totalMemBytes) {
   return 500 << 20;
 }
 
-/// 探测设备物理内存总量；仅 Android 读 `/proc/meminfo`，其余平台返回 null。
+/// 探测设备物理内存总量；仅移动系平台（Android / 鸿蒙）读 `/proc/meminfo`，
+/// 其余平台返回 null。鸿蒙内核同为 Linux，节点存在且可读，失败时由下方
+/// catch 兜底为 null（调用方即退回默认预算）。
 Future<int?> probeDeviceTotalMemBytes() async {
-  if (kIsWeb || !Platform.isAndroid) return null;
+  if (kIsWeb) return null;
+  if (!PlatformService.instance.isAndroid && !PlatformService.instance.isOHOS) {
+    return null;
+  }
   try {
     final meminfo = await File('/proc/meminfo').readAsString();
     final match =

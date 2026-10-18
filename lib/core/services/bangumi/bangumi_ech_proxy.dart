@@ -47,6 +47,7 @@ import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding, Wi
 import 'package:path_provider/path_provider.dart';
 
 import '../../network/network_config_service.dart';
+import '../../platform/platform_service.dart';
 import '../../network/runtime/network_client_builder.dart';
 import '../../network/source_network_override_store.dart';
 import '../../models/plugin_config.dart' show PluginConfig;
@@ -306,14 +307,16 @@ class BangumiEchProxy {
   /// 本平台是否具备接入 ECH 引擎的通道（引擎本体是否存在由后端探测）。
   ///
   /// Android 走 MethodChannel→JNI；Windows/Linux/macOS 走 dart:ffi 加载
-  /// echproxy 动态库（缺失时后端安全降级）。iOS/Web 目前不提供引擎。
+  /// echproxy 动态库（缺失时后端安全降级）。iOS / 鸿蒙 / Web 目前不提供引擎：
+  /// 鸿蒙需按 OHOS NDK 重编 Rust 库，暂沿用「直连」降级路径。
   static bool get platformSupported {
     if (kIsWeb) return false;
     try {
-      return Platform.isAndroid ||
-          Platform.isWindows ||
-          Platform.isLinux ||
-          Platform.isMacOS;
+      final PlatformService platform = PlatformService.instance;
+      return platform.isAndroid ||
+          platform.isWindows ||
+          platform.isLinux ||
+          platform.isMacOS;
     } catch (_) {
       return false;
     }
@@ -613,7 +616,9 @@ abstract class EchProxyBackend {
 /// 按当前平台挑选后端（[BangumiEchProxy] 初始化时调用一次）。
 EchProxyBackend createEchBackend() {
   if (!BangumiEchProxy.platformSupported) return _UnavailableEchBackend();
-  if (!kIsWeb && Platform.isAndroid) return MethodChannelEchBackend();
+  if (!kIsWeb && PlatformService.instance.isAndroid) {
+    return MethodChannelEchBackend();
+  }
   return FfiEchBackend();
 }
 
@@ -707,9 +712,11 @@ class FfiEchBackend implements EchProxyBackend {
   /// 各平台的动态库文件名（及加载路径约定，见 android/rust/README.md）。
   static List<String> _candidateLibraryNames() {
     if (kIsWeb) return const <String>[];
-    if (Platform.isWindows) return const <String>['echproxy.dll'];
-    if (Platform.isMacOS) return const <String>['libechproxy.dylib'];
-    if (Platform.isLinux) return const <String>['libechproxy.so'];
+    if (PlatformService.instance.isWindows) return const <String>['echproxy.dll'];
+    if (PlatformService.instance.isMacOS) {
+      return const <String>['libechproxy.dylib'];
+    }
+    if (PlatformService.instance.isLinux) return const <String>['libechproxy.so'];
     return const <String>[];
   }
 

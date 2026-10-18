@@ -27,6 +27,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/plugin_config.dart';
+import '../../platform/platform_service.dart';
 import '../model/network_config.dart';
 import 'dns_resolver.dart';
 import '../network_config_service.dart';
@@ -173,7 +174,7 @@ class WebviewSourceNetwork {
     _activeEnv = null;
     try {
       await _clearProxy();
-      if (!Platform.isWindows) await _stop();
+      if (!PlatformService.instance.isWindows) await _stop();
     } on Object catch (e) {
       debugPrint('WebviewSourceNetwork.releaseForSource failed: $e');
     }
@@ -191,7 +192,7 @@ class WebviewSourceNetwork {
   /// ERROR_INVALID_STATE）。失败 debugPrint 回传 null（best-effort，同
   /// Android 侧 MissingPluginException 语义），不阻断 WebView 打开。
   Future<WebViewEnvironment?> _ensureWindowsEnv(String browserArgs) async {
-    if (!Platform.isWindows) return null;
+    if (!PlatformService.instance.isWindows) return null;
     final cached = _windowsEnvs[browserArgs];
     if (cached != null) {
       _activeEnv = cached;

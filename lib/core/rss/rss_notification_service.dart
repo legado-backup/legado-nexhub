@@ -6,10 +6,10 @@
 /// 的设计一致，避免 Windows 上初始化崩溃）。
 library;
 
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import '../platform/platform_service.dart';
 
 /// RSS 更新系统通知服务（单例）。
 class RssNotificationService {
@@ -20,8 +20,14 @@ class RssNotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  /// Web 与 Windows 无 flutter_local_notifications 后端，跳过 OS 通知。
-  bool get _supported => !kIsWeb && !Platform.isWindows;
+  /// RSS 更新系统通知（OS 通知）。
+  ///
+  /// 封装 `flutter_local_notifications`：在支持的平台（Android / iOS / Linux /
+  /// macOS / 鸿蒙）上发送 RSS 更新 OS 通知；**平台降级**——Web 与 Windows 无
+  /// 官方后端，跳过 OS 通知、仅保留应用内未读 badge（与 `RssUpdateChecker`
+  /// 既有「不依赖 flutter_local_notifications」的设计一致，避免 Windows 上
+  /// 初始化崩溃）。
+  bool get _supported => !kIsWeb && !PlatformService.instance.isWindows;
 
   /// 初始化通知插件与 Android 通知渠道。无后端平台安全跳过。
   Future<void> init() async {

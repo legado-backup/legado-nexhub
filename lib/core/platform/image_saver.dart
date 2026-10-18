@@ -10,16 +10,19 @@
 /// 直写公共 `Pictures/NexHub` 并触发媒体扫描；
 /// - 桌面（Windows/macOS/Linux）：系统「下载」目录（`getDownloadsDirectory`，
 /// 不可用时回退应用文档目录）；
-/// - iOS / Web：维持旧行为——应用文档目录（iOS 相册授权流程不在此展开）。
+/// - iOS / 鸿蒙 / Web：维持旧行为——应用文档目录（iOS 相册授权流程不在此展开；
+///   鸿蒙缺相册写入通道，见 [_saveToAppDocuments] 注释）。
 library;
 
-import 'dart:io' show Directory, File, Platform;
+import 'dart:io' show Directory, File;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+import 'platform_service.dart';
 
 /// 存储权限被拒绝（Android 9- 才会走到）；调用方据此给出可操作的提示。
 class ImageSavePermissionDeniedException implements Exception {
@@ -46,7 +49,7 @@ class ImageSaver {
     if (kIsWeb) {
       throw UnsupportedError('ImageSaver.saveImage is not supported on web');
     }
-    if (Platform.isAndroid) {
+    if (PlatformService.instance.isAndroid) {
       // Android 10+ 走 MediaStore（免权限）；旧版本先申请写存储权限。
       if (await _androidSdkInt() < 29) {
         final PermissionStatus status = await Permission.storage.request();
@@ -67,7 +70,7 @@ class ImageSaver {
       }
       return saved;
     }
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (PlatformService.instance.isDesktopForm) {
       final Directory? downloads = await getDownloadsDirectory();
       final Directory dir = downloads ??
           await getApplicationDocumentsDirectory();
@@ -80,7 +83,11 @@ class ImageSaver {
     return _saveToAppDocuments(bytes, fileName);
   }
 
-  /// 旧行为兜底：应用文档目录 `reader_images/`（iOS / 未知平台）。
+  /// 旧行为兜底：应用文档目录 `reader_images/`（iOS / 鸿蒙 / 未知平台）。
+  ///
+  /// 鸿蒙暂无写入系统相册的通道（需原生 photoAccessHelper），先落应用文档
+  /// 目录保证功能可用，用户可在「文件管理 → 应用」内找到；系统相册写入
+  /// 待后续原生补齐。
   static Future<String> _saveToAppDocuments(
     Uint8List bytes,
     String fileName,

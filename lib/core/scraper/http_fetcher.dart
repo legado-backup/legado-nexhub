@@ -12,6 +12,7 @@ import 'package:fast_gbk/fast_gbk.dart';
 import '../network/model/effective_network_profile.dart';
 import '../network/network_config_service.dart';
 import '../network/runtime/network_client_builder.dart';
+import '../platform/platform_service.dart';
 import '../services/config_loader.dart';
 import '../settings/advanced_settings.dart';
 import '../utils/app_log.dart';
@@ -372,18 +373,20 @@ class HttpFetcher {
   }
 
 
-  /// 完整浏览器 UA：优先用户配置的全局默认 UA；否则 Android 返回与系统 Chrome
-  /// 一致的**移动版** UA，其他平台返回内置桌面 UA。
+  /// 完整浏览器 UA：优先用户配置的全局默认 UA；否则移动系平台（Android /
+  /// 鸿蒙）返回与系统浏览器一致的**移动版** UA，其他平台返回内置桌面 UA。
   ///
   /// 供 Cloudflare 验证（turnstile）使用——部分源声明的 UA 极简（如
   /// `Mozilla/5.0`）被 CF 判定为不合法浏览器 → 挑战 600010；而把 Windows 桌面
-  /// UA 硬塞给 Android WebView 会造成「声称桌面、实为移动 WebView」的环境矛盾，
-  /// 同样触发 600010。移动版 UA 与用户手机上能正常过 turnstile 的系统 Chrome
-  /// 一致，环境自洽。
+  /// UA 硬塞给移动 WebView 会造成「声称桌面、实为移动 WebView」的环境矛盾，
+  /// 同样触发 600010。移动版 UA 与用户手机上能正常过 turnstile 的系统浏览器
+  /// 一致，环境自洽（鸿蒙 ArkWeb 同为移动内核，故共用移动版 UA）。
   String fullBrowserUserAgent() {
     final String custom = _customUa();
     if (custom.isNotEmpty) return custom;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    if (!kIsWeb &&
+        (PlatformService.instance.isAndroid ||
+            PlatformService.instance.isOHOS)) {
       return _androidBuiltinUa;
     }
     return _defaultBuiltinUa;

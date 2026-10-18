@@ -17,6 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../settings/player_settings.dart';
+import '../platform/platform_service.dart';
 
 /// 内置 shader 的部署版本（改变即强制重拷全部文件）。
 const int kAnime4kDeployVersion = 1;
@@ -57,7 +58,7 @@ class Anime4kShaderCatalog {
     if (mode == UpscaleShaderMode.off) return '';
     try {
       final paths = await _ensureDeployed(mode);
-      final sep = Platform.isWindows ? ';' : ':';
+      final sep = PlatformService.instance.isWindows ? ';' : ':';
       return paths.join(sep);
     } on Object {
       // 无文件系统（Web）或资产读取失败：等价关闭。

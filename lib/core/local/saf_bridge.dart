@@ -33,6 +33,7 @@ import 'local_content_manager.dart'
         extractVideoThumbnail,
         kFolderCoverNames;
 import 'archive_extractor.dart' show extractFirstArchiveImage;
+import '../platform/platform_service.dart';
 import '../local/pdf_util.dart' show extractPdfCover;
 import '../utils/app_log.dart';
 
@@ -47,7 +48,7 @@ final Saf saf = Saf();
 /// dart:io 会 `exists()=true` 但 `list()` 静默空扫，导致导入误报「未找到文件」。
 /// 返回 null 表示用户取消。
 Future<String?> pickFolderPath() async {
-  if (Platform.isAndroid) {
+  if (PlatformService.instance.isAndroid) {
     final SafDocumentFile? dir = await saf.pickDirectory();
     return dir?.uri;
   }
