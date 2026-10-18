@@ -8,7 +8,9 @@ library;
 
 import 'dart:convert';
 
+import '../utils/app_log.dart';
 import '../comic/models/reader_preferences.dart';
+import '../storage/file_prefs_backend.dart';
 import 'download_task.dart';
 
 /// 下载任务存储（可注入后端，测试用 InMemoryBackend）。
@@ -18,11 +20,28 @@ class DownloadStorage {
   final PrefsBackend _backend;
 
   DownloadStorage({PrefsBackend? backend})
-      : _backend = backend ?? const SharedPrefsBackend();
+      // 默认走独立文件存储：任务整列表 JSON 随下载量增长，shared_preferences
+      // 底层「轻量级偏好存储」在鸿蒙对大字符串值落盘不可靠且失败静默。
+      : _backend = backend ?? FilePrefsBackend();
 
   /// 读取全部任务。
   Future<List<DownloadTask>> loadAll() async {
-    final raw = await _backend.get(_key);
+    String? raw = await _backend.get(_key);
+    if (raw == null && _backend is FilePrefsBackend) {
+      // 一次性迁移：旧版本任务记录存于 shared_preferences，文件后端不存在
+      // 而旧值还在时搬过来，之后以文件为准（旧键保留不动，作兜底）。
+      try {
+        final legacy = await const SharedPrefsBackend().get(_key);
+        if (legacy != null && legacy.isNotEmpty) {
+          await _backend.set(_key, legacy);
+          AppLog.instance
+              .i('[下载] 任务记录已从偏好存储迁移到独立文件（${legacy.length} 字节）');
+          raw = legacy;
+        }
+      } on Object catch (e) {
+        AppLog.instance.w('[下载] 迁移旧偏好存储失败: $e');
+      }
+    }
     if (raw == null || raw.isEmpty) return <DownloadTask>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
