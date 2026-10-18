@@ -1,6 +1,8 @@
 **English** | [简体中文](./README.md)
 
-> Latest release: **v3.0.0 (stable)**. The previous release is **v3.0.0-beta.4** (pre-release beta, containing all 3.0.0-line capabilities). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
+> Latest release: **v3.1.0 (stable)**. The previous release is **v3.0.0** (stable — the 3.0.0 beta line consolidated: Material 3 visual system + media server + multi-platform ECH + reader enhancements and manga motion effects). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
+>
+> 🚧 **HarmonyOS / OpenHarmony port in progress**: the first HarmonyOS build has entered on-device verification. See [Platform Support & HarmonyOS Port](#2-platform-support--harmonyos-port-in-progress) below.
 
 # NexHub
 
@@ -38,6 +40,62 @@ Benefits of this design:
 
 ---
 
+## 2. Platform Support & HarmonyOS Port (in progress)
+
+### Platform status
+
+| Platform | Status | How to get it |
+| --- | --- | --- |
+| Android | ✅ Fully supported | APK from the Releases page |
+| Windows | ✅ Fully supported | zip / installer from the Releases page |
+| Linux | ✅ Fully supported | tar.gz / deb / AppImage from the Releases page |
+| macOS | ✅ Fully supported | zip / dmg from the Releases page |
+| **HarmonyOS / OpenHarmony (arm64 device)** | 🚧 Port in progress (preview) | Unsigned HAP from the Releases page (sideload) |
+
+### 🚧 HarmonyOS port notes
+
+A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, the HarmonyOS build is a **full "Source-as-Plugin" client**: the core chains — all four content modules, source import & parsing (including JS-scripted sources), manga / novel / video reading & watching, danmaku, downloads, favorites, and Bangumi sync — are already working.
+
+**Available on HarmonyOS (aligned with Android)**:
+
+- Full source parsing & reading chain (including JS-scripted sources, QuickJS engine);
+- Video playback (libmpv engine, same lineage as Android: playback speed / audio tracks / subtitles / anti-leech headers) with on-screen danmaku;
+- Picture-in-picture (system floating window), system notifications, saving images into the system gallery (system confirmation dialog, permission-free);
+- Local persistence for favorites / download tasks / history (standalone file storage — survives force-kill);
+- Bangumi login & sync (authorization completed in an in-app WebView);
+- In-app updates (opens the browser on the Releases page for the new HAP).
+
+**Installation (sideload)**: download `NexHub-ohos-arm64-unsigned.hap` from the Releases page → sign it yourself with an on-device signing tool and install (or install via DevEco Studio / hdc). Release artifacts are consistently unsigned; signing is left to the user.
+
+### HarmonyOS: to-do
+
+1. **Full on-device verification**: itemized checks across the reading chain, playback engine, persistence migration, and system capabilities;
+2. **Switch to the official stable SDK**: currently based on the community-maintained Flutter OHOS port (3.47 line); will switch and re-verify when the official stable release lands (expected December 2026);
+3. **First CI build verification**: the HarmonyOS packaging workflow is ready, pending its first run;
+4. **Recovery evaluation for degraded features**: directory picking, clipboard images, offline TTS, etc., to be restored depending on upstream progress or in-house plans.
+
+### HarmonyOS: known issues / platform differences (preview)
+
+| Feature | Status on HarmonyOS | Workaround / notes |
+| --- | --- | --- |
+| Local folder import | Directory picking unavailable | Use "import files" to pick files one by one |
+| Custom download directory / custom screenshot directory | Directory picking unavailable | Falls back to the in-app default location |
+| Plugin export / backup export | No directory picker | Saved to the default location, then shared via the system share sheet |
+| Per-source WebView network following | Does not follow per-source proxy / hosts / DoH | HTTP scraping is unaffected; only pages inside the WebView are affected |
+| Clipboard image import | Unavailable | Path-copy fallback exists |
+| Offline TTS reading | Unavailable (entry hidden) | Waiting for upstream adaptation |
+| Volume-key page turning | Unavailable (Android-only channel) | — |
+| Screen casting | Unavailable (entry hidden) | — |
+| Material You dynamic color | Not supported yet | Falls back to the default theme color |
+| ECH acceleration | Not supported yet | Direct connection |
+| Podcast background notification | Unavailable | In-app playback unaffected |
+| Emulator (x64) | Video playback unsupported | The playback engine only ships arm64 device artifacts; emulators work for image/text development |
+| Page transition animations | Slightly different from Android | Framework default transitions; no functional impact |
+
+> The HarmonyOS build is a preview. This list keeps evolving with on-device verification and upstream progress; fixes and feature recoveries will be noted in future release notes.
+
+---
+
 ## 🗺️ Roadmap (TODO · planned · community input welcome)
 
 The following features are **not yet implemented** and are priorities for upcoming versions. Design trade-offs are welcome in GitHub Discussions / Issues:
@@ -49,7 +107,7 @@ The following features are **not yet implemented** and are priorities for upcomi
 
 ---
 
-## 2. Source-as-Plugin · Co-created Community
+## 3. Source-as-Plugin · Co-created Community
 
 NexHub's vitality comes from community-maintained "sources." Everyone is welcome to participate:
 
@@ -61,7 +119,7 @@ NexHub's vitality comes from community-maintained "sources." Everyone is welcome
 
 ---
 
-## 3. Disclaimer
+## 4. Disclaimer
 
 > This disclaimer is drafted in accordance with the laws and regulations of the People's Republic of China (including, without limitation, the Cybersecurity Law, the Copyright Law, the Regulations on the Protection of the Right of Communication through Information Networks, and the Protection of Minors Law) and general international practice. By using this software you acknowledge that you have read, understood, and agreed to all of the following.
 
@@ -87,13 +145,14 @@ NexHub's vitality comes from community-maintained "sources." Everyone is welcome
 
 ---
 
-## 4. Acknowledgments
+## 5. Acknowledgments
 
 NexHub would not exist without the following projects and communities:
 
 - [Legado](https://github.com/gedoor/legado) (and its various forks): the "book source" rule system provided core inspiration for NexHub's "Source-as-Plugin" parsing and co-creation philosophy (especially the declarative / scripted approach for novel sources). NexHub's novel paginator independently implements a pagination algorithm inspired by Legado's `ChapterProvider` without copying its source code; the upstream Legado repository does not carry an explicit open-source license, so this acknowledgment is for inspiration only and implies no license grant.
 - [Mihon](https://github.com/mihonapp/mihon) (a Tachiyomi derivative, and its various forks): the extension-source architecture and manga-reader interactions provided important references for NexHub's manga parsing and reading experience. Mihon is released under the Apache License 2.0 (© Mihon contributors).
 - [RSSHub](https://github.com/DIYgod/RSSHub): its RSS aggregation capability provides the service foundation for NexHub's subscription feature. RSSHub is released under AGPL-3.0 (© DIYgod); NexHub only calls its instances as a client and does not modify or redistribute its source.
+- **Flutter HarmonyOS community (Flutter SIG / OpenHarmony adaptation project)**: for bringing HarmonyOS platform support to the Flutter ecosystem — the NexHub HarmonyOS build is based on the community-maintained Flutter OHOS SDK and adapted third-party packages;
 - [Flutter](https://flutter.dev) and the Dart team, for the excellent cross-platform framework;
 - [flutter_js](https://pub.dev/packages/flutter_js) (QuickJS engine), for the safe JS sandbox for embedded source scripts;
 - [xpath_selector](https://pub.dev/packages/xpath_selector) and [html](https://pub.dev/packages/html), for declarative extraction;
@@ -108,7 +167,7 @@ NexHub would not exist without the following projects and communities:
 
 ---
 
-## 5. Open-source License
+## 6. Open-source License
 
 This project is open-sourced under the **Apache License 2.0 (Apache-2.0)** — see the [LICENSE](LICENSE) file and the [NOTICE](NOTICE) third-party attribution file in the repository root.
 
