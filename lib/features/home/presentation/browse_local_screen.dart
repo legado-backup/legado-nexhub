@@ -8,6 +8,7 @@ import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/local/folder_import_dialog.dart';
 import '../../../core/local/import_permission.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/local/local_content_manager.dart';
 import '../../../core/local/local_content_actions.dart';
@@ -603,7 +604,14 @@ class _BrowseLocalScreenState extends State<BrowseLocalScreen> {
           AppIconButton(
             icon: Icons.folder_rounded,
             tooltip: l10n.browseLocalSelectFolder,
-            onPressed: _pickFolder,
+            // 鸿蒙目录选择不可用：入口保留但点按提示，引导改用「选择文件」。
+            onPressed: PlatformService.instance.isOHOS
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.folderImportOhosUnsupported)),
+                    );
+                  }
+                : _pickFolder,
           ),
         ],
       ),

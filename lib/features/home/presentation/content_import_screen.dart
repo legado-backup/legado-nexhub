@@ -6,6 +6,8 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/local/folder_import_dialog.dart';
+import '../../../core/local/ohos_folder_import_hint.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/local/import_permission.dart';
 import '../../../core/local/local_content_manager.dart';
 import '../../../core/local/saf_bridge.dart';
@@ -216,12 +218,15 @@ class _ContentImportScreenState extends State<ContentImportScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          FloatingActionButton.extended(
-            onPressed: _picking ? null : _pickFolder,
-            icon: const Icon(Icons.folder_rounded),
-            label: Text(l10n.importNovelPickFolder),
-          ),
-          const SizedBox(height: AppTokens.spaceMd),
+          // 鸿蒙目录选择不可用，隐藏文件夹入口（正文卡内有降级提示）。
+          if (!PlatformService.instance.isOHOS) ...<Widget>[
+            FloatingActionButton.extended(
+              onPressed: _picking ? null : _pickFolder,
+              icon: const Icon(Icons.folder_rounded),
+              label: Text(l10n.importNovelPickFolder),
+            ),
+            const SizedBox(height: AppTokens.spaceMd),
+          ],
           FloatingActionButton.extended(
             onPressed: _picking ? null : _pick,
             icon: _picking
@@ -252,6 +257,11 @@ class _ContentImportScreenState extends State<ContentImportScreen> {
                   _formatRow(l10n.contentImportNovelFormats, Icons.menu_book_rounded),
                   _formatRow(l10n.contentImportComicFormats, Icons.auto_stories_rounded),
                   _formatRow(l10n.contentImportMediaFormats, Icons.movie_rounded),
+                  // 鸿蒙目录选择不可用，说明改由「选择文件」路径导入。
+                  if (PlatformService.instance.isOHOS) ...<Widget>[
+                    const SizedBox(height: AppTokens.spaceMd),
+                    OhosFolderImportHint(l10n: l10n),
+                  ],
                 ],
               ),
             ),

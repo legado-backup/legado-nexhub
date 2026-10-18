@@ -14,6 +14,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/local/folder_import_dialog.dart';
+import '../../../core/local/ohos_folder_import_hint.dart';
 import '../../../core/local/import_permission.dart';
 import '../../../core/local/local_content_manager.dart';
 import '../../../core/local/archive_extractor.dart'
@@ -300,15 +301,18 @@ class _ImportNovelScreenState extends State<ImportNovelScreen> {
               ),
               const SizedBox(height: AppTokens.spaceMd),
 
-              // 选择目录按钮（Outlined）
-              SizedBox(
-                width: 200,
-                child: OutlinedButton.icon(
-                  onPressed: _picking ? null : _pickDirectory,
-                  icon: const Icon(Icons.folder_rounded, size: 18),
-                  label: Text(l10n.importNovelPickFolder),
+              // 选择目录按钮（Outlined）。鸿蒙目录选择不可用，降级为提示行。
+              if (PlatformService.instance.isOHOS)
+                OhosFolderImportHint(l10n: l10n)
+              else
+                SizedBox(
+                  width: 200,
+                  child: OutlinedButton.icon(
+                    onPressed: _picking ? null : _pickDirectory,
+                    icon: const Icon(Icons.folder_rounded, size: 18),
+                    label: Text(l10n.importNovelPickFolder),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
