@@ -278,7 +278,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flutter build hap --release --no-pub --target-platform ohos-arm64 \
+          # --no-tree-shake-icons：3.47 线 SDK 的 IconTreeShaker 读取 kernel 时
+          # 报 "Invalid SDK hash"（宿主 kernel 读取与 gen_snapshot 批次不一致，
+          # 上游 release 验证仅覆盖 debug 档）。关闭图标树摇只影响体积
+          # （Material 图标字体全量打包，约多 1-2MB），AOT 编译本身不受影响。
+          flutter build hap --release --no-pub --no-tree-shake-icons --target-platform ohos-arm64 \
             --dart-define=DANMAKU_APP_ID=${{ secrets.DANMAKU_APP_ID }} \
             --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} \
             --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} \
