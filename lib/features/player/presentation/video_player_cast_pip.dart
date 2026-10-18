@@ -155,6 +155,14 @@ extension _VideoCastPip on _VideoPlayerScreenState {
   }
 
   Future<void> _togglePip(AppLocalizations l10n) async {
+    // 鸿蒙：系统 PiP（floating）无适配、桌面窗口 PiP 也不适用——直接提示。
+    // 菜单入口已在鸿蒙隐藏（video_player_more_menu），此处为二次兜底。
+    if (PlatformService.instance.isOHOS) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.pipNotSupportedOnDevice)),
+      );
+      return;
+    }
     // 桌面端：用 window_manager 缩小窗口置顶，实现应用内 PiP。
     if (_isDesktop) {
       // 进出进行中忽略再次点击：防止并发进入把 PiP 小尺寸存成「原始尺寸」。

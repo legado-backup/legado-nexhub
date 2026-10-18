@@ -59,7 +59,7 @@ class RssNotificationService {
     }
   }
 
-  /// 请求通知权限（Android 13+ 显式请求；iOS/macOS 在初始化时已触发）。
+  /// 请求通知权限（Android 13+ 与鸿蒙显式请求；iOS/macOS 在初始化时已触发）。
   /// 返回是否获权；无后端平台返回 false。
   Future<bool> requestPermission() async {
     if (!_supported) return false;
@@ -68,7 +68,12 @@ class RssNotificationService {
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       final granted = await android?.requestNotificationsPermission();
-      return granted ?? true;
+      if (granted != null) return granted;
+      // 鸿蒙：插件同样是显式授权模型，未请求时通知不会弹出。
+      final ohos = _plugin.resolvePlatformSpecificImplementation<
+          OhosFlutterLocalNotificationsPlugin>();
+      final bool? ohosGranted = await ohos?.requestNotificationsPermission();
+      return ohosGranted ?? true;
     } catch (e, st) {
       debugPrint('RssNotificationService.requestPermission failed: $e\n$st');
       return false;
@@ -93,6 +98,12 @@ class RssNotificationService {
           iOS: DarwinNotificationDetails(),
           macOS: DarwinNotificationDetails(),
           linux: LinuxNotificationDetails(),
+          // 鸿蒙：slotType 为必填位参数，缺失时原生侧拿不到通知槽位，
+          // show 会失败（消息体也只带 platformSpecifics=null）。
+          ohos: OhosNotificationDetails(
+            OhosNotificationSlotType.CONTENT_INFORMATION,
+            slotDesc: 'RSS 订阅源有新内容时通知',
+          ),
         ),
       );
     } catch (e, st) {
