@@ -204,3 +204,7 @@ _tmp_legado/
 ohos/**/oh_modules/
 third_party/patched/*/ohos/oh_modules/
 third_party/patched/*/ohos/oh-package-lock.json5
+ohos/entry/build_old*/
+ohos/entry/build/
+ohos/build/
+ohos/.hvigor/
