@@ -18,6 +18,8 @@ import '../models/media_item.dart';
 import '../models/plugin_config.dart';
 import '../scraper/http_fetcher.dart';
 import '../services/config_loader.dart';
+import '../storage/file_prefs_backend.dart';
+import '../utils/app_log.dart';
 
 /// 历史条目——记录最近浏览的内容。
 class HistoryEntry {
@@ -179,7 +181,7 @@ class HistoryManager extends ChangeNotifier {
   HistoryManager({
     PrefsBackend? backend,
     this.maxPerModule = 50,
-  }) : _backend = backend ?? const SharedPrefsBackend();
+  }) : _backend = backend ?? FilePrefsBackend();
 
   final PrefsBackend _backend;
   final int maxPerModule;
@@ -189,7 +191,22 @@ class HistoryManager extends ChangeNotifier {
 
   /// 加载持久化数据。
   Future<void> init() async {
-    final raw = await _backend.get(_key);
+    String? raw = await _backend.get(_key);
+    if (raw == null && _backend is FilePrefsBackend) {
+      // 一次性迁移：旧版本历史存于 shared_preferences，其底层「轻量级
+      // 偏好存储」对数百 KB 的大字符串值落盘不可靠（鸿蒙 dataPreferences
+      // 失败静默），历史因此重启丢失。文件后端不存在而旧值还在时搬过来，
+      // 之后以文件为准（旧键保留不动，作兜底）。
+      try {
+        raw = await const SharedPrefsBackend().get(_key);
+        if (raw != null) {
+          await _backend.set(_key, raw);
+          AppLog.instance.i('[历史] 已从偏好存储迁移到独立文件（${raw.length} 字节）');
+        }
+      } on Object catch (e) {
+        AppLog.instance.w('[历史] 迁移旧偏好存储失败: $e');
+      }
+    }
     if (raw != null) {
       try {
         final list = jsonDecode(raw) as List<dynamic>;
@@ -197,6 +214,7 @@ class HistoryManager extends ChangeNotifier {
           final entry = HistoryEntry.fromJson(item as Map<String, dynamic>);
           _cache.putIfAbsent(entry.sourceType, () => <HistoryEntry>[]).add(entry);
         }
+        AppLog.instance.i('[历史] 加载 ${list.length} 条');
       } catch (_) {
         // 损坏数据忽略
       }
