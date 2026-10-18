@@ -185,6 +185,11 @@ jobs:
         run: |
           python3 - <<'PYEOF'
           import json, os, sys, urllib.request
+          from pathlib import Path
+          from urllib.parse import urlparse
+          def uri_to_path(uri):
+              # 跨平台：file:///D:/x -> D:/x (Windows)；file:///Users/x -> /Users/x (POSIX)
+              return urllib.request.url2pathname(urlparse(uri).path)
           p = os.path.join(".dart_tool", "package_config.json")
           with open(p, encoding="utf-8") as f:
               cfg = json.load(f)
@@ -202,7 +207,7 @@ jobs:
                           hit = c
                           break
                   if hit is not None:
-                      pkg["rootUri"] = "file:///" + hit.replace("\\", "/")
+                      pkg["rootUri"] = Path(hit).as_uri()
                       n += 1
                       if pkg.get("name") in ("shared_preferences", "url_launcher"):
                           print("::notice::resolved %s -> %s" % (pkg["name"], hit))
@@ -223,7 +228,7 @@ jobs:
                   missing = True
                   continue
               ru = entry.get("rootUri", "")
-              local = ru[8:] if ru.startswith("file:///") else None
+              local = uri_to_path(ru) if ru.startswith("file:///") else None
               if local is None:
                   print("::error::%s rootUri not absolute: %s" % (name, ru))
                   missing = True
