@@ -508,7 +508,7 @@ NexHub 的解析能力完全由源 JSON 驱动。一个源是一个 JSON 文件�
 | `antiHotlinking` | object | 可选；反盗链：`{ referer?, userAgent?, headers? }` |
 | `webviewConfig` | object | 可选；`{ adblock?, timeoutSeconds? }` |
 | `useWebview` | bool | 可选；整源使用 WebView 渲染 |
-| `stealthMode` | bool | 可选；隐身模式（减少特征） |
+| `stealthMode` | bool | 可选；无痕浏览默认值：`true` 时该源默认不记录浏览历史与搜索记录（源管理页的「无痕」开关可随时覆盖）。默认 `false` |
 | `network` | object | 可选（v0.4.0）；源级网络覆盖：`proxy` / `dns` / `hosts` / `sni` / `ech` |
 | `comments` | object | 可选（v0.4.0）；评论能力：`provider` / `routes` / `selectors` / `login` |
 | `routes.recommend` / `routes.related` | object | 可选；「猜你喜欢」推荐接口（优先 `recommend`，其次 `related`），详情页用 `{id}` 变量调用 |

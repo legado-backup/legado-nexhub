@@ -199,7 +199,9 @@ class HivePluginConfig {
     required this.routes,
     this.selectors,
     this.category,
-    this.stealthMode = true,
+    // 与 PluginConfig 默认值保持一致（false）。镜像层若默认 true，旧缓存缺
+    // 该字段时会静默把源判成无痕（不记历史/搜索记录）。
+    this.stealthMode = false,
     this.antiHotlinking,
     this.webviewConfig,
     this.deprecated = false,

@@ -508,7 +508,7 @@ Below is the source-authoring tutorial tiered by difficulty, consistent with the
 | `antiHotlinking` | object | Optional; anti-hotlink: `{ referer?, userAgent?, headers? }` |
 | `webviewConfig` | object | Optional; `{ adblock?, timeoutSeconds? }` |
 | `useWebview` | bool | Optional; use WebView rendering for the whole source |
-| `stealthMode` | bool | Optional; stealth mode (fewer fingerprints) |
+| `stealthMode` | bool | Optional; default value of incognito browsing for this source: when `true`, browse and search history are not recorded by default (the per-source "Incognito" toggle in source management can override anytime). Defaults to `false` |
 | `network` | object | Optional (v0.4.0); source-level network override: `proxy` / `dns` / `hosts` / `sni` / `ech` |
 | `comments` | object | Optional (v0.4.0); commenting: `provider` / `routes` / `selectors` / `login` |
 | `routes.recommend` / `routes.related` | object | Optional; 'You may also like' endpoint (`recommend` preferred, then `related`), called from the detail page with the `{id}` variable |
