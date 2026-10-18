@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.nexhub.nexhub",
     "vendor": "nexhub",
-    "versionCode": 51,
-    "versionName": "3.1.0",
+    "versionCode": 52,
+    "versionName": "3.1.1",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }
