@@ -137,7 +137,7 @@ jobs:
               # 经 API 读取，便于无 token 环境远程定位失败原因）。
               grep -naE "ERROR|error:|Error:|Exception|FAILURE|FAILED|not found|No such" ohos_build.log \
                 | tail -n 30 | cut -c1-380 \
-                | while IFS= read -r line; do echo "::error::${line//%/[0m%25}"; done
+                | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
               exit 1; }
 
       - name: 收集产物
