@@ -8,18 +8,19 @@ import '../platform/platform_service.dart';
 /// 规格 §7：把散落的 `MediaKit.ensureInitialized()` 调用收口到此，
 /// 由工厂 / 页面统一经此判断，避免鸿蒙侧误加载不存在的原生库。
 ///
-/// 鸿蒙内核（libmpv.so）由 `media_kit_libs_ohos` 随 HAP 打进 `libs/arm64-v8a/`。
-/// 内核是否就位由**构建开关**控制：
+/// 鸿蒙内核（libmpv.so）由 `media_kit_libs_ohos` 随 HAP 打进 `libs/arm64-v8a/`
+/// （构建前用 `tool/fetch_ohos_libmpv.ps1` 预置，详见《播放内核选型结论》）。
+/// 内核已验证随包可达，**默认开启**；排查内核问题时可显式退回降级提示：
 /// ```powershell
 /// flutter build hap --debug --target-platform ohos-arm64 `
-///   --dart-define=NEXHUB_OHOS_PLAYER=true
+///   --dart-define=NEXHUB_OHOS_PLAYER=false
 /// ```
-/// 默认关闭——原生库缺失时创建 `Player` 会崩溃，保持降级提示比黑屏可诊断。
-/// 验证通过后再把默认值翻成 true（阶段 6 收尾时应已默认开启）。
+/// 内核加载失败时（如 .so 未打入）由 [PlayerFactory] 捕获降级为占位后端，
+/// 不会崩溃。
 abstract final class PlayerRuntime {
-  /// 鸿蒙播放内核构建开关（`--dart-define=NEXHUB_OHOS_PLAYER=true`）。
+  /// 鸿蒙播放内核开关（默认开，可用 `NEXHUB_OHOS_PLAYER=false` 关闭）。
   static const bool ohosPlayerEnabled =
-      bool.fromEnvironment('NEXHUB_OHOS_PLAYER');
+      bool.fromEnvironment('NEXHUB_OHOS_PLAYER', defaultValue: true);
 
   /// 是否具备 media_kit 播放内核。
   ///
