@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import '../../../core/utils/app_log.dart';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
@@ -122,6 +123,7 @@ Future<void> _saveImage(
       bytes: bytes,
       fileName: name,
     );
+    AppLog.instance.i('[保存图片] 成功: $savedTo');
     messenger.showSnackBar(SnackBar(content: Text(l10n.imageSavedTo(savedTo))));
   } on Object {
     messenger.showSnackBar(SnackBar(content: Text(l10n.imageSaveFailed)));
