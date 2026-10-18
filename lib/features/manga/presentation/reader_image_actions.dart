@@ -178,7 +178,14 @@ Future<void> _copyImage(
   }
   try {
     final Uint8List bytes = await file.readAsBytes();
-    final clipboard = SystemClipboard.instance;
+    // SystemClipboard.instance 在无实现平台（如鸿蒙，super_native_extensions
+    // 无 ohos runner）可能抛异常而非返回 null——探针单独包 try。
+    SystemClipboard? clipboard;
+    try {
+      clipboard = SystemClipboard.instance;
+    } on Object {
+      clipboard = null;
+    }
     if (clipboard == null) {
       // 平台不支持剪贴板图片：回退为复制本地路径。
       await Clipboard.setData(ClipboardData(text: file.path));
@@ -196,8 +203,12 @@ Future<void> _copyImage(
     messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageSuccess)));
   } on Object {
     // 复制失败：回退为复制本地路径，保证菜单项「有反应」。
-    await Clipboard.setData(ClipboardData(text: file.path));
-    messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageFailed)));
+    try {
+      await Clipboard.setData(ClipboardData(text: file.path));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.imagePathCopied)));
+    } on Object {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageFailed)));
+    }
   }
 }
 

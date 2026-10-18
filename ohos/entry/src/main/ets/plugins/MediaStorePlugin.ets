@@ -9,9 +9,12 @@ import {
   MethodResult
 } from '@ohos/flutter_ohos';
 import common from '@ohos.app.ability.common';
+import hilog from '@ohos.hilog';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
+
+const TAG: string = 'NexHubMediaStore';
 
 /**
  * 与 Android 侧同名通道（nexhub/media_store）：保存图片到系统相册。
@@ -62,11 +65,23 @@ export default class MediaStorePlugin implements FlutterPlugin, AbilityAware, Me
   }
 
   private saveImage(call: MethodCall, result: MethodResult): void {
-    const bytes: Uint8Array = call.argument('bytes');
+    // StandardMessageCodec：Dart Uint8List → Uint8Array（个别版本为
+    // ArrayBuffer，两种都收）；显式类型声明满足 ArkTS 严格模式。
+    const bytesArg: Object | null = call.argument('bytes');
     const fileName: string = call.argument('fileName');
     const context: common.UIAbilityContext | null = this.uiContext;
-    if (bytes == null || fileName == null || bytes.length === 0 || context == null) {
+    if (bytesArg == null || fileName == null || fileName.length === 0 || context == null) {
+      hilog.error(0x0000, TAG, 'saveImage bad_args (bytes/fileName/context null)');
       result.error('bad_args', 'bytes/fileName is empty', '');
+      return;
+    }
+    let bytes: Uint8Array;
+    if (bytesArg instanceof Uint8Array) {
+      bytes = bytesArg;
+    } else if (bytesArg instanceof ArrayBuffer) {
+      bytes = new Uint8Array(bytesArg);
+    } else {
+      result.error('bad_args', 'bytes type unsupported', '');
       return;
     }
     const dot: number = fileName.lastIndexOf('.');
@@ -78,28 +93,43 @@ export default class MediaStorePlugin implements FlutterPlugin, AbilityAware, Me
         dst,
         fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC
       );
-      fileIo.writeSync(f.fd, bytes.buffer);
+      fileIo.writeSync(
+        f.fd,
+        bytes.buffer as ArrayBuffer,
+        { offset: bytes.byteOffset, length: bytes.byteLength }
+      );
       fileIo.closeSync(f);
     } catch (e) {
-      result.error('save_failed', `${(e as BusinessError).message}`, '');
+      const err = e as BusinessError;
+      hilog.error(0x0000, TAG, 'saveImage write failed: %{public}d %{public}s', err.code, err.message);
+      result.error('save_failed', `${err.message}`, '');
       return;
     }
-    const srcUri: string = fileUri.getUriFromPath(dst);
-    const helper: photoAccessHelper.PhotoAccessHelper =
-      photoAccessHelper.getPhotoAccessHelper(context);
-    const config: photoAccessHelper.PhotoCreationConfig = {
-      photoType: photoAccessHelper.PhotoType.IMAGE,
-      title: title,
-      fileNameExtension: ext
-    };
-    helper.showAssetsCreationDialog([srcUri], [config]).then((uris: Array<string>) => {
+    try {
+      const srcUri: string = fileUri.getUriFromPath(dst);
+      const helper: photoAccessHelper.PhotoAccessHelper =
+        photoAccessHelper.getPhotoAccessHelper(context);
+      const config: photoAccessHelper.PhotoCreationConfig = {
+        photoType: photoAccessHelper.PhotoType.IMAGE,
+        title: title,
+        fileNameExtension: ext
+      };
+      helper.showAssetsCreationDialog([srcUri], [config]).then((uris: Array<string>) => {
+        this.cleanupTemp(dst);
+        // 用户确认保存 → 回传展示位置；拒绝 → 空数组 → 空字符串。
+        hilog.info(0x0000, TAG, 'saveImage dialog done, saved=%{public}d', uris.length);
+        result.success(uris.length > 0 ? '系统相册' : '');
+      }).catch((e: BusinessError) => {
+        this.cleanupTemp(dst);
+        hilog.error(0x0000, TAG, 'saveImage dialog rejected: %{public}d %{public}s', e.code, e.message);
+        result.error('save_failed', `${e.code} ${e.message}`, '');
+      });
+    } catch (e) {
       this.cleanupTemp(dst);
-      // 用户确认保存 → 回传展示位置；拒绝 → 空数组 → 空字符串。
-      result.success(uris.length > 0 ? '系统相册' : '');
-    }).catch((e: BusinessError) => {
-      this.cleanupTemp(dst);
-      result.error('save_failed', `${e.code} ${e.message}`, '');
-    });
+      const err = e as BusinessError;
+      hilog.error(0x0000, TAG, 'saveImage dialog setup failed: %{public}s', err.message);
+      result.error('save_failed', `${err.message}`, '');
+    }
   }
 
   private cleanupTemp(path: string): void {

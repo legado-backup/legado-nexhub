@@ -143,7 +143,13 @@ Future<void> _copyImage(
   }
   try {
     final Uint8List bytes = await file.readAsBytes();
-    final clipboard = SystemClipboard.instance;
+    // SystemClipboard.instance 在无实现平台（如鸿蒙）可能抛异常而非返回 null。
+    SystemClipboard? clipboard;
+    try {
+      clipboard = SystemClipboard.instance;
+    } on Object {
+      clipboard = null;
+    }
     if (clipboard == null) {
       await Clipboard.setData(ClipboardData(text: file.path));
       messenger.showSnackBar(SnackBar(content: Text(l10n.imagePathCopied)));
@@ -159,8 +165,13 @@ Future<void> _copyImage(
     await clipboard.write(<DataWriterItem>[item]);
     messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageSuccess)));
   } on Object {
-    await Clipboard.setData(ClipboardData(text: file.path));
-    messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageFailed)));
+    // 复制失败：回退为复制本地路径，保证菜单项「有反应」。
+    try {
+      await Clipboard.setData(ClipboardData(text: file.path));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.imagePathCopied)));
+    } on Object {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageFailed)));
+    }
   }
 }
 

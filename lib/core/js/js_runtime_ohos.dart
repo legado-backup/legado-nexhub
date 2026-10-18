@@ -126,7 +126,15 @@ class OhosJsRuntime implements NexJsRuntime {
   @override
   Future<NexJsEvalResult> evaluateAsync(String code) {
     // 延后一个事件循环执行：避免在原生 sendMessage 回调栈内重入求值。
-    return Future<NexJsEvalResult>(() => evaluate(code));
+    // 运行时可能在排队期间被释放（页面退出 / 换源 / 超时清理）——此时安静
+    // 返回错误结果而非抛异常：抛进 Timer 的异常会以 Uncaught zone error
+    // 刷屏（真机日志曾每秒数条）。
+    return Future<NexJsEvalResult>(() {
+      if (_disposed) {
+        return const NexJsEvalResult('QuickJS 运行时已释放', isError: true);
+      }
+      return evaluate(code);
+    });
   }
 
   @override

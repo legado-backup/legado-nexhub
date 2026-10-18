@@ -18,6 +18,8 @@ import 'dart:io' show Directory, File;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
+
+import '../utils/app_log.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -74,14 +76,21 @@ class ImageSaver {
       // 鸿蒙：原生 MediaStorePlugin（nexhub/media_store）调系统
       // 「保存到相册」确认框（photoAccessHelper.showAssetsCreationDialog，
       // API 12+，免存储权限）；用户取消返回空串。
-      final String? saved = await _channel.invokeMethod<String>(
-        'saveImage',
-        <String, dynamic>{
-          'bytes': bytes,
-          'fileName': fileName,
-          'mime': _mimeFor(fileName),
-        },
-      );
+      final String? saved;
+      try {
+        saved = await _channel.invokeMethod<String>(
+          'saveImage',
+          <String, dynamic>{
+            'bytes': bytes,
+            'fileName': fileName,
+            'mime': _mimeFor(fileName),
+          },
+        );
+      } on PlatformException catch (e) {
+        // 原生失败原因透传日志（保存失败类反馈的首要排查项）。
+        AppLog.instance.w('[保存图片] 原生通道失败: ${e.code} ${e.message}');
+        rethrow;
+      }
       if (saved == null || saved.isEmpty) {
         throw StateError('saveImage declined by user');
       }
