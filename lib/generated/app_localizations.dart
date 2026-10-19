@@ -3944,6 +3944,12 @@ abstract class AppLocalizations {
   /// **'Custom download folder isn\'t supported on HarmonyOS yet. Files are saved to the app directory.'**
   String get downloadPathOhosUnsupported;
 
+  /// No description provided for @folderImportOhosUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder import isn\'t supported on HarmonyOS yet. Use file import instead.'**
+  String get folderImportOhosUnsupported;
+
   /// No description provided for @downloadPathSet.
   ///
   /// In en, this message translates to:

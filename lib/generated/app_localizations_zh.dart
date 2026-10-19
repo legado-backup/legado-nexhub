@@ -1997,6 +1997,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadPathOhosUnsupported => '鸿蒙版暂不支持自定义下载目录，文件将保存到应用目录';
 
   @override
+  String get folderImportOhosUnsupported => '鸿蒙版暂不支持文件夹导入，请改用「选择文件」导入';
+
+  @override
   String get downloadPathSet => '下载路径已更新';
 
   @override
