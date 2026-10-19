@@ -9,11 +9,15 @@
 /// 接线：Android 侧经 `ProxyController.setProxyOverride` 用**静态全量规则**把
 /// WebView 全部流量导到本地正向代理（API 28+；androidx `ProxyConfig` 只认
 /// `[scheme=]host[:port]` 规则，不支持 PAC/域名分流，hosts/DoH 的按域解析由
-/// 本地代理完成，非源域名由代理按系统 DNS 回退）。Windows 侧 WebView2 不支持
-/// 运行期 ProxyController，改为创建带 `--proxy-server` 启动参数的
-/// WebView2 环境（[WebViewEnvironment]）：hosts/DoH 模式全量指向本地正向代理，
-/// 手动代理模式直指用户代理。不同启动参数必须配不同 `userDataFolder`
-/// （WebView2 共享浏览器进程按 options 匹配，不匹配 → ERROR_INVALID_STATE）。
+/// 本地代理完成，非源域名由代理按系统 DNS 回退）。鸿蒙侧走
+/// `flutter_inappwebview_ohos` 已封装的 ArkWeb `ProxyController`
+/// （`webview.ProxyController.applyProxyOverride`，API 15+，作用域=应用内全部
+/// `Web` 组件）；规则格式为 `[scheme://]host[:port]`，本地正向代理同样负责
+/// hosts/DoH 的按域解析。Windows 侧 WebView2 不支持运行期 ProxyController，
+/// 改为创建带 `--proxy-server` 启动参数的 WebView2 环境
+/// （[WebViewEnvironment]）：hosts/DoH 模式全量指向本地正向代理，手动代理模式
+/// 直指用户代理。不同启动参数必须配不同 `userDataFolder`（WebView2 共享浏览器
+/// 进程按 options 匹配，不匹配 → ERROR_INVALID_STATE）。
 /// 本文件只做配置驱动的逻辑，不写死任何站点。
 library;
 
@@ -30,6 +34,7 @@ import '../../models/plugin_config.dart';
 import '../../platform/platform_service.dart';
 import '../model/network_config.dart';
 import 'dns_resolver.dart';
+import 'webview_proxy_rule.dart';
 import '../network_config_service.dart';
 
 /// 源 WebView 网络跟随桥（进程内单例）。
@@ -97,12 +102,16 @@ class WebviewSourceNetwork {
 
     // 手动代理模式：直接让 ProxyController 走该代理，无需本地代理。
     if (!hasCustomDns && manualProxy) {
-      // androidx ProxyConfig 规则格式为 `[scheme=]host[:port]`（裸 host:port 即
-      // HTTP 代理，socks 必须带 scheme= 前缀）。原先发的 'SOCKS h:p' / 'PROXY h:p'
-      // 不是合法规则，被静默忽略 → WebView 直连（手机跟随从未生效的原因之一）。
-      final proxyUrl = profile.proxy.protocol == ProxyProtocol.socks5
-          ? 'socks5=${profile.proxy.host}:${profile.proxy.port}'
-          : '${profile.proxy.host}:${profile.proxy.port}';
+      // 规则语法因平台而异：androidx ProxyConfig 为 `[scheme=]host[:port]`
+      // （裸 host:port 即 HTTP 代理，socks 必须带 `socks5=` 前缀；原先发的
+      // 'SOCKS h:p' / 'PROXY h:p' 不是合法规则，被静默忽略 → WebView 直连）；
+      // ArkWeb ProxyConfig 为 `[scheme://]host[:port]`。
+      final proxyUrl = webviewProxyRuleUrl(
+        profile.proxy.host,
+        profile.proxy.port,
+        ohos: PlatformService.instance.isOHOS,
+        socks5: profile.proxy.protocol == ProxyProtocol.socks5,
+      );
       final ok = await _setProxy(proxyUrl: proxyUrl);
       if (ok) {
         _refCount++;
@@ -136,7 +145,13 @@ class WebviewSourceNetwork {
     _dns = profile.dns;
     _hosts = profile.hosts;
 
-    final ok = await _setProxy(proxyUrl: '127.0.0.1:$_port');
+    final ok = await _setProxy(
+      proxyUrl: webviewProxyRuleUrl(
+        '127.0.0.1',
+        _port,
+        ohos: PlatformService.instance.isOHOS,
+      ),
+    );
     if (ok) {
       _refCount++;
     } else {
@@ -567,9 +582,19 @@ class WebviewSourceNetwork {
     }
   }
 
-  // ---- 平台通道（Android ProxyController）----
+  // ---- 平台代理覆盖（Android 通道 / 鸿蒙插件 ProxyController）----
+
+  /// 鸿蒙代理设置：全部 scheme 走 [proxyUrl]，回环地址直连。
+  ///
+  /// 与 Android 一致只给一条全量规则——ArkWeb 的 ProxyConfig 同样不支持
+  /// PAC/域名分流；hosts/DoH 的按域解析由本地正向代理完成。
+  static ProxySettings _ohosProxySettings(String proxyUrl) => ProxySettings(
+        proxyRules: <ProxyRule>[ProxyRule(url: proxyUrl)],
+        bypassRules: const <String>['localhost', '127.0.0.1'],
+      );
 
   Future<bool> _setProxy({String? pacUrl, String? proxyUrl}) async {
+    if (PlatformService.instance.isOHOS) return _setOhosProxy(proxyUrl);
     try {
       final r = await _channel.invokeMethod<bool>('setProxyOverride', <String, dynamic>{
         if (pacUrl != null) 'pacUrl': pacUrl,
@@ -585,7 +610,33 @@ class WebviewSourceNetwork {
     }
   }
 
+  /// 鸿蒙：经 flutter_inappwebview_ohos 的 ProxyController 下发 ArkWeb 覆盖。
+  ///
+  /// 插件通道在目标 SDK（API 15+）不可用 / 引擎未就绪时抛错；网络跟随是
+  /// best-effort，失败返回 false 由调用方回落到 WebView2 分支（鸿蒙上必空）。
+  Future<bool> _setOhosProxy(String? proxyUrl) async {
+    if (proxyUrl == null || proxyUrl.isEmpty) return false;
+    try {
+      await ProxyController.instance().setProxyOverride(
+        settings: _ohosProxySettings(proxyUrl),
+      );
+      debugPrint('WebviewProxy(OHOS) applied rule=$proxyUrl');
+      return true;
+    } on Object catch (e) {
+      debugPrint('WebviewProxy(OHOS) setProxyOverride failed: $e');
+      return false;
+    }
+  }
+
   Future<void> _clearProxy() async {
+    if (PlatformService.instance.isOHOS) {
+      try {
+        await ProxyController.instance().clearProxyOverride();
+      } on Object catch (e) {
+        debugPrint('WebviewProxy(OHOS) clearProxyOverride failed: $e');
+      }
+      return;
+    }
     try {
       await _channel.invokeMethod<void>('clearProxyOverride');
     } on Object catch (e) {
