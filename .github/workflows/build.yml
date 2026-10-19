@@ -188,6 +188,18 @@
 #     - **其他平台排查**：Android 三个 ABI 的 jniLibs libechproxy.so 均已入库、Gradle 自动
 #       打包，无此 bug（仍加校验步骤防回归）；Linux/macOS 引擎本体（libechproxy.so /
 #       .dylib）尚无构建脚本与入库产物，属功能缺口（FFI 后端安全降级），非本次打包问题。
+#   v29（当前）：
+#     - **新增 iOS 无签名构建 job**：在 macos-latest 上跑 `flutter build ios --release
+#       --no-codesign`，产出未签名的 Runner.app，再手动塞进 Payload/ 打成标准
+#       `NexHub-ios.ipa`（自签/越狱侧载用）。未签名 IPA 无法直接装入非越狱真机，仅作
+#       构建产物分发。Release 文件清单与 needs 同步纳入 ios-build。
+#     - **iOS 工程 Podfile 缺失**：仓库 ios/ 已含 Runner.xcodeproj，但 ios/Podfile 未入库，
+#       `flutter build ios` 在 pod install 阶段会因找不到 Podfile 失败。job 内加「确保 iOS
+#       工程存在」步骤——Podfile 缺失时用 `flutter create --platforms=ios .` 重新生成
+#       （含 Podfile，保留既有 Runner 代码与配置），与 Linux job 的保工程逻辑一致。
+#     - **包名统一**：ios/Runner.xcodeproj/project.pbxproj 的 PRODUCT_BUNDLE_IDENTIFIER
+#       已从默认 com.example.nexhub 改为 com.nexhub.app，与 Android 的 com.nexhub.app 一致；
+#       侧载用户用本地自签工具（AltStore / Sideloadly 等）对未签名 IPA 重新签名即可安装。
 # =============================================================================
 
 name: Build & Release NexHub
@@ -874,9 +886,89 @@ jobs:
           path: NexHub-macos.dmg
           if-no-files-found: error
 
+  ios:
+    name: iOS (无签名)
+    runs-on: macos-latest
+    if: ${{ !contains(github.ref_name, 'ohos') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: 'stable'
+          cache: true
+      - name: 启用 iOS 支持
+        run: flutter config --enable-ios
+      - name: 清理旧缓存（强制重建 Pods）
+        run: flutter clean || true
+      - name: 确保 iOS 工程存在（缺失 Podfile 则生成）
+        # iOS 工程的 Podfile 未入库（仓库历史未提交），`flutter build ios` 在 pod install
+        # 阶段会因找不到 Podfile 失败。缺失时重新生成 iOS 工程文件（含 Podfile），
+        # 保留既有 Runner 代码与配置；已存在则跳过。
+        shell: bash
+        run: |
+          set -e
+          if [ -f ios/Podfile ]; then
+            echo "ios/Podfile 已存在，跳过生成"
+          else
+            echo "缺失 ios/Podfile，重新生成 iOS 工程"
+            flutter create --platforms=ios .
+          fi
+          echo "== ios/ 结构 =="
+          ls -la ios
+      - name: 获取依赖
+        run: flutter pub get 2>&1
+      - name: 生成多语言文件 (gen-l10n)
+        run: |
+          flutter gen-l10n 2>&1
+          echo "== generated l10n files =="
+          ls -la lib/generated 2>&1 || true
+          grep -n "class AppLocalizations" lib/generated/app_localizations.dart 2>&1 || true
+      - name: 重新生成启动图标 (flutter_launcher_icons)
+        # 用 assets/icon/icon.png 重新生成 iOS AppIcon.appiconset。
+        run: flutter pub run flutter_launcher_icons 2>&1 || dart run flutter_launcher_icons 2>&1
+      - name: 编译 iOS（无签名）
+        # --no-codesign：跳过代码签名，产出未签名的 Runner.app。
+        # 未签名 IPA 无法直接装入非越狱真机，仅作构建产物/自签分发使用。
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign --verbose --dart-define=DANMAKU_APP_ID=${{ secrets.DANMAKU_APP_ID }} --dart-define=DANMAKU_APP_SECRET=${{ secrets.DANMAKU_APP_SECRET }} --dart-define=BANGUMI_CLIENT_ID=${{ secrets.BANGUMI_CLIENT_ID }} --dart-define=BANGUMI_CLIENT_SECRET=${{ secrets.BANGUMI_CLIENT_SECRET }} 2>&1 | tee ios_build.log || { echo "=== IOS BUILD FAILED ===" && tail -n 500 ios_build.log; exit 1; }
+      - name: 校验 Runner.app 已产出
+        shell: bash
+        run: |
+          set -e
+          APP=build/ios/iphoneos/Runner.app
+          if [ ! -d "$APP" ]; then
+            echo "!! 未找到 $APP"
+            echo "== build/ios 结构 =="
+            find build/ios -maxdepth 3 -type d | head -n 40
+            exit 1
+          fi
+          echo "Runner.app 已产出: $(du -sh "$APP" | cut -f1)"
+      - name: 打包未签名 IPA
+        # 未签名无法走 `flutter build ipa` 的 export 流程（export 需 team/签名），
+        # 故手动把 Runner.app 塞进 Payload/ 并 zip 成标准 .ipa（自签/越狱侧载用）。
+        shell: bash
+        run: |
+          set -e
+          APP_DIR=build/ios/iphoneos
+          rm -rf "$APP_DIR/Payload" NexHub-ios.ipa
+          mkdir -p "$APP_DIR/Payload"
+          cp -r "$APP_DIR/Runner.app" "$APP_DIR/Payload/"
+          cd "$APP_DIR"
+          zip -r NexHub-ios.ipa Payload
+          cd -
+          ls -la NexHub-ios.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: NexHub-ios.ipa
+          if-no-files-found: error
+
   release:
     name: 发布到 GitHub Releases
-    needs: [android, windows, linux, macos]
+    needs: [android, windows, linux, macos, ios]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'ohos')
     permissions:
@@ -902,3 +994,4 @@ jobs:
             artifacts/linux-appimage/NexHub-linux-x64.AppImage
             artifacts/macos-build/NexHub-macos.zip
             artifacts/macos-dmg/NexHub-macos.dmg
+            artifacts/ios-build/NexHub-ios.ipa
