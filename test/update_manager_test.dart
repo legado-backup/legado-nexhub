@@ -1,9 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nexhub/core/platform/platform_service.dart';
 import 'package:nexhub/core/update/update_manager.dart';
+import 'package:nexhub/core/update/update_settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+UpdateAsset _asset(String name) => UpdateAsset(
+      name: name,
+      browserDownloadUrl: 'https://github.com/nexhub-app/nexhub/releases'
+          '/download/v9.9.9/$name',
+    );
 
 /// 可编程 Dio 适配器：模拟镜像测速会遇到的各类网络怪相
 /// （黑洞连接、忽略 Range 整包回流、4xx 拒绝等）。
@@ -221,6 +231,150 @@ void main() {
       // （45 镜像 × 300ms 全测完约 1.8s+，预算拦截后远小于此）。
       expect(picked, isNotNull);
       expect(sw.elapsed, lessThan(const Duration(milliseconds: 1200)));
+    });
+  });
+
+  group('安装包平台对应（防止跨平台误选）', () {
+    test('Android 只选择 APK，无 APK 时不回退到鸿蒙 HAP', () {
+      final List<UpdateAsset> assets = <UpdateAsset>[
+        _asset('NexHub-ohos-arm64-unsigned.hap'),
+        _asset('app-arm64-v8a-release.apk'),
+      ];
+      expect(
+        UpdateManager.selectAssetForPlatform(assets, AppPlatform.android)?.name,
+        'app-arm64-v8a-release.apk',
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(
+          <UpdateAsset>[_asset('NexHub-ohos-arm64-unsigned.hap')],
+          AppPlatform.android,
+        ),
+        isNull,
+      );
+    });
+
+    test('Windows 优先 EXE，ZIP 兜底只认 Windows 包', () {
+      expect(
+        UpdateManager.selectAssetForPlatform(
+          <UpdateAsset>[
+            _asset('NexHub-windows-x64.zip'),
+            _asset('NexHub-setup-3.1.0.exe'),
+          ],
+          AppPlatform.windows,
+        )?.name,
+        'NexHub-setup-3.1.0.exe',
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(
+          <UpdateAsset>[
+            _asset('NexHub-macos.zip'),
+            _asset('NexHub-windows-x64.zip'),
+          ],
+          AppPlatform.windows,
+        )?.name,
+        'NexHub-windows-x64.zip',
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(
+          <UpdateAsset>[_asset('NexHub-macos.zip')],
+          AppPlatform.windows,
+        ),
+        isNull,
+      );
+    });
+
+    test('macOS / Linux / 鸿蒙 / iOS 只匹配各自格式', () {
+      final List<UpdateAsset> assets = <UpdateAsset>[
+        _asset('app-release.apk'),
+        _asset('NexHub-linux-x64.AppImage'),
+        _asset('NexHub-macos.dmg'),
+        _asset('NexHub-ohos-arm64-unsigned.hap'),
+        _asset('NexHub-ios.ipa'),
+      ];
+      expect(
+        UpdateManager.selectAssetForPlatform(assets, AppPlatform.macos)?.name,
+        'NexHub-macos.dmg',
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(assets, AppPlatform.linux)?.name,
+        'NexHub-linux-x64.AppImage',
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(assets, AppPlatform.ohos),
+        isNull,
+      );
+      expect(
+        UpdateManager.selectAssetForPlatform(assets, AppPlatform.ios),
+        isNull,
+      );
+    });
+  });
+
+  group('发布平台过滤（Android 不拉取鸿蒙专属发布）', () {
+    test('tag 含 ohos 的发布识别为鸿蒙专属', () {
+      expect(UpdateManager.isOhosReleaseTag('v3.1.1-ohos-beta.1'), isTrue);
+      expect(UpdateManager.isOhosReleaseTag('V3.2.0-OHOS'), isTrue);
+      expect(UpdateManager.isOhosReleaseTag('v3.1.0'), isFalse);
+    });
+
+    test('测试版通道在非鸿蒙平台跳过仅含 HAP 的最新发布', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final UpdateManager m = UpdateManager.instance;
+      await m.saveSettings(
+        const UpdateSettings(updateChannel: UpdateChannel.beta),
+      );
+      addTearDown(() async {
+        await m.saveSettings(const UpdateSettings.defaults());
+      });
+      m.adapterForTest = _FakeMirrorAdapter((options, cancelFuture) async {
+        final String body = jsonEncode(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'tag_name': 'v3.1.1-ohos-beta.1',
+            'name': 'NexHub v3.1.1-ohos-beta.1',
+            'body': 'ohos only',
+            'html_url':
+                'https://github.com/nexhub-app/NexHub/releases/tag/v3.1.1-ohos-beta.1',
+            'prerelease': true,
+            'assets': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'name': 'NexHub-ohos-arm64-unsigned.hap',
+                'browser_download_url':
+                    'https://github.com/nexhub-app/NexHub/releases/download/'
+                        'v3.1.1-ohos-beta.1/NexHub-ohos-arm64-unsigned.hap',
+                'size': 100,
+              },
+            ],
+          },
+          <String, dynamic>{
+            'tag_name': 'v3.1.0',
+            'name': 'NexHub v3.1.0',
+            'body': 'all platforms',
+            'html_url':
+                'https://github.com/nexhub-app/NexHub/releases/tag/v3.1.0',
+            'prerelease': false,
+            'assets': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'name': 'app-arm64-v8a-release.apk',
+                'browser_download_url':
+                    'https://github.com/nexhub-app/NexHub/releases/download/'
+                        'v3.1.0/app-arm64-v8a-release.apk',
+                'size': 100,
+              },
+            ],
+          },
+        ]);
+        return ResponseBody.fromString(
+          body,
+          200,
+          headers: <String, List<String>>{
+            Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+          },
+        );
+      });
+
+      final UpdateReleaseInfo? release = await m.checkForUpdate();
+      expect(release, isNotNull);
+      expect(release!.tagName, 'v3.1.0');
     });
   });
 }

@@ -115,10 +115,13 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen> {
       _settings = _manager.settings;
       _loaded = true;
     });
-    _ensureMirrorExpansionValid();
-    // 进入页面即用真实安装包文件自动测速（用户需求：打开即可看到各镜像
-    // 对下载文件的实测延迟；全部失败时给出统一提示）。
-    _probeAllMirrors();
+    // 鸿蒙已移除内置更新，镜像测速与相关设置不再出现。
+    if (_manager.supportsInAppUpdate) {
+      _ensureMirrorExpansionValid();
+      // 进入页面即用真实安装包文件自动测速（用户需求：打开即可看到各镜像
+      // 对下载文件的实测延迟；全部失败时给出统一提示）。
+      _probeAllMirrors();
+    }
   }
 
   /// 若当前选中的镜像位于折叠区，自动展开，避免选中项「消失」。
@@ -444,57 +447,62 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen> {
                           },
                         ),
                       ),
-                      SettingsTile(
-                        key: const ValueKey<String>('update.autoDownload'),
-                        icon: Icons.download_for_offline_rounded,
-                        title: l10n.updateAutoDownload,
-                        subtitle: l10n.updateAutoDownloadDesc,
-                        trailing: Switch(
-                          value: _settings.autoDownload,
-                          onChanged: (v) {
-                            v == true
-                                ? AppHaptics.toggleOn()
-                                : AppHaptics.toggleOff();
-                            _save(_settings.copyWith(autoDownload: v));
-                          },
-                        ),
-                      ),
-                      if (_settings.autoDownload)
+                      // 鸿蒙已移除内置更新：下载相关开关同步隐藏。
+                      if (_manager.supportsInAppUpdate) ...<Widget>[
                         SettingsTile(
-                          key: const ValueKey<String>('update.wifiOnly'),
-                          icon: Icons.wifi_rounded,
-                          title: l10n.updateWifiOnlyAutoDownload,
-                          subtitle: l10n.updateWifiOnlyAutoDownloadDesc,
+                          key: const ValueKey<String>('update.autoDownload'),
+                          icon: Icons.download_for_offline_rounded,
+                          title: l10n.updateAutoDownload,
+                          subtitle: l10n.updateAutoDownloadDesc,
                           trailing: Switch(
-                            value: _settings.wifiOnlyAutoDownload,
+                            value: _settings.autoDownload,
                             onChanged: (v) {
                               v == true
                                   ? AppHaptics.toggleOn()
                                   : AppHaptics.toggleOff();
-                              _save(
-                                _settings.copyWith(wifiOnlyAutoDownload: v),
-                              );
+                              _save(_settings.copyWith(autoDownload: v));
                             },
                           ),
                         ),
-                      SettingsTile(
-                        key: const ValueKey<String>('update.inAppDownload'),
-                        icon: Icons.storage_rounded,
-                        title: l10n.updateInAppDownload,
-                        subtitle: l10n.updateInAppDownloadDesc,
-                        trailing: Switch(
-                          value: _settings.inAppDownload,
-                          onChanged: (v) {
-                            v == true
-                                ? AppHaptics.toggleOn()
-                                : AppHaptics.toggleOff();
-                            _save(_settings.copyWith(inAppDownload: v));
-                          },
+                        if (_settings.autoDownload)
+                          SettingsTile(
+                            key: const ValueKey<String>('update.wifiOnly'),
+                            icon: Icons.wifi_rounded,
+                            title: l10n.updateWifiOnlyAutoDownload,
+                            subtitle: l10n.updateWifiOnlyAutoDownloadDesc,
+                            trailing: Switch(
+                              value: _settings.wifiOnlyAutoDownload,
+                              onChanged: (v) {
+                                v == true
+                                    ? AppHaptics.toggleOn()
+                                    : AppHaptics.toggleOff();
+                                _save(
+                                  _settings.copyWith(wifiOnlyAutoDownload: v),
+                                );
+                              },
+                            ),
+                          ),
+                        SettingsTile(
+                          key: const ValueKey<String>('update.inAppDownload'),
+                          icon: Icons.storage_rounded,
+                          title: l10n.updateInAppDownload,
+                          subtitle: l10n.updateInAppDownloadDesc,
+                          trailing: Switch(
+                            value: _settings.inAppDownload,
+                            onChanged: (v) {
+                              v == true
+                                  ? AppHaptics.toggleOn()
+                                  : AppHaptics.toggleOff();
+                              _save(_settings.copyWith(inAppDownload: v));
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
 
+                  // 鸿蒙已移除内置更新：镜像相关设置整体隐藏。
+                  if (_manager.supportsInAppUpdate) ...<Widget>[
                   const SizedBox(height: AppTokens.spaceLg),
 
                   // ── 镜像设置 ──
@@ -588,8 +596,8 @@ class _SettingsUpdateScreenState extends State<SettingsUpdateScreen> {
                     icon: const Icon(Icons.speed_rounded),
                     label: Text(l10n.updateTestMirrors),
                   ),
-
                   const SizedBox(height: AppTokens.spaceXl),
+                  ],
 
                   // ── 检查更新 ──
                   FilledButton.icon(
@@ -757,6 +765,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
 
   Future<void> _startDownload() async {
     AppHaptics.medium();
+    if (!_manager.supportsInAppUpdate) return;
     setState(() => _downloading = true);
     final String? path = await _manager.downloadInstaller(
       widget.release,
@@ -806,6 +815,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final String mirrorName = _manager.currentMirrorName;
     final int percent = (_progress * 100).round();
+    final bool supportsInApp = _manager.supportsInAppUpdate;
 
     return AlertDialog(
       title: Text(l10n.updateAvailable(widget.release.tagName)),
@@ -819,9 +829,9 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             children: <Widget>[
               // 完整更新说明：限高滚动区（短内容贴合收缩），渲染 Markdown
               // 而非纯文本截断——发布正文远超旧实现的 6 行上限。
-              if (widget.release.body.isEmpty)
+              if (widget.release.body.isEmpty && supportsInApp)
                 Text(l10n.updateAvailableHint, style: textTheme.bodyMedium)
-              else
+              else if (widget.release.body.isNotEmpty)
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.sizeOf(context).height * 0.45,
@@ -832,6 +842,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                     ),
                   ),
                 ),
+              // 鸿蒙无内置更新：只展示更新内容，不展示镜像、进度与下载状态。
+              if (supportsInApp) ...<Widget>[
               const SizedBox(height: AppTokens.spaceMd),
               Row(
                 children: <Widget>[
@@ -869,12 +881,18 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                   ],
                 ),
               ],
+              ],
             ],
           ),
         ),
       ),
       actions: <Widget>[
-        if (!_downloading && !_downloaded) ...<Widget>[
+        if (!supportsInApp) ...<Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ] else if (!_downloading && !_downloaded) ...<Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(l10n.cancel),

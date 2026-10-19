@@ -299,6 +299,12 @@ class UpdateManager extends ChangeNotifier {
       _status == UpdateStatus.downloading ||
       _status == UpdateStatus.installing;
 
+  /// 当前平台是否支持应用内下载并安装更新。
+  ///
+  /// 鸿蒙 HAP 需系统包管理器签名安装，应用内无法拉起安装器，故关闭内置
+  /// 更新，只保留检查更新与更新说明展示。
+  bool get supportsInAppUpdate => !PlatformService.instance.isOHOS;
+
   /// 初始化：加载持久化设置。
   Future<void> init() async {
     _settings = await UpdateSettingsStore().load();
@@ -350,19 +356,29 @@ class UpdateManager extends ChangeNotifier {
           .whereType<Map<String, dynamic>>()
           .map(_ReleaseJson.fromJson)
           .toList();
+      // 非鸿蒙平台跳过鸿蒙专属发布（tag 含 ohos，资产仅 HAP）：否则测试版
+      // 通道会把最新 HAP 发布当成 Android/桌面的新版本。
+      final bool isOHOS = PlatformService.instance.isOHOS;
+      final List<_ReleaseJson> visible = isOHOS
+          ? all
+          : all
+              .where((r) => !isOhosReleaseTag(r.tagName))
+              .toList(growable: false);
+      if (visible.isEmpty) {
+        throw Exception('no release for this platform');
+      }
       final bool wantBeta = _settings.updateChannel == UpdateChannel.beta;
       _ReleaseJson? first;
-      for (final r in all) {
+      for (final r in visible) {
         // 稳定版通道：跳过预发布（GitHub 的 prerelease 标记 + tag 识别兜底，
         // 防止发布时漏勾 prerelease 导致 alpha/beta/rc 混入稳定版）。
-        if (!wantBeta &&
-            (r.prerelease || isPrereleaseVersion(r.tagName))) {
+        if (!wantBeta && (r.prerelease || isPrereleaseVersion(r.tagName))) {
           continue;
         }
         first = r;
         break;
       }
-      first ??= all.first;
+      first ??= visible.first;
       final assets = first.assets
           .map((a) => UpdateAsset(
                 name: a['name'] as String? ?? '',
@@ -394,6 +410,13 @@ class UpdateManager extends ChangeNotifier {
   /// （如 `v2.1.0-alpha.1`、`v2.1.0-rc.1`）。
   static bool isPrereleaseVersion(String version) =>
       _splitSemver(version)[1].isNotEmpty;
+
+  /// 发布 tag 是否为鸿蒙专属发布。
+  ///
+  /// 鸿蒙构建使用 `v<version>-ohos...` 标签且只上传 HAP，非鸿蒙平台必须
+  /// 跳过这类发布，避免把 HAP 当作本平台安装包。
+  static bool isOhosReleaseTag(String tagName) =>
+      tagName.toLowerCase().contains('ohos');
 
   /// 判断版本 a 是否比 b 新（SemVer 规则，含预发布段）。
   ///
@@ -468,43 +491,59 @@ class UpdateManager extends ChangeNotifier {
     return 0;
   }
 
-  /// 获取当前平台的安装包资产（Windows/Android/Linux/macOS）。
+  /// 选择指定平台的安装包资产。
   ///
-  /// 鸿蒙返回 null：HAP 需系统包管理器签名安装，无法像 APK 一样由应用内下载后
-  /// 直接拉起安装器，故统一走「浏览器打开发布页」路径（见 [downloadInstaller]）。
-  UpdateAsset? _selectAssetForPlatform(List<UpdateAsset> assets) {
+  /// 各平台只接受自身安装格式，找不到匹配资产即返回 null，绝不跨平台兜底
+  /// （例如发布只含鸿蒙 HAP 时，Android 必须失败而不是下载 HAP）。
+  /// 鸿蒙 / iOS 不支持应用内安装，固定返回 null。
+  @visibleForTesting
+  static UpdateAsset? selectAssetForPlatform(
+    List<UpdateAsset> assets,
+    AppPlatform platform,
+  ) {
     if (assets.isEmpty) return null;
-    if (kIsWeb) return null;
-    if (PlatformService.instance.isOHOS) return null;
-    if (PlatformService.instance.isWindows) {
-      // 优先 .exe 安装包，其次 .msix / .zip
-      for (final a in assets) {
-        final n = a.name.toLowerCase();
-        if (n.endsWith('.exe')) return a;
-      }
-      for (final a in assets) {
-        final n = a.name.toLowerCase();
-        if (n.endsWith('.msix') || n.endsWith('.zip')) return a;
-      }
-    } else if (PlatformService.instance.isAndroid) {
-      for (final a in assets) {
-        final n = a.name.toLowerCase();
-        if (n.endsWith('.apk')) return a;
-      }
-    } else if (PlatformService.instance.isLinux) {
-      for (final a in assets) {
-        final n = a.name.toLowerCase();
-        if (n.endsWith('.appimage') || n.endsWith('.deb')) return a;
-      }
-    } else if (PlatformService.instance.isMacOS) {
-      for (final a in assets) {
-        final n = a.name.toLowerCase();
-        if (n.endsWith('.dmg')) return a;
-      }
+    bool endsWith(UpdateAsset a, String suffix) =>
+        a.name.toLowerCase().endsWith(suffix);
+
+    switch (platform) {
+      case AppPlatform.windows:
+        // 优先 .exe 安装包，其次 .msix；ZIP 兜底仅接受 Windows 命名资产，
+        // 避免误选同时发布的 macOS ZIP。
+        for (final a in assets) {
+          if (endsWith(a, '.exe')) return a;
+        }
+        for (final a in assets) {
+          if (endsWith(a, '.msix')) return a;
+        }
+        for (final a in assets) {
+          final String n = a.name.toLowerCase();
+          if (n.endsWith('.zip') && n.contains('windows')) return a;
+        }
+        return null;
+      case AppPlatform.android:
+        for (final a in assets) {
+          if (endsWith(a, '.apk')) return a;
+        }
+        return null;
+      case AppPlatform.linux:
+        for (final a in assets) {
+          if (endsWith(a, '.appimage') || endsWith(a, '.deb')) return a;
+        }
+        return null;
+      case AppPlatform.macos:
+        for (final a in assets) {
+          if (endsWith(a, '.dmg')) return a;
+        }
+        return null;
+      case AppPlatform.ohos:
+      case AppPlatform.ios:
+      case AppPlatform.web:
+        return null;
     }
-    // 兜底：第一个资产
-    return assets.first;
   }
+
+  UpdateAsset? _selectAssetForPlatform(List<UpdateAsset> assets) =>
+      selectAssetForPlatform(assets, PlatformService.instance.current);
 
   /// 应用镜像前缀转换下载 URL（官方前缀不替换）。
   String _applyMirrorPrefix(String originalUrl, String prefix) {
@@ -656,6 +695,8 @@ class UpdateManager extends ChangeNotifier {
   /// [wifiOnlyAutoDownload] 开启时仅 WiFi 下下载，移动网络挂起等待。
   /// 返回是否已触发下载（false = 未满足条件或失败）。
   Future<bool> maybeAutoDownload(UpdateReleaseInfo release) async {
+    // 鸿蒙不支持内置更新：即使历史设置里开着自动下载也不触发。
+    if (!supportsInAppUpdate) return false;
     if (!_settings.autoDownload) return false;
     if (!_settings.inAppDownload) return false;
     if (isBusy) return false;
@@ -689,11 +730,10 @@ class UpdateManager extends ChangeNotifier {
     bool silent = false,
     void Function(double progress)? onProgress,
   }) async {
-    // 鸿蒙：HAP 无法应用内安装，等价于「关闭应用内下载」——直接开浏览器发布页。
-    if (PlatformService.instance.isOHOS) {
-      final bool ok = await openReleaseInBrowser(release);
-      _lastError = ok ? 'opened-in-browser' : 'cannot-open-browser';
-      _status = UpdateStatus.idle;
+    // 鸿蒙已移除内置更新：不下载、不拉起安装器，仅保留检查更新与说明展示。
+    if (!supportsInAppUpdate) {
+      _lastError = 'in-app update is not supported on this platform';
+      _status = UpdateStatus.failed;
       notifyListeners();
       return null;
     }
