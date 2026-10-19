@@ -306,17 +306,19 @@ class BangumiEchProxy {
 
   /// 本平台是否具备接入 ECH 引擎的通道（引擎本体是否存在由后端探测）。
   ///
-  /// Android 走 MethodChannel→JNI；Windows/Linux/macOS 走 dart:ffi 加载
-  /// echproxy 动态库（缺失时后端安全降级）。iOS / 鸿蒙 / Web 目前不提供引擎：
-  /// 鸿蒙需按 OHOS NDK 重编 Rust 库，暂沿用「直连」降级路径。
+  /// Android 走 MethodChannel→JNI；Windows/Linux/macOS/鸿蒙走 dart:ffi 加载
+  /// echproxy 动态库（缺失时后端安全降级）。iOS / Web 不提供引擎。
+  /// 鸿蒙产物 `libechproxy.so` 由 `android/rust/build-ohos.sh` 交叉编译，
+  /// 打包进 `ohos/entry/libs/arm64-v8a/`；库缺失时 start 返回 0，上层回落直连。
   static bool get platformSupported {
     if (kIsWeb) return false;
     try {
-      final PlatformService platform = PlatformService.instance;
+      const PlatformService platform = PlatformService.instance;
       return platform.isAndroid ||
           platform.isWindows ||
           platform.isLinux ||
-          platform.isMacOS;
+          platform.isMacOS ||
+          platform.isOHOS;
     } catch (_) {
       return false;
     }
@@ -591,7 +593,7 @@ class _EchLifecycleObserver with WidgetsBindingObserver {
 /// 同一个 Rust 引擎（`libechproxy`）有两套加载路径：
 /// - **Android**：`MethodChannel('nexhub/ech_proxy')` → `EchProxyBridge` → JNI，
 ///   由 [MethodChannelEchBackend] 承载（含原生侧环形日志）；
-/// - **桌面（Windows/Linux/macOS）**：dart:ffi 直接绑定 Rust C API（`ech_*`），
+/// - **FFI（Windows/Linux/macOS/鸿蒙）**：dart:ffi 直接绑定 Rust C API（`ech_*`），
 ///   由 [FfiEchBackend] 承载——不存在 Java/Kotlin 层，日志走 stderr。
 ///
 /// 两套语义一一对应（start/stop/setScope/status/logs）；原生缺失时各自安全降级
@@ -683,11 +685,11 @@ class MethodChannelEchBackend implements EchProxyBackend {
   }
 }
 
-/// 桌面后端：dart:ffi → Rust C API（`ech_start_proxy` / `ech_stop_proxy` /
+/// FFI 后端：dart:ffi → Rust C API（`ech_start_proxy` / `ech_stop_proxy` /
 /// `ech_is_alive` / `ech_set_scope`，见 `android/rust/src/lib.rs` 的 C API 段）。
 ///
-/// 动态库缺失（未打包 / 未构建）时整体降级为「不可用」，与 Android 侧
-/// `MissingPluginException` 的降级语义一致。
+/// Windows/Linux/macOS/鸿蒙共用；动态库缺失（未打包 / 未构建）时整体降级为
+/// 「不可用」，与 Android 侧 `MissingPluginException` 的降级语义一致。
 class FfiEchBackend implements EchProxyBackend {
   ffi.DynamicLibrary? _lib;
 
@@ -716,7 +718,11 @@ class FfiEchBackend implements EchProxyBackend {
     if (PlatformService.instance.isMacOS) {
       return const <String>['libechproxy.dylib'];
     }
-    if (PlatformService.instance.isLinux) return const <String>['libechproxy.so'];
+    // 鸿蒙与 Linux 同名；HAP 内 `libs/arm64-v8a/libechproxy.so` 由系统链接器解析。
+    if (PlatformService.instance.isOHOS ||
+        PlatformService.instance.isLinux) {
+      return const <String>['libechproxy.so'];
+    }
     return const <String>[];
   }
 
@@ -741,7 +747,7 @@ class FfiEchBackend implements EchProxyBackend {
   Future<int> start(EchProxyConfig config) async {
     if (!_ensureBound()) return 0;
 
-    // CA / ECH 缓存目录：桌面端没有 filesDir/cacheDir，用应用支持目录 + 临时目录
+    // CA / ECH 缓存目录：FFI 后端没有 filesDir/cacheDir，用应用支持目录 + 临时目录
     // （RCGen CA 需持久存放，ECH 探测缓存可丢）。
     String caDir = '';
     String cacheDir = '';

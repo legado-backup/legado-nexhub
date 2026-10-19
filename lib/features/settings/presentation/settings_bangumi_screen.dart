@@ -39,7 +39,7 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
   final TextEditingController _imageController = TextEditingController();
   BangumiProxyMode _proxyMode = BangumiProxyMode.direct;
 
-  /// 展示用连接模式：本平台无 ECH 引擎（iOS / Web / 鸿蒙）时，历史 ECH 选择
+  /// 展示用连接模式：本平台无 ECH 引擎（iOS / Web）时，历史 ECH 选择
   /// 回落为直连——设置项已隐藏，避免 SegmentedButton 选中值不在候选中触发断言。
   BangumiProxyMode get _effectiveProxyMode =>
       (!BangumiEchProxy.platformSupported && _proxyMode == BangumiProxyMode.ech)
@@ -266,7 +266,7 @@ class _SettingsBangumiScreenState extends State<SettingsBangumiScreen> {
           Text(l10n.bangumiProxyTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: AppTokens.spaceMd),
           // ── 连接模式：直连 / 镜像 / ECH 三选一（对齐参考项目 ProxyMode）──
-          // 无原生 ECH 引擎的平台（iOS / Web / 鸿蒙）隐藏 ECH 选项，历史选择回落直连。
+          // 无原生 ECH 引擎的平台（iOS / Web）隐藏 ECH 选项，历史选择回落直连。
           SegmentedButton<BangumiProxyMode>(
             segments: <ButtonSegment<BangumiProxyMode>>[
               ButtonSegment<BangumiProxyMode>(

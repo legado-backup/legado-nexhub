@@ -1,19 +1,22 @@
-# ECH Proxy - 原生引擎（Android JNI + 桌面 C API）
+# ECH Proxy - 原生引擎（Android JNI + 桌面/鸿蒙 C API）
 
 本地 HTTPS CONNECT 代理，通过 ECH (Encrypted Client Hello) + DoH 绕过 SNI 封锁。
-同一份 Rust 源码编译出两种接入形态：
+同一份 Rust 源码编译出三种接入形态：
 
 - **Android**：`libechproxy.so` → JNI（`com.nexhub.app.EchProxyNative`）→
   `MethodChannel('nexhub/ech_proxy')`
 - **桌面 (Windows/Linux/macOS)**：`echproxy.dll` / `libechproxy.so` /
   `libechproxy.dylib` → dart:ffi 直接绑定 C API（`ech_*`，见 `src/lib.rs` 末尾）
+- **鸿蒙 (HarmonyOS arm64)**：`libechproxy.so` → dart:ffi（与桌面同一条 C API），
+  随 HAP 打包进 `ohos/entry/libs/arm64-v8a/`
 
 ## 架构
 
 ```
 Dart BangumiEchProxy (lib/core/services/bangumi/bangumi_ech_proxy.dart)
   ├─ Android:  MethodChannel → EchProxyBridge (Kotlin) → JNI → Rust
-  └─ 桌面:     dart:ffi → ech_start_proxy / ech_set_scope / ... → Rust
+  ├─ 桌面:     dart:ffi → ech_start_proxy / ech_set_scope / ... → Rust
+  └─ 鸿蒙:     dart:ffi → 同一组 C API → Rust（libechproxy.so 随 HAP 打包）
       Rust libechproxy
         ├── 本地 HTTP CONNECT 代理
         ├── ECH TLS 后端 (OpenSSL 4.0.1 + ech.h)
@@ -60,6 +63,29 @@ android/rust/target/                       ← Cargo 产物（gitignored）
 渠道时可删掉多余 jniLibs 目录或配 gradle `abiFilters`；缺失 ABI 的设备上
 `System.loadLibrary` 失败会被 Kotlin 侧捕获，ECH 安全降级为直连。
 
+### HarmonyOS（arm64，随 HAP 打包）
+
+```bash
+bash build-ohos.sh            # OpenSSL + Rust；产物复制进 ohos/entry/libs/arm64-v8a/
+bash build-ohos.sh --setup    # 仅准备 Rust 目标与工具链包装器
+```
+
+- **NDK 自动探测**：默认找 DevEco Studio 的 `sdk/default/openharmony/native`；
+  自定义安装用 `OHOS_NDK_HOME=/path/to/native`。
+- **OpenSSL**：源码与产物在 `openssl/build-ohos-arm64/`（已 gitignore），
+  Configure 目标 `linux-aarch64`，`no-shared no-module no-tests no-apps no-docs`，
+  静态链接进 `libechproxy.so`，产物依赖只有 `libc.so`。
+- **Windows 宿主特殊处理**：
+  - Rust 的 cc crate 无法执行 shell 脚本、且 SDK 自带 clang 包装器路径未加引号，
+    脚本用 rustc 生成 `ohos-cc/ar/ranlib.exe` 原生包装器；
+  - `libcrypto.a` 归档命令超过 Windows 32K 命令行上限，脚本为 Makefile 的每个
+    归档分片生成独立 `@response-file`。
+- **产物位置**：`ohos/entry/libs/arm64-v8a/libechproxy.so`（gitignore，不入库）。
+  重新出包前需先跑一次构建脚本；`flutter build hap` 会由 hvigor 自动打包。
+- **验证**：脚本自检 AArch64 架构、`ech_start_proxy` / `ech_stop_proxy` /
+  `ech_is_alive` / `ech_set_scope` 四个导出符号，以及 `ech_get_retry_config`
+  辅助符号（缺失即说明静默退化成了 `no_ech`，脚本直接失败）。
+
 ### Windows 桌面（echproxy.dll）
 
 ```bash
@@ -100,6 +126,7 @@ Dart FFI 后端按标准名字加载（缺库时安全降级，不影响其他�
 | `build.rs`        | 编译期探测 `openssl/ech.h`                  |
 | `Cargo.toml`      | Rust 依赖（`jni` 仅 Android target 依赖）   |
 | `build-android.sh`| Android 三 ABI 构建                         |
+| `build-ohos.sh`   | 鸿蒙 arm64 构建（OpenSSL + Rust + 打包产物）|
 | `build-windows.sh`| Windows 桌面构建                            |
 
 ## 注意事项

@@ -725,7 +725,7 @@ class _SettingsNetworkScreenState extends State<SettingsNetworkScreen> {
   }
 
   Widget _buildEchCard(AppLocalizations l10n) {
-    // 无原生 ECH 引擎的平台（iOS / Web / 鸿蒙）：设置项隐藏，静默直连（规格 §6）。
+    // 无原生 ECH 引擎的平台（iOS / Web）：设置项隐藏，静默直连（规格 §6）。
     if (!BangumiEchProxy.platformSupported) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return SettingsCard(

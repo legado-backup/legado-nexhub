@@ -13,3 +13,7 @@
 
 # macOS
 .DS_Store
+
+# OHOS 交叉编译产物 (build-ohos.sh)
+/openssl/build-ohos*/
+/openssl/install-*/

@@ -1,6 +1,9 @@
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(has_ech)");
     println!("cargo::rustc-check-cfg=cfg(no_ech)");
+    // 交叉编译时 OPENSSL_INCLUDE_DIR 随安装目录变化；不声明会导致沿用上一次
+    // 的 no_ech 指纹，产物静默失去 ECH 能力。
+    println!("cargo:rerun-if-env-changed=OPENSSL_INCLUDE_DIR");
 
     // 从环境变量获取 OpenSSL 路径
     let openssl_include = std::env::var("OPENSSL_INCLUDE_DIR")
