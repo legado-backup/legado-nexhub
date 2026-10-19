@@ -3996,6 +3996,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// （"自动定位到朗读的页面"）；滚动模式段落连续排版，交给高亮与用户手势。
   void _onTtsChanged() {
     if (!mounted) return;
+    final String? ttsError = _tts.takeLastError();
+    if (ttsError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).ttsPlaybackFailed)),
+      );
+    }
     // 通知栏会话同步（stopped 时 detach、playing/paused 时 attach/刷新标题）。
     _syncTtsAudioService();
     // TTS 朗读中音量键恢复系统调音量（不翻页），状态变化时重新同步拦截。
@@ -5700,11 +5706,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 可配置的槽位。配置入口移至内联设置面板（见 _NovelInlineSettings）。
     final slots = _prefs.bottomToolbarSlots.take(6).where((tool) {
       if (tool == NovelBottomTool.bookmarkList) return false;
-      // 鸿蒙：离线朗读引擎（flutter_tts）无 ohos 实现，入口隐藏（规格 §6）。
-      // 在线 TTS 走 media_kit，内核可用后可单独评估放开。
-      if (tool == NovelBottomTool.tts && PlatformService.instance.isOHOS) {
-        return false;
-      }
       // 本地模式无章节导航时隐藏 toc / prevChapter / nextChapter。
       // 聚合本地模式（多文件合成一整本）与单 EPUB（已解析出章节）保留。
       final hasChapters =
@@ -9681,14 +9682,12 @@ class _NovelInlineSettings extends StatelessWidget {
                     ],
                   ),
                   // ── 朗读组 ──
-                  // 鸿蒙：离线朗读引擎（flutter_tts）无 ohos 实现，整组隐藏。
-                  if (!PlatformService.instance.isOHOS)
-                    _buildSettingsGroup(
-                      context,
-                      l10n.novelSectionTts,
-                      searchQuery: searchController.text,
-                      leading: Icons.record_voice_over_rounded,
-                      searchTerms: _kNovelSecTtsTerms,
+                  _buildSettingsGroup(
+                    context,
+                    l10n.novelSectionTts,
+                    searchQuery: searchController.text,
+                    leading: Icons.record_voice_over_rounded,
+                    searchTerms: _kNovelSecTtsTerms,
                     children: <Widget>[
                       ListenableBuilder(
                         listenable: tts,

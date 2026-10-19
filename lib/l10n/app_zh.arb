@@ -3039,6 +3039,7 @@
   "novelSectionToolbar": "底部工具栏",
   "novelSectionTts": "朗读设置",
   "ttsRate": "朗读语速",
+  "ttsPlaybackFailed": "朗读失败，请检查系统语音引擎",
   "ttsSleepTimer": "睡眠定时",
   "ttsSleepOff": "关闭",
   "ttsSleepCustom": "自定义",

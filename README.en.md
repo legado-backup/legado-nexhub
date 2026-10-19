@@ -61,6 +61,7 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 - Full source parsing & reading chain (including JS-scripted sources, QuickJS engine);
 - Video playback (libmpv engine, same lineage as Android: playback speed / audio tracks / subtitles / anti-leech headers) with on-screen danmaku;
 - Picture-in-picture (system floating window), system notifications, saving images into the system gallery (system confirmation dialog, permission-free);
+- Offline TTS reading for novels (system CoreSpeechKit engine with speech rate / sleep timer / background playback) and self-hosted online HTTP TTS;
 - Local persistence for favorites / download tasks / history (standalone file storage — survives force-kill);
 - Bangumi login & sync (authorization completed in an in-app WebView);
 - In-app updates (opens the browser on the Releases page for the new HAP).
@@ -76,7 +77,6 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 | Plugin export / backup export | No directory picker | Saved to the default location, then shared via the system share sheet |
 | Per-source WebView network following | Does not follow per-source proxy / hosts / DoH | HTTP scraping is unaffected; only pages inside the WebView are affected |
 | Clipboard image import | Unavailable | Path-copy fallback exists |
-| Offline TTS reading | Unavailable (entry hidden) | Waiting for upstream adaptation |
 | Volume-key page turning | Unavailable (Android-only channel) | — |
 | Screen casting | Unavailable (entry hidden) | — |
 | Material You dynamic color | Not supported yet | Falls back to the default theme color |

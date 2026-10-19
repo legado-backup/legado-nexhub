@@ -1,6 +1,7 @@
 /// 小说阅读器 TTS 朗读控制器。
 ///
-/// 封装 flutter_tts，提供逐段朗读、暂停/恢复/停止、自动翻段功能。
+/// 封装系统朗读引擎（Android/iOS 为 flutter_tts，鸿蒙为 CoreSpeechKit），
+/// 提供逐段朗读、暂停/恢复/停止、自动翻段功能。
 /// 朗读状态通过 [notifyListeners] 广播，阅读器据此更新 UI。
 /// 支持在线 HTTP TTS 引擎（[novel_http_tts_player.dart]），
 /// 由配置 [NovelHttpTtsConfig] 启用时优先走在线管线。
@@ -9,12 +10,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/novel/novel_http_tts_config.dart';
 import '../../../core/novel/novel_http_tts_player.dart';
 import '../../../core/novel/novel_http_tts_sentence_player.dart';
+import '../../../core/novel/novel_tts_engine.dart';
 
 enum NovelTtsState {
   stopped,
@@ -25,7 +26,7 @@ enum NovelTtsState {
 class NovelTtsController extends ChangeNotifier {
   NovelTtsController();
 
-  FlutterTts? _tts;
+  NovelTtsEngine? _tts;
   NovelTtsState _state = NovelTtsState.stopped;
   int _currentIndex = 0;
   List<String> _paragraphs = const <String>[];
@@ -37,6 +38,9 @@ class NovelTtsController extends ChangeNotifier {
   Timer? _sleepTimer;
   Duration? _sleepRemaining;
   bool _backgroundMode = false;
+
+  /// 最近一次朗读错误（阅读器取走后清空）。
+  String? _lastError;
 
   /// 引擎当前是否正在朗读某一句。用于"点按切换段落"时先 [FlutterTts.stop]
   /// 打断旧句、再朗读新句（flutter_tts 4.2.5 无 setQueueMode，用 stop+speak
@@ -52,6 +56,13 @@ class NovelTtsController extends ChangeNotifier {
   bool get hasSleepTimer => _sleepTimer != null;
   bool get backgroundMode => _backgroundMode;
 
+  /// 取走最近一次朗读错误（无错误返回 null）。
+  String? takeLastError() {
+    final String? error = _lastError;
+    _lastError = null;
+    return error;
+  }
+
   /// 设置后台朗读开关：true 时应用进入后台仍继续朗读；
   /// false 时进入后台由调用方（AppLifecycle 监听）触发 [pause]。
   void setBackground(bool enabled) {
@@ -63,11 +74,12 @@ class NovelTtsController extends ChangeNotifier {
   /// 初始化 TTS 引擎（懒加载）。
   Future<void> _ensureTts() async {
     if (_tts != null) return;
-    _tts = FlutterTts();
+    _tts = createNovelTtsEngine();
     // 先挂完成回调，确保初始化任何一步失败也不会漏掉（此前 setQueueMode
     // 在 4.2.5 无原生实现会抛 MissingPluginException，导致回调从未注册、
     // 读完一句即停）。
     _tts!.setCompletionHandler(_onComplete);
+    _tts!.setErrorHandler(_onError);
     await _tts!.setLanguage('zh-CN');
     await _tts!.setSpeechRate(_rate);
   }
@@ -82,6 +94,7 @@ class NovelTtsController extends ChangeNotifier {
       {int startIndex = 0, int sleepTimer = 0}) async {
     _paragraphs = paragraphs;
     _currentIndex = startIndex.clamp(0, _paragraphs.length - 1);
+    _lastError = null;
     _state = NovelTtsState.playing;
     notifyListeners();
     await _setAwake(true);
@@ -252,6 +265,18 @@ class NovelTtsController extends ChangeNotifier {
     }
   }
 
+  /// 引擎朗读失败：停止本轮并记录错误，由阅读器提示用户。
+  void _onError(String message) {
+    if (_state == NovelTtsState.stopped) return;
+    _state = NovelTtsState.stopped;
+    _isSpeaking = false;
+    _lastError = message;
+    _cancelSleepTimer();
+    _sleepRemaining = null;
+    _setAwake(false);
+    notifyListeners();
+  }
+
   /// 当前段落朗读完毕回调：自动朗读下一段。
   void _onComplete() {
     if (_state != NovelTtsState.playing) return;
@@ -273,7 +298,9 @@ class NovelTtsController extends ChangeNotifier {
   @override
   void dispose() {
     _cancelSleepTimer();
-    _tts?.stop();
+    _onlinePlayer?.cancel();
+    _onlinePlayer = null;
+    _tts?.dispose();
     try {
       WakelockPlus.disable();
     } on Object {

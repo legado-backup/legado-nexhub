@@ -5783,6 +5783,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsRate => 'Speech rate';
 
   @override
+  String get ttsPlaybackFailed =>
+      'Reading failed. Check the system speech engine.';
+
+  @override
   String get ttsSleepTimer => 'Sleep timer';
 
   @override

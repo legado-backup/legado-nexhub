@@ -10946,6 +10946,12 @@ abstract class AppLocalizations {
   /// **'Speech rate'**
   String get ttsRate;
 
+  /// No description provided for @ttsPlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading failed. Check the system speech engine.'**
+  String get ttsPlaybackFailed;
+
   /// No description provided for @ttsSleepTimer.
   ///
   /// In en, this message translates to:

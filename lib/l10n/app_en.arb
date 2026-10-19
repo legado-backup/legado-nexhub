@@ -3062,6 +3062,7 @@
   "novelSectionToolbar": "Bottom toolbar",
   "novelSectionTts": "TTS Settings",
   "ttsRate": "Speech rate",
+  "ttsPlaybackFailed": "Reading failed. Check the system speech engine.",
   "ttsSleepTimer": "Sleep timer",
   "ttsSleepOff": "Off",
   "ttsSleepCustom": "Custom",

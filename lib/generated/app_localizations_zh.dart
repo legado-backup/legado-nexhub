@@ -5669,6 +5669,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsRate => '朗读语速';
 
   @override
+  String get ttsPlaybackFailed => '朗读失败，请检查系统语音引擎';
+
+  @override
   String get ttsSleepTimer => '睡眠定时';
 
   @override
