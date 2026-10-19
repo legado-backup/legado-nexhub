@@ -1,6 +1,6 @@
 {
-  "name": "nexhub",
-  "short_name": "nexhub",
+  "name": "NexHub",
+  "short_name": "NexHub",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#5B9BD5",

@@ -20,7 +20,7 @@
     <!-- 应用内更新：Android 7+ 请求安装未知来源 APK 必需 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
-        android:label="nexhub"
+        android:label="NexHub"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"

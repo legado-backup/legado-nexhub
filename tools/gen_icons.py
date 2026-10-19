@@ -123,8 +123,8 @@ def gen_web(im):
     save_png(os.path.join(out, "Icon-192.png"), square(im, 192))
     save_png(os.path.join(out, "Icon-512.png"), square(im, 512))
     manifest = {
-        "name": "nexhub",
-        "short_name": "nexhub",
+        "name": "NexHub",
+        "short_name": "NexHub",
         "start_url": ".",
         "display": "standalone",
         "background_color": "#5B9BD5",
