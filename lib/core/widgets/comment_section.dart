@@ -26,6 +26,7 @@ import 'app_card.dart';
 import 'app_shimmer.dart';
 import 'comment_list_screen.dart';
 import 'source_login_sheet.dart';
+import 'translatable_text.dart';
 
 /// 详情页评论区。
 class CommentSection extends StatefulWidget {
@@ -470,8 +471,9 @@ class _CommentTileState extends State<CommentTile> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          text,
+        BilingualTranslatedText(
+          text: text,
+          kind: TranslatableTextKind.comment,
           style: theme.textTheme.bodyMedium,
           maxLines: _contentExpanded ? null : 6,
           overflow:
@@ -622,7 +624,11 @@ class _CommentTileState extends State<CommentTile> {
                           ),
                       ],
                     ),
-                    Text(r.content, style: theme.textTheme.bodySmall),
+                    BilingualTranslatedText(
+                      text: r.content,
+                      kind: TranslatableTextKind.comment,
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),

@@ -28,10 +28,14 @@ import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../ai/bing_translation_client.dart';
 import '../ai/endpoint_router.dart';
 import '../ai/glossary_manager.dart';
 import '../ai/prompt_builder.dart';
+import '../ai/translation_engine_policy.dart';
 import '../ai/translation_exception.dart';
+import '../ai/translation_feature_flags.dart';
+import '../ai/translation_language.dart';
 import '../ai/translation_options_store.dart';
 import '../ai/vision_translation_client.dart';
 import '../utils/app_log.dart';
@@ -70,9 +74,11 @@ class SubtitleTranslationController extends ChangeNotifier {
     VisionTranslationClient? client,
     GlossaryManager? glossary,
     TranslationOptionsStore? options,
+    BingTranslationClient? bingClient,
   })  : _client = client ?? VisionTranslationClient(),
         _glossary = glossary ?? GlossaryManager(),
-        _options = options ?? TranslationOptionsStore();
+        _options = options ?? TranslationOptionsStore(),
+        _bing = bingClient ?? BingTranslationClient();
 
   /// mpv `sub-text` 轮询节流（位置回调 4-10Hz，属性读取无需每帧）。
   static const Duration _kPollInterval = Duration(milliseconds: 600);
@@ -98,6 +104,7 @@ class SubtitleTranslationController extends ChangeNotifier {
   static const String _kPrefOcrFallback = 'subtitle_translation_ocr_fallback_v1';
 
   final VisionTranslationClient _client;
+  final BingTranslationClient _bing;
 
   /// 播放器控制器（attach 后可用；用于读 mpv 属性与截图）。
   dynamic _playerController;
@@ -460,35 +467,29 @@ class SubtitleTranslationController extends ChangeNotifier {
     );
     notifyListeners();
     try {
-      final endpoints = await _resolveEndpoints();
-      if (endpoints.isEmpty) {
-        throw const TranslationException('未配置 AI 接口：请先在 设置 → AI 配置 中填写'
-            '通用接口或视频翻译专用接口');
-      }
       // 指数退避重试，瞬时抖动不再丢句；重试期间 UI 保持「翻译中」。
       // system prompt 经 PromptBuilder 组装（术语表 + 风格 + CoT），
       // 注入最近几句对话历史；轻量格式默认开启（省 token，失败自动
       // 回退编号协议）。
       final glossary = _glossaryEntries ?? const <GlossaryEntry>[];
       final lightweight = await _options.getSubtitleLightweight();
+      final style = await _options.effectiveStyle(null);
+      final cot = await _options.getCotEnabled();
       final system = PromptBuilder.subtitleSystemPrompt(
         lang: _targetLang,
         glossary: glossary,
-        style: await _options.effectiveStyle(null),
+        style: style,
         lightweight: lightweight,
-        cot: await _options.getCotEnabled(),
+        cot: cot,
       );
       final result = await _translateWithRetry(
-        () => AiEndpointRouter.execute<List<String>>(
-          endpoints,
-          (cfg) => _client.translateBatch(
-            config: cfg,
-            targetLang: _targetLang,
-            texts: <String>[text],
-            history: List<TranslationContextPair>.of(_history),
-            lightweight: lightweight,
-            systemPrompt: system,
-          ),
+        () => _translateOnce(
+          text,
+          glossary: glossary,
+          style: style,
+          cot: cot,
+          lightweight: lightweight,
+          system: system,
         ),
       );
       final translated = result.first.trim();
@@ -532,6 +533,84 @@ class SubtitleTranslationController extends ChangeNotifier {
         unawaited(_translateSentence(next));
       }
     }
+  }
+
+  /// 单次翻译尝试：按策略选择 Bing / AI，失败时向另一侧回退。
+  Future<List<String>> _translateOnce(
+    String text, {
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+    required bool cot,
+    required bool lightweight,
+    required String system,
+  }) async {
+    final flags = TranslationFeatureFlags.instance;
+    await flags.ensureLoaded();
+    final bingAvailable =
+        flags.bingEnabled && TranslationLanguage.bingCode(_targetLang) != null;
+    if (bingAvailable &&
+        !TranslationLanguage.shouldTranslate(text, _targetLang)) {
+      return <String>[text];
+    }
+    final advanced = TranslationEnginePolicy.advanced(
+      hasGlossary: glossary.isNotEmpty,
+      nonStandardStyle: style != TranslationStyle.standard,
+      cot: cot,
+    );
+    final order = TranslationEnginePolicy.order(
+      bingEnabled: flags.bingEnabled,
+      preferBing: flags.bingFirst,
+      advancedOptions: advanced,
+    );
+
+    Future<List<String>> viaBing() async {
+      final translated = await _bing.translate(
+        texts: <String>[text],
+        targetLang: _targetLang,
+      );
+      return <String>[translated.first];
+    }
+
+    Object? bingError;
+    if (order == TranslationEngineOrder.bingFirst && bingAvailable) {
+      try {
+        return await viaBing();
+      } on Object catch (e) {
+        bingError = e;
+        AppLog.instance.w('[字幕翻译] Bing 失败，转 AI: $e');
+      }
+    }
+
+    final endpoints = await _resolveEndpoints();
+    if (endpoints.isNotEmpty) {
+      try {
+        return await AiEndpointRouter.execute<List<String>>(
+          endpoints,
+          (cfg) => _client.translateBatch(
+            config: cfg,
+            targetLang: _targetLang,
+            texts: <String>[text],
+            history: List<TranslationContextPair>.of(_history),
+            lightweight: lightweight,
+            systemPrompt: system,
+          ),
+        );
+      } on Object catch (e) {
+        if (order == TranslationEngineOrder.aiFirst && bingAvailable) {
+          AppLog.instance.w('[字幕翻译] AI 失败，转 Bing: $e');
+          return viaBing();
+        }
+        rethrow;
+      }
+    }
+
+    if (bingAvailable) {
+      if (bingError != null) {
+        throw TranslationException.from(bingError);
+      }
+      return viaBing();
+    }
+    throw const TranslationException('未配置 AI 接口，且 Bing 免费翻译不可用');
   }
 
   /// 成功句入会话历史——最多 [_kHistoryMaxPairs] 句，总字符超预算时

@@ -5346,5 +5346,22 @@
   "mediaServerPlayMethodDirectStream": "Direct stream",
   "mediaServerPlayMethodTranscode": "Transcoding",
   "mediaServerSearchHistory": "Search history",
-  "mediaServerSearchHistoryClear": "Clear search history"
+  "mediaServerSearchHistoryClear": "Clear search history",
+  "bingTranslationTitle": "Bing free translation",
+  "bingTranslationDesc": "No API key required; also powers titles, tags, summaries and comments",
+  "bingTranslationEnable": "Enable Bing free translation",
+  "bingTranslationEnableHint": "When off, novels and subtitles use AI only; auto translation on detail pages is disabled",
+  "bingTranslationPriority": "Engine priority",
+  "bingTranslationBingFirst": "Bing first",
+  "bingTranslationAiFirst": "AI first",
+  "bingTranslationAutoTitle": "Auto-translate titles",
+  "bingTranslationAutoTags": "Auto-translate tags",
+  "bingTranslationAutoSummary": "Auto-translate summaries",
+  "bingTranslationAutoComments": "Auto-translate comments",
+  "bingTranslationTest": "Test Bing connection",
+  "bingTranslationTesting": "Testing...",
+  "bingTranslationTestOk": "Bing translation is available",
+  "bingTranslationTestFail": "Bing is unavailable right now; AI fallback will be used",
+  "bingTranslationPrivacy": "Text is sent to Microsoft's translation service. This is an unofficial endpoint and may change or stop working at any time.",
+  "translationCacheUiText": "Detail page & comment translation"
 }

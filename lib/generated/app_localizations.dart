@@ -18158,6 +18158,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear search history'**
   String get mediaServerSearchHistoryClear;
+
+  /// No description provided for @bingTranslationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bing free translation'**
+  String get bingTranslationTitle;
+
+  /// No description provided for @bingTranslationDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'No API key required; also powers titles, tags, summaries and comments'**
+  String get bingTranslationDesc;
+
+  /// No description provided for @bingTranslationEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Bing free translation'**
+  String get bingTranslationEnable;
+
+  /// No description provided for @bingTranslationEnableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, novels and subtitles use AI only; auto translation on detail pages is disabled'**
+  String get bingTranslationEnableHint;
+
+  /// No description provided for @bingTranslationPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine priority'**
+  String get bingTranslationPriority;
+
+  /// No description provided for @bingTranslationBingFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Bing first'**
+  String get bingTranslationBingFirst;
+
+  /// No description provided for @bingTranslationAiFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'AI first'**
+  String get bingTranslationAiFirst;
+
+  /// No description provided for @bingTranslationAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translate titles'**
+  String get bingTranslationAutoTitle;
+
+  /// No description provided for @bingTranslationAutoTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translate tags'**
+  String get bingTranslationAutoTags;
+
+  /// No description provided for @bingTranslationAutoSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translate summaries'**
+  String get bingTranslationAutoSummary;
+
+  /// No description provided for @bingTranslationAutoComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translate comments'**
+  String get bingTranslationAutoComments;
+
+  /// No description provided for @bingTranslationTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Bing connection'**
+  String get bingTranslationTest;
+
+  /// No description provided for @bingTranslationTesting.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing...'**
+  String get bingTranslationTesting;
+
+  /// No description provided for @bingTranslationTestOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Bing translation is available'**
+  String get bingTranslationTestOk;
+
+  /// No description provided for @bingTranslationTestFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Bing is unavailable right now; AI fallback will be used'**
+  String get bingTranslationTestFail;
+
+  /// No description provided for @bingTranslationPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Text is sent to Microsoft\'s translation service. This is an unofficial endpoint and may change or stop working at any time.'**
+  String get bingTranslationPrivacy;
+
+  /// No description provided for @translationCacheUiText.
+  ///
+  /// In en, this message translates to:
+  /// **'Detail page & comment translation'**
+  String get translationCacheUiText;
 }
 
 class _AppLocalizationsDelegate

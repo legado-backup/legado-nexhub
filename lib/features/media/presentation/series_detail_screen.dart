@@ -11,6 +11,7 @@ import '../../../core/widgets/app_empty_state.dart';
 import 'season_detail_screen.dart';
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import '../../../core/widgets/app_glass_bar.dart';
+import '../../../core/widgets/translatable_text.dart';
 
 /// 系列详情页：展示该系列下所有季的卡片网格，点击进入 [SeasonDetailScreen]。
 ///
@@ -30,7 +31,14 @@ class SeriesDetailScreen extends StatelessWidget {
         context.read<SourceRepository>().getById(series.sourceId ?? '');
 
     return Scaffold(
-      appBar: AppBar(title: Text(series.title)),
+      appBar: AppBar(
+        title: AutoTranslatedText(
+          text: series.title,
+          kind: TranslatableTextKind.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
       body: seasons.isEmpty
           ? AppEmptyState(icon: Icons.tv_off_rounded, message: l10n.emptyContent)
           : GridView.builder(
@@ -108,8 +116,9 @@ class _SeasonCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTokens.spaceXs),
-          Text(
-            season.title,
+          AutoTranslatedText(
+            text: season.title,
+            kind: TranslatableTextKind.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall,

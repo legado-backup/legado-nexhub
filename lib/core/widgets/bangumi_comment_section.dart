@@ -18,6 +18,7 @@ import '../services/bangumi/bangumi_sync_service.dart';
 import '../services/bangumi/subject_link_store.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'translatable_text.dart';
 
 /// Bangumi 吐槽区（根据官方 v0 评论接口增加，只读）。
 class BangumiCommentSection extends StatefulWidget {
@@ -310,18 +311,26 @@ class _BangumiCommentTileBodyState extends State<_BangumiCommentTileBody> {
           const SizedBox(height: AppTokens.spaceXs),
           if (needsFold)
             AnimatedCrossFade(
-              firstChild: Text(text,
+              firstChild: BilingualTranslatedText(
+                  text: text,
+                  kind: TranslatableTextKind.comment,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall),
-              secondChild: Text(text, style: theme.textTheme.bodySmall),
+              secondChild: BilingualTranslatedText(
+                  text: text,
+                  kind: TranslatableTextKind.comment,
+                  style: theme.textTheme.bodySmall),
               crossFadeState: _expanded
                   ? CrossFadeState.showSecond
                   : CrossFadeState.showFirst,
               duration: const Duration(milliseconds: 200),
             )
           else
-            Text(text, style: theme.textTheme.bodySmall),
+            BilingualTranslatedText(
+                text: text,
+                kind: TranslatableTextKind.comment,
+                style: theme.textTheme.bodySmall),
 
           // 展开/收起
           if (needsFold)

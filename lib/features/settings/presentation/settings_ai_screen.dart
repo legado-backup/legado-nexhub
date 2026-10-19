@@ -20,7 +20,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
+import 'package:nexhub/core/ai/bing_translation_client.dart';
 import 'package:nexhub/core/ai/prompt_builder.dart';
+import 'package:nexhub/core/ai/text_translation_cache.dart';
+import 'package:nexhub/core/ai/translation_feature_flags.dart';
 import 'package:nexhub/core/ai/translation_options_store.dart';
 import 'package:nexhub/core/theme/app_tokens.dart';
 import 'package:nexhub/core/widgets/app_animations.dart';
@@ -111,11 +114,21 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
   final _mediaModelCtrl = TextEditingController();
   final _mediaLangCtrl = TextEditingController();
 
-  // 翻译缓存：三个 box 的当前条数（清除后刷新）。
+  // 翻译缓存：各 box 的当前条数（清除后刷新）。
   int _novelCacheCount = 0;
   int _comicCacheCount = 0;
   int _subtitleCacheCount = 0;
+  int _textCacheCount = 0;
   bool _clearingCache = false;
+
+  // Bing 免费翻译与详情页自动翻译开关。
+  bool _bingEnabled = true;
+  bool _bingFirst = true;
+  bool _autoTitle = true;
+  bool _autoTags = true;
+  bool _autoSummary = true;
+  bool _autoComments = true;
+  bool _bingTesting = false;
 
   bool _saving = false;
 
@@ -125,14 +138,15 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
     _load();
   }
 
-  /// 刷新三个翻译缓存的条数展示。
+  /// 刷新全部翻译缓存的条数展示。
   void _refreshCacheCounts() {
     _novelCacheCount = NovelTranslationManager().count();
     _comicCacheCount = ComicTranslationManager().count();
     _subtitleCacheCount = SubtitleTranslationController().cacheCount();
+    _textCacheCount = TextTranslationCache().count();
   }
 
-  /// 一键清空三个翻译缓存（二次确认后执行）。
+  /// 一键清空全部翻译缓存（二次确认后执行）。
   Future<void> _clearTranslationCaches(AppLocalizations l10n) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
@@ -159,6 +173,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
       await NovelTranslationManager().clearAll();
       await ComicTranslationManager().clearAll();
       await SubtitleTranslationController().clearCache();
+      await TextTranslationCache().clear();
       if (!mounted) return;
       setState(_refreshCacheCounts);
       messenger.showSnackBar(
@@ -259,9 +274,18 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
     final trBak = await _settings.getTranslationBackupConfig();
     final comicBak = await _settings.getComicTranslationBackupConfig();
     final mediaBak = await _settings.getMediaTranslationBackupConfig();
+    final flags = TranslationFeatureFlags.instance;
+    await flags.ensureLoaded();
 
     if (!mounted) return;
     setState(() {
+      _bingEnabled = flags.bingEnabled;
+      _bingFirst = flags.bingFirst;
+      _autoTitle = flags.autoTitle;
+      _autoTags = flags.autoTags;
+      _autoSummary = flags.autoSummary;
+      _autoComments = flags.autoComments;
+
       _commonBaseCtrl.text = defaultCfg.baseUrl;
       _commonKeyCtrl.text = defaultCfg.apiKey;
       _commonModelCtrl.text = defaultCfg.model;
@@ -424,12 +448,41 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
         apiKey: orEmptyIfSame(_mediaKeyBakCtrl.text, _mediaKeyCtrl.text),
         model: orEmptyIfSame(_mediaModelBakCtrl.text, _mediaModelCtrl.text),
       ));
+      await TranslationFeatureFlags.instance.update(
+        bingEnabled: _bingEnabled,
+        bingFirst: _bingFirst,
+        autoTitle: _autoTitle,
+        autoTags: _autoTags,
+        autoSummary: _autoSummary,
+        autoComments: _autoComments,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.aiSaved)),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Bing 连通性测试：发一条短文本，成功/失败用 SnackBar 反馈。
+  Future<void> _testBing(AppLocalizations l10n) async {
+    setState(() => _bingTesting = true);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await BingTranslationClient().translate(
+        texts: <String>['Hello'],
+        targetLang: '中文',
+      );
+      messenger?.showSnackBar(
+        SnackBar(content: Text(l10n.bingTranslationTestOk)),
+      );
+    } on Object {
+      messenger?.showSnackBar(
+        SnackBar(content: Text(l10n.bingTranslationTestFail)),
+      );
+    } finally {
+      if (mounted) setState(() => _bingTesting = false);
     }
   }
 
@@ -533,6 +586,77 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                     for (final s in _kIllustrationSizes)
                       SettingsChoiceChipData<String>(value: s, label: s),
                   ],
+                ),
+              ],
+            ),
+            SettingsCard(
+              key: const ValueKey<String>('translation.bing'),
+              title: l10n.bingTranslationTitle,
+              description: l10n.bingTranslationDesc,
+              children: <Widget>[
+                SettingsSwitchTile(
+                  title: l10n.bingTranslationEnable,
+                  subtitle: l10n.bingTranslationEnableHint,
+                  value: _bingEnabled,
+                  onChanged: (v) => setState(() => _bingEnabled = v),
+                ),
+                SettingsChoiceChips<String>(
+                  title: l10n.bingTranslationPriority,
+                  boxed: false,
+                  selected: _bingFirst ? 'bingFirst' : 'aiFirst',
+                  onSelected: (v) =>
+                      setState(() => _bingFirst = v == 'bingFirst'),
+                  options: <SettingsChoiceChipData<String>>[
+                    SettingsChoiceChipData<String>(
+                      value: 'bingFirst',
+                      label: l10n.bingTranslationBingFirst,
+                    ),
+                    SettingsChoiceChipData<String>(
+                      value: 'aiFirst',
+                      label: l10n.bingTranslationAiFirst,
+                    ),
+                  ],
+                ),
+                SettingsSwitchTile(
+                  title: l10n.bingTranslationAutoTitle,
+                  value: _autoTitle,
+                  onChanged: (v) => setState(() => _autoTitle = v),
+                ),
+                SettingsSwitchTile(
+                  title: l10n.bingTranslationAutoTags,
+                  value: _autoTags,
+                  onChanged: (v) => setState(() => _autoTags = v),
+                ),
+                SettingsSwitchTile(
+                  title: l10n.bingTranslationAutoSummary,
+                  value: _autoSummary,
+                  onChanged: (v) => setState(() => _autoSummary = v),
+                ),
+                SettingsSwitchTile(
+                  title: l10n.bingTranslationAutoComments,
+                  value: _autoComments,
+                  onChanged: (v) => setState(() => _autoComments = v),
+                ),
+                const SizedBox(height: AppTokens.spaceMd),
+                OutlinedButton.icon(
+                  onPressed: _bingTesting ? null : () => _testBing(l10n),
+                  icon: _bingTesting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.cloud_sync_rounded, size: 16),
+                  label: Text(_bingTesting
+                      ? l10n.bingTranslationTesting
+                      : l10n.bingTranslationTest),
+                ),
+                const SizedBox(height: AppTokens.spaceSm),
+                Text(
+                  l10n.bingTranslationPrivacy,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Theme.of(context).colorScheme.outline),
                 ),
               ],
             ),
@@ -787,6 +911,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 _cacheCountTile(l10n.translationCacheComic, _comicCacheCount),
                 _cacheCountTile(
                     l10n.translationCacheSubtitle, _subtitleCacheCount),
+                _cacheCountTile(l10n.translationCacheUiText, _textCacheCount),
                 const SizedBox(height: AppTokens.spaceMd),
                 FilledButton.tonalIcon(
                   onPressed: _clearingCache

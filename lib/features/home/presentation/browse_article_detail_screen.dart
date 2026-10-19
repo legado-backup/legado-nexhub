@@ -29,6 +29,7 @@ import '../../../core/theme/reader_tokens.dart';
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/translatable_text.dart';
 import '../../../core/widgets/source_image.dart';
 import '../../../features/rss/presentation/rss_image_actions.dart';
 import '../../../features/rss/presentation/rss_image_gallery.dart';
@@ -1108,8 +1109,12 @@ class _BrowseArticleDetailScreenState extends State<BrowseArticleDetailScreen> {
         return Scaffold(
           backgroundColor: bg,
           appBar: AppBar(
-            title:
-                Text(_item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: AutoTranslatedText(
+              text: _item.title,
+              kind: TranslatableTextKind.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             actions: <Widget>[
               if (canFetch || _fetching)
                 AppIconButton(

@@ -17,6 +17,7 @@ import '../../player/presentation/video_player_screen.dart';
 import '../../verification/presentation/webview_verification_screen.dart';
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import '../../../core/widgets/app_glass_bar.dart';
+import '../../../core/widgets/translatable_text.dart';
 
 /// 季详情页：展示某季的剧集网格，点击进入 [VideoPlayerScreen]。
 ///
@@ -132,7 +133,14 @@ class _SeasonDetailScreenState extends State<SeasonDetailScreen> {
     // 渲染后抽取请求 → 显示「抓取本页渲染内容」引导（webview-html 源）。
     if (_htmlCaptureRequest != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(season.title)),
+        appBar: AppBar(
+          title: AutoTranslatedText(
+            text: season.title,
+            kind: TranslatableTextKind.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         body: AppErrorState(
           message: l10n.captureHint,
           onRetry: () async {
@@ -152,7 +160,14 @@ class _SeasonDetailScreenState extends State<SeasonDetailScreen> {
     // 验证异常 → 显示验证引导。
     if (_verificationError != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(season.title)),
+        appBar: AppBar(
+          title: AutoTranslatedText(
+            text: season.title,
+            kind: TranslatableTextKind.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         body: AppErrorState(
           message: l10n.errorVerification,
           onRetry: () async {
@@ -169,7 +184,14 @@ class _SeasonDetailScreenState extends State<SeasonDetailScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(season.title)),
+      appBar: AppBar(
+          title: AutoTranslatedText(
+            text: season.title,
+            kind: TranslatableTextKind.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       body: FutureBuilder<List<Episode>>(
         future: _episodesFuture,
         builder: (BuildContext context, AsyncSnapshot<List<Episode>> snap) {
@@ -227,8 +249,9 @@ class _SeasonDetailScreenState extends State<SeasonDetailScreen> {
                       size: 24, color: scheme.primary),
                   const SizedBox(width: AppTokens.spaceXs),
                   Expanded(
-                    child: Text(
-                      ep.title,
+                    child: AutoTranslatedText(
+                      text: ep.title,
+                      kind: TranslatableTextKind.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,

@@ -24,6 +24,7 @@ import 'package:hive/hive.dart';
 import 'package:nexhub/core/ai/image_resizer.dart';
 import 'package:nexhub/core/ai/glossary_manager.dart';
 import 'package:nexhub/core/ai/translation_exception.dart';
+import 'package:nexhub/core/ai/translation_feature_flags.dart';
 import 'package:nexhub/core/ai/vision_translation_client.dart';
 import 'package:nexhub/core/comic/comic_translation_manager.dart';
 import 'package:nexhub/core/novel/novel_translation_manager.dart';
@@ -261,9 +262,11 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues(<String, String>{
+      SharedPreferences.setMockInitialValues(<String, Object>{
         'novel_overview_api_base_v1': 'http://test.local',
+        'translation_bing_enabled_v1': false,
       });
+      await TranslationFeatureFlags.instance.reload();
       adapter = _EchoAdapter();
       // 起 translateParagraphs 会读取术语表（Hive），需先初始化。
       tempDir = await Directory.systemTemp.createTemp('nexhub_b3_test');
@@ -374,9 +377,11 @@ void main() {
     late Uint8List frame;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues(<String, String>{
+      SharedPreferences.setMockInitialValues(<String, Object>{
         'novel_overview_api_base_v1': 'http://test.local',
+        'translation_bing_enabled_v1': false,
       });
+      await TranslationFeatureFlags.instance.reload();
       frame = await _png(32, 32);
       Hive.init(
           '${Directory.systemTemp.path}/nexhub_b1_test_${DateTime.now().microsecondsSinceEpoch}');

@@ -14,6 +14,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:nexhub/core/ai/glossary_manager.dart';
+import 'package:nexhub/core/ai/translation_feature_flags.dart';
 import 'package:nexhub/core/novel/novel_translation_manager.dart';
 import 'package:nexhub/features/novel/domain/novel_translation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -147,9 +148,11 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues(<String, String>{
+      SharedPreferences.setMockInitialValues(<String, Object>{
         'novel_overview_api_base_v1': 'http://test.local',
+        'translation_bing_enabled_v1': false,
       });
+      await TranslationFeatureFlags.instance.reload();
       tempDir = await Directory.systemTemp.createTemp('nexhub_f4_svc');
       Hive.init(tempDir.path);
     });

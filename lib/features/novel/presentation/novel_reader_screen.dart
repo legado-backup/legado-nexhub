@@ -72,6 +72,7 @@ import '../../../core/widgets/highlight_text.dart' show searchHitSpans;
 import '../../../core/widgets/detail_action_utils.dart';
 import '../../../core/widgets/web_favorite_action.dart';
 import '../../../core/widgets/source_image.dart';
+import '../../../core/widgets/translatable_text.dart';
 import '../../../core/novel/novel_chinese_converter.dart';
 import '../../verification/presentation/webview_verification_screen.dart';
 import '../../../core/resolver/webview_resolver.dart';
@@ -7068,7 +7069,12 @@ Widget _buildChapterTitleWidget(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: cross,
       children: <Widget>[
-        Text(chapterTitle, style: mainStyle, textAlign: textAlign),
+        AutoTranslatedText(
+          text: chapterTitle,
+          kind: TranslatableTextKind.title,
+          style: mainStyle,
+          textAlign: textAlign,
+        ),
         SizedBox(height: prefs.titleSegmentSpacing),
         Text(
           bookName,
@@ -7080,8 +7086,9 @@ Widget _buildChapterTitleWidget(
       ],
     );
   } else {
-    titleBlock = Text(
-      chapterTitle,
+    titleBlock = AutoTranslatedText(
+      text: chapterTitle,
+      kind: TranslatableTextKind.title,
       style: mainStyle,
       textAlign: textAlign,
     );

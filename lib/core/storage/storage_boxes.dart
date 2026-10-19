@@ -43,6 +43,8 @@ const List<String> kStorageBoxNames = <String>[
   'comic_translations',
   // 视频字幕翻译缓存（视频实时翻译：lang|md5(原文) → 译文 JSON）
   'subtitle_translations',
+  // 详情页标题/标签/简介/评论翻译缓存（目标码|md5(原文) → 译文 JSON）
+  'text_translations',
   'comic_bookmarks',
   // 漫画阅读器收藏的图片（图库页数据，REQ-）
   ImageFavoriteManager.boxName, // 'image_favorites'

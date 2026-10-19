@@ -104,11 +104,12 @@ const String kUpdatePackageDirName = 'updates';
 /// 弹幕缓存 Hive box 名。
 const String kDanmakuCacheBoxName = 'danmaku_cache';
 
-/// 翻译缓存 Hive box 名（小说 / 漫画 / 字幕）。
+/// 翻译缓存 Hive box 名（小说 / 漫画 / 字幕 / 详情页文本）。
 const List<String> kTranslationBoxNames = <String>[
   'novel_translations',
   'comic_translations',
   'subtitle_translations',
+  'text_translations',
 ];
 
 /// 缓存清单：统计各类别占用 + 按类清理。

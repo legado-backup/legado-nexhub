@@ -27,6 +27,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/utils/app_haptics.dart';
 import '../../core/widgets/app_animations.dart';
 import '../../core/widgets/app_shimmer.dart';
+import '../../core/widgets/translatable_text.dart';
 import 'media_server_widgets.dart';
 
 class MediaServerDetailScreen extends StatefulWidget {
@@ -402,8 +403,9 @@ class _MediaServerDetailScreenState extends State<MediaServerDetailScreen> {
               valueListenable: _titleOpacity,
               builder: (_, v, __) => Opacity(
                 opacity: v,
-                child: Text(
-                  detail.name,
+                child: AutoTranslatedText(
+                  text: detail.name,
+                  kind: TranslatableTextKind.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -434,8 +436,9 @@ class _MediaServerDetailScreenState extends State<MediaServerDetailScreen> {
                       if (detail.overview != null &&
                           detail.overview!.isNotEmpty) ...<Widget>[
                         const SizedBox(height: AppTokens.spaceMd),
-                        Text(
-                          detail.overview!,
+                        BilingualTranslatedText(
+                          text: detail.overview!,
+                          kind: TranslatableTextKind.summary,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(height: 1.5),
                         ),
@@ -766,8 +769,14 @@ class _ClearLogoTitle extends StatelessWidget {
         fit: BoxFit.contain,
         alignment: Alignment.centerLeft,
         fadeInDuration: const Duration(milliseconds: 150),
-        placeholder: (_, __) => Text(detail.name, style: fallbackStyle),
-        errorWidget: (_, __, ___) => Text(detail.name, style: fallbackStyle),
+        placeholder: (_, __) => AutoTranslatedText(
+            text: detail.name,
+            kind: TranslatableTextKind.title,
+            style: fallbackStyle),
+        errorWidget: (_, __, ___) => AutoTranslatedText(
+            text: detail.name,
+            kind: TranslatableTextKind.title,
+            style: fallbackStyle),
       ),
     );
   }

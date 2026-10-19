@@ -9482,4 +9482,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mediaServerSearchHistoryClear => '清空搜索历史';
+
+  @override
+  String get bingTranslationTitle => 'Bing 免费翻译';
+
+  @override
+  String get bingTranslationDesc => '无需 API Key，同时用于标题、标签、简介与评论';
+
+  @override
+  String get bingTranslationEnable => '启用 Bing 免费翻译';
+
+  @override
+  String get bingTranslationEnableHint => '关闭后小说/字幕仅走 AI，详情页自动翻译同时停用';
+
+  @override
+  String get bingTranslationPriority => '引擎优先级';
+
+  @override
+  String get bingTranslationBingFirst => 'Bing 优先';
+
+  @override
+  String get bingTranslationAiFirst => 'AI 优先';
+
+  @override
+  String get bingTranslationAutoTitle => '自动翻译标题';
+
+  @override
+  String get bingTranslationAutoTags => '自动翻译标签';
+
+  @override
+  String get bingTranslationAutoSummary => '自动翻译简介';
+
+  @override
+  String get bingTranslationAutoComments => '自动翻译评论';
+
+  @override
+  String get bingTranslationTest => '测试 Bing 连通性';
+
+  @override
+  String get bingTranslationTesting => '测试中...';
+
+  @override
+  String get bingTranslationTestOk => 'Bing 翻译可用';
+
+  @override
+  String get bingTranslationTestFail => 'Bing 当前不可用，将使用 AI 兜底';
+
+  @override
+  String get bingTranslationPrivacy =>
+      '文本会发送到 Microsoft 翻译服务；该接口非官方公开接口，可能随时调整或失效。';
+
+  @override
+  String get translationCacheUiText => '详情页与评论翻译';
 }

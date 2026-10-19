@@ -69,6 +69,7 @@ import '../../../core/widgets/download_selection_sheet.dart';
 import '../../../core/widgets/favorite_group_assign_sheet.dart';
 import '../../../core/widgets/module_source_search_screen.dart';
 import '../../../core/widgets/progress_card.dart';
+import '../../../core/widgets/translatable_text.dart';
 import '../../../core/widgets/source_url_browse_screen.dart';
 import '../../../core/widgets/web_favorite_action.dart';
 import '../../downloads/presentation/download_list_screen.dart';
@@ -982,8 +983,8 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     final List<String> tagUrls = item.tagUrls ?? const <String>[];
     return <Widget>[
       for (int i = 0; i < tags.length; i++)
-        ActionChip(
-          label: Text(tags[i]),
+        TranslatableTagChip(
+          label: tags[i],
           tooltip: l10n.searchByTag,
           onPressed: () =>
               (i < tagUrls.length && tagUrls[i].trim().isNotEmpty)

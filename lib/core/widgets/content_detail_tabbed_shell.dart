@@ -38,6 +38,7 @@ import 'app_card.dart';
 import 'bangumi_sync_dialog.dart';
 import 'app_cover_image.dart';
 import 'app_refresh_indicator.dart';
+import 'translatable_text.dart';
 import 'detail_action_utils.dart';
 import '../settings/general_settings.dart';
 import 'source_image.dart';
@@ -501,8 +502,9 @@ class _ContentDetailTabbedShellState extends State<ContentDetailTabbedShell>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          widget.title,
+        AutoTranslatedText(
+          text: widget.title,
+          kind: TranslatableTextKind.title,
           style: (isCompact ? textTheme.titleLarge : textTheme.headlineSmall)
               ?.copyWith(fontWeight: FontWeight.w600),
           maxLines: 2,
@@ -660,8 +662,9 @@ class _ContentDetailTabbedShellState extends State<ContentDetailTabbedShell>
                             duration: AppTokens.durBase,
                             curve: AppCurves.smooth,
                             alignment: Alignment.topCenter,
-                            child: Text(
-                              widget.description!,
+                            child: BilingualTranslatedText(
+                              text: widget.description!,
+                              kind: TranslatableTextKind.summary,
                               style: textTheme.bodyMedium
                                   ?.copyWith(color: scheme.onSurfaceVariant),
                               maxLines: _descriptionExpanded ? null : 4,
@@ -902,8 +905,9 @@ class _ContentDetailTabbedShellState extends State<ContentDetailTabbedShell>
                                     (0.163 + 0.28 * (1 - t)),
                             child: Opacity(
                               opacity: expandOpacity,
-                              child: Text(
-                                widget.title,
+                              child: AutoTranslatedText(
+                                text: widget.title,
+                                kind: TranslatableTextKind.title,
                                 style: textTheme.headlineSmall?.copyWith(
                                   color: scheme.onSurface,
                                   fontWeight: FontWeight.w700,
@@ -936,8 +940,9 @@ class _ContentDetailTabbedShellState extends State<ContentDetailTabbedShell>
                               alignment: Alignment.centerLeft,
                               child: Opacity(
                                 opacity: collapseOpacity,
-                                child: Text(
-                                  widget.title,
+                                child: AutoTranslatedText(
+                                  text: widget.title,
+                                  kind: TranslatableTextKind.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.titleMedium?.copyWith(

@@ -21,11 +21,15 @@ library;
 import 'package:dio/dio.dart';
 
 import '../../../core/ai/batch_protocol.dart';
+import '../../../core/ai/bing_translation_client.dart';
 import '../../../core/ai/endpoint_router.dart';
 import '../../../core/ai/vision_translation_client.dart' show AiEndpointConfig;
 import '../../../core/ai/glossary_manager.dart';
 import '../../../core/ai/prompt_builder.dart';
+import '../../../core/ai/translation_engine_policy.dart';
 import '../../../core/ai/translation_exception.dart';
+import '../../../core/ai/translation_feature_flags.dart';
+import '../../../core/ai/translation_language.dart';
 import '../../../core/ai/translation_options_store.dart';
 import '../../../core/ai/vision_translation_client.dart' show TranslationContextPair;
 import '../../../core/utils/app_log.dart';
@@ -41,16 +45,19 @@ class NovelTranslationService {
     String? targetLanguage,
     GlossaryManager? glossary,
     TranslationOptionsStore? options,
+    BingTranslationClient? bingClient,
   })  : _dio = dio ?? Dio(),
         _settings = settings ?? NovelSummarySettings.instance,
         _targetLanguage = targetLanguage,
         _glossary = glossary ?? GlossaryManager(),
-        _options = options ?? TranslationOptionsStore();
+        _options = options ?? TranslationOptionsStore(),
+        _bing = bingClient ?? BingTranslationClient();
 
   final Dio _dio;
   final NovelSummarySettings _settings;
   final GlossaryManager _glossary;
   final TranslationOptionsStore _options;
+  final BingTranslationClient _bing;
 
   /// 翻译目标语言（提示词用，默认中文）；null 时运行时读翻译配置页设置。
   final String? _targetLanguage;
@@ -86,20 +93,6 @@ class NovelTranslationService {
     String? bookContext,
   }) async {
     if (paragraphs.isEmpty) return const <String>[];
-    // 主 + 备用端点（功能级回落通用），失败路由在请求层执行。
-    final endpointCfgs = await _settings.getTranslationEndpoints();
-    final endpoints = <AiEndpointConfig>[
-      for (final c in endpointCfgs)
-        if (c.baseUrl.trim().isNotEmpty)
-          AiEndpointConfig(
-            baseUrl: c.baseUrl,
-            apiKey: c.apiKey,
-            model: c.model,
-          ),
-    ];
-    if (endpoints.isEmpty) {
-      throw const TranslationException('未配置云端 AI 接口');
-    }
     final lang =
         _targetLanguage ?? await _settings.getTranslationTargetLanguage();
     final chunkSize =
@@ -131,12 +124,186 @@ class NovelTranslationService {
     }
     onProgress?.call(done, paragraphs.length);
 
-    // 1) 整章一次批量（最省 token）；超大章或已有断点直接跳过
-    // ——必然截断的请求不值得先付一次 token/延迟；失败/解析不齐 → 分块回退。
-    final bool tryOneShot =
+    final flags = TranslationFeatureFlags.instance;
+    await flags.ensureLoaded();
+    final advanced = TranslationEnginePolicy.advanced(
+      hasGlossary: glossary.isNotEmpty,
+      nonStandardStyle: style != TranslationStyle.standard,
+      cot: cot,
+    );
+    final order = TranslationEnginePolicy.order(
+      bingEnabled: flags.bingEnabled,
+      preferBing: flags.bingFirst,
+      advancedOptions: advanced,
+    );
+    final bingAvailable =
+        flags.bingEnabled && TranslationLanguage.bingCode(lang) != null;
+
+    // 主 + 备用端点（功能级回落通用），失败路由在请求层执行。
+    final endpointCfgs = await _settings.getTranslationEndpoints();
+    final endpoints = <AiEndpointConfig>[
+      for (final c in endpointCfgs)
+        if (c.baseUrl.trim().isNotEmpty)
+          AiEndpointConfig(
+            baseUrl: c.baseUrl,
+            apiKey: c.apiKey,
+            model: c.model,
+          ),
+    ];
+
+    Future<void> runBing() => _bingPass(
+          paragraphs: paragraphs,
+          result: result,
+          lang: lang,
+          onProgress: onProgress,
+          onChunkPersisted: onChunkPersisted,
+        );
+
+    Future<void> runAi() => _aiPass(
+          paragraphs: paragraphs,
+          result: result,
+          endpoints: endpoints,
+          lang: lang,
+          chunkSize: chunkSize,
+          allowOneShot: batchSize == null,
+          hasPartial: hasPartial || _doneCount(paragraphs, result) > 0,
+          glossary: glossary,
+          style: style,
+          cot: cot,
+          bookContext: bookContext,
+          onProgress: onProgress,
+          onChunkPersisted: onChunkPersisted,
+        );
+
+    if (order == TranslationEngineOrder.bingFirst && bingAvailable) {
+      try {
+        await runBing();
+        if (_allDone(paragraphs, result)) {
+          onProgress?.call(paragraphs.length, paragraphs.length);
+          return result;
+        }
+      } on Object catch (e) {
+        AppLog.instance.w('[小说翻译] Bing 失败，转 AI 续跑: $e');
+      }
+    }
+
+    if (endpoints.isNotEmpty) {
+      try {
+        await runAi();
+        return result;
+      } on Object catch (e) {
+        if (order == TranslationEngineOrder.aiFirst &&
+            bingAvailable &&
+            !_allDone(paragraphs, result)) {
+          AppLog.instance.w('[小说翻译] AI 失败，转 Bing 续跑: $e');
+          await runBing();
+          return result;
+        }
+        rethrow;
+      }
+    }
+
+    if (bingAvailable && order == TranslationEngineOrder.aiFirst) {
+      await runBing();
+      return result;
+    }
+    if (_allDone(paragraphs, result)) return result;
+    throw const TranslationException('未配置 AI 接口，且 Bing 免费翻译不可用');
+  }
+
+  static bool _isDone(List<String> paragraphs, List<String> result, int i) =>
+      paragraphs[i].trim().isEmpty || result[i].trim().isNotEmpty;
+
+  static int _doneCount(List<String> paragraphs, List<String> result) {
+    var done = 0;
+    for (var i = 0; i < paragraphs.length; i++) {
+      if (_isDone(paragraphs, result, i)) done++;
+    }
+    return done;
+  }
+
+  static bool _allDone(List<String> paragraphs, List<String> result) =>
+      _doneCount(paragraphs, result) >= paragraphs.length;
+
+  /// Bing 免费翻译 pass：按批量上限切片，逐块进度与检查点；
+  /// 同语言 / 空段落直接保留原文。
+  Future<void> _bingPass({
+    required List<String> paragraphs,
+    required List<String> result,
+    required String lang,
+    void Function(int done, int total)? onProgress,
+    void Function(List<String> translatedSoFar)? onChunkPersisted,
+  }) async {
+    var start = 0;
+    while (start < paragraphs.length) {
+      if (_isDone(paragraphs, result, start)) {
+        start++;
+        continue;
+      }
+      var end = start;
+      var chars = 0;
+      while (end < paragraphs.length) {
+        if (!_isDone(paragraphs, result, end)) {
+          final len = paragraphs[end].length;
+          if (end > start &&
+              (end - start >= BingTranslationClient.maxBatchItems ||
+                  chars + len > BingTranslationClient.maxBatchChars)) {
+            break;
+          }
+          chars += len;
+        }
+        end++;
+      }
+      final indexes = <int>[];
+      final texts = <String>[];
+      for (var i = start; i < end; i++) {
+        if (_isDone(paragraphs, result, i)) continue;
+        if (!TranslationLanguage.shouldTranslate(paragraphs[i], lang)) {
+          result[i] = paragraphs[i];
+          continue;
+        }
+        indexes.add(i);
+        texts.add(paragraphs[i]);
+      }
+      if (texts.isNotEmpty) {
+        final translated = await _bing.translate(
+          texts: texts,
+          targetLang: lang,
+        );
+        for (var i = 0; i < texts.length; i++) {
+          final text = translated[i].trim();
+          result[indexes[i]] = text.isEmpty ? texts[i] : text;
+        }
+      }
+      onChunkPersisted?.call(List<String>.of(result));
+      onProgress?.call(_doneCount(paragraphs, result), paragraphs.length);
+      start = end;
+    }
+  }
+
+  /// AI pass：保留原有 one-shot / 分块回退 / 术语与语境注入逻辑，
+  /// 只对未完成段落发请求。
+  Future<void> _aiPass({
+    required List<String> paragraphs,
+    required List<String> result,
+    required List<AiEndpointConfig> endpoints,
+    required String lang,
+    required int chunkSize,
+    required bool allowOneShot,
+    required bool hasPartial,
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+    required bool cot,
+    required String? bookContext,
+    void Function(int done, int total)? onProgress,
+    void Function(List<String> translatedSoFar)? onChunkPersisted,
+  }) async {
+    // 1) 整章一次批量（最省 token）；超大章或已有断点直接跳过，
+    //    必然截断的请求不值得先付一次 token/延迟；失败/解析不齐 → 分块回退。
+    final bool tryOneShot = allowOneShot &&
         paragraphs.length <= _kOneShotMaxParagraphs &&
-            batchSize == null &&
-            !hasPartial;
+        !hasPartial &&
+        !_allDone(paragraphs, result);
     if (tryOneShot) {
       try {
         final oneShot = await _requestBatch(
@@ -151,58 +318,79 @@ class NovelTranslationService {
         final parsed = parseBatched(oneShot, paragraphs.length);
         if (parsed != null) {
           _detectGlossaryConflicts(glossary, paragraphs, parsed);
+          for (var i = 0; i < result.length; i++) {
+            if (!_isDone(paragraphs, result, i)) result[i] = parsed[i];
+          }
           onProgress?.call(paragraphs.length, paragraphs.length);
-          return parsed;
+          onChunkPersisted?.call(List<String>.of(result));
+          return;
         }
       } on Object catch (e) {
-        // 落入分块回退。
         AppLog.instance.w('[小说翻译] 整章批量失败，转入分块回退: $e');
       }
     }
 
     // 2) 分块翻译（每块 chunkSize 段，块内仍走批量协议）。
-    // 整块已完成（全部非空）直接跳过，不重复请求；
-    // 携带上一块最后 2 段原文+译文作为衔接。
+    // 整块已完成直接跳过，不重复请求；携带上一块最后 2 段原文+译文衔接。
     List<TranslationContextPair> chunkContext = const <TranslationContextPair>[];
     for (var start = 0; start < paragraphs.length; start += chunkSize) {
       final end = (start + chunkSize).clamp(0, paragraphs.length);
-      final chunk = paragraphs.sublist(start, end);
-      final chunkExisting = <String>[
-        for (var i = start; i < end; i++) result[i],
-      ];
-      final fullyDone = chunkExisting.every((t) => t.isNotEmpty);
+      final fullyDone = <bool>[
+        for (var i = start; i < end; i++) _isDone(paragraphs, result, i),
+      ].every((done) => done);
       if (!fullyDone) {
-        final raw = await _requestBatch(
-          chunk,
-          endpoints,
-          lang,
-          glossary: glossary,
-          style: style,
-          cot: cot,
-          bookContext: bookContext,
-          priorContext: chunkContext,
-        );
-        final parsed =
-            parseBatched(raw, chunk.length) ?? (throw const TranslationException('翻译返回格式异常'));
-        _detectGlossaryConflicts(glossary, chunk, parsed);
-        for (var i = 0; i < chunk.length; i++) {
-          result[start + i] = parsed[i];
+        final pendingIndexes = <int>[];
+        final pendingTexts = <String>[];
+        for (var i = start; i < end; i++) {
+          if (_isDone(paragraphs, result, i)) continue;
+          pendingIndexes.add(i);
+          pendingTexts.add(paragraphs[i]);
         }
-        // 记录本块最后 N 段，供下一块衔接。
+        if (pendingTexts.isNotEmpty) {
+          final raw = await _requestBatch(
+            pendingTexts,
+            endpoints,
+            lang,
+            glossary: glossary,
+            style: style,
+            cot: cot,
+            bookContext: bookContext,
+            priorContext: chunkContext,
+          );
+          final parsed = parseBatched(raw, pendingTexts.length) ??
+              (throw const TranslationException('翻译返回格式异常'));
+          _detectGlossaryConflicts(glossary, pendingTexts, parsed);
+          for (var i = 0; i < pendingTexts.length; i++) {
+            result[pendingIndexes[i]] = parsed[i];
+          }
+          chunkContext = <TranslationContextPair>[
+            for (var i = (pendingTexts.length - _kChunkContextPairs)
+                .clamp(0, pendingTexts.length);
+                i < pendingTexts.length;
+                i++)
+              (source: pendingTexts[i], translation: parsed[i]),
+          ];
+        }
+      } else {
+        // 已完成块同样维护上下文，保证下一块衔接自然。
+        final realIndexes = <int>[
+          for (var i = start; i < end; i++)
+            if (paragraphs[i].trim().isNotEmpty) i,
+        ];
         chunkContext = <TranslationContextPair>[
-          for (var i = (chunk.length - _kChunkContextPairs)
-              .clamp(0, chunk.length);
-              i < chunk.length;
+          for (var i = (realIndexes.length - _kChunkContextPairs)
+              .clamp(0, realIndexes.length);
+              i < realIndexes.length;
               i++)
-            (source: chunk[i], translation: parsed[i]),
+            (
+              source: paragraphs[realIndexes[i]],
+              translation: result[realIndexes[i]],
+            ),
         ];
       }
-      done = result.where((t) => t.isNotEmpty).length;
-      onProgress?.call(done, paragraphs.length);
-      // 逐块检查点回调（快照拷贝，调用方可安全落盘）。
+      onProgress?.call(_doneCount(paragraphs, result), paragraphs.length);
       onChunkPersisted?.call(List<String>.of(result));
     }
-    return result;
   }
 
   /// 术语冲突检测：命中告警仅写日志（修正通道后续迭代）。

@@ -10,7 +10,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:nexhub/core/ai/bing_translation_client.dart';
 import 'package:nexhub/core/ai/glossary_manager.dart';
+import 'package:nexhub/core/ai/translation_feature_flags.dart';
 import 'package:nexhub/core/ai/translation_options_store.dart';
 import 'package:nexhub/core/ai/vision_translation_client.dart';
 import 'package:nexhub/core/player/subtitle_file.dart';
@@ -132,10 +134,12 @@ void main() {
     late _EchoClient client;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues(<String, String>{
+      SharedPreferences.setMockInitialValues(<String, Object>{
         'novel_overview_api_base_v1': 'http://test.local',
         'media_translation_api_base_v1': 'http://test.local',
+        'translation_bing_enabled_v1': false,
       });
+      await TranslationFeatureFlags.instance.reload();
       tempDir = await Directory.systemTemp.createTemp('nexhub_f6');
       Hive.init(tempDir.path);
       subDir = Directory('${tempDir.path}/subs')..createSync(recursive: true);
@@ -228,5 +232,79 @@ void main() {
       final ass = await File(assPath).readAsString();
       expect(ass, contains('こんにちは\\N译[こんにちは]'));
     });
+
+    test('无 AI 配置时 Bing 免费翻译整片', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'translation_bing_enabled_v1': true,
+      });
+      await TranslationFeatureFlags.instance.reload();
+      var bingCalls = 0;
+      final dio = Dio()
+        ..httpClientAdapter = _BingAdapter(() {
+          bingCalls++;
+        });
+      final pipeline = SubtitleOfflinePipeline(
+        client: client,
+        bingClient: BingTranslationClient(
+          dio: dio,
+          delay: (_) async {},
+        ),
+        glossary: GlossaryManager(),
+        options: TranslationOptionsStore(),
+      );
+      final subPath = await writeSubtitle('bing.srt', _srtSample);
+      final id = await pipeline.start(
+        videoPath: '/tmp/video2.mkv',
+        videoTitle: 'video2.mkv',
+        subtitlePath: subPath,
+        lang: '中文',
+        config: null,
+      );
+      for (var i = 0; i < 100; i++) {
+        final job = await pipeline.getJob(id);
+        if (job?.status == SubtitleJobStatus.done) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      final job = await pipeline.getJob(id);
+      expect(job!.status, SubtitleJobStatus.done);
+      expect(job.translatedCount, 3);
+      expect(bingCalls, greaterThan(0));
+      expect(client.calls, 0);
+      expect(job.translations[0], 'B:こんにちは');
+    });
   });
+}
+
+/// Bing Edge 假接口：按请求数组逐条回声 `B:<原文>`。
+class _BingAdapter implements HttpClientAdapter {
+  _BingAdapter(this.onCall);
+
+  final void Function() onCall;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    onCall();
+    final texts = (options.data as List).cast<String>();
+    return ResponseBody.fromString(
+      jsonEncode(<Map<String, dynamic>>[
+        for (final t in texts)
+          <String, dynamic>{
+            'translations': <Map<String, dynamic>>[
+              <String, dynamic>{'text': 'B:$t', 'to': 'zh-Hans'},
+            ],
+          },
+      ]),
+      200,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+      },
+    );
+  }
 }

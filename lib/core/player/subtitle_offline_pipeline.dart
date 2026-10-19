@@ -19,9 +19,13 @@ import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../ai/bing_translation_client.dart';
 import '../ai/glossary_manager.dart';
 import '../ai/prompt_builder.dart';
+import '../ai/translation_engine_policy.dart';
 import '../ai/translation_exception.dart';
+import '../ai/translation_feature_flags.dart';
+import '../ai/translation_language.dart';
 import '../ai/translation_options_store.dart';
 import '../ai/vision_translation_client.dart';
 import '../services/novel_export_upload_service.dart';
@@ -128,10 +132,12 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
     VisionTranslationClient? client,
     GlossaryManager? glossary,
     TranslationOptionsStore? options,
+    BingTranslationClient? bingClient,
   })  : _box = box,
         _client = client ?? VisionTranslationClient(),
         _glossary = glossary ?? GlossaryManager(),
-        _options = options ?? TranslationOptionsStore();
+        _options = options ?? TranslationOptionsStore(),
+        _bing = bingClient ?? BingTranslationClient();
 
   static const String boxName = 'subtitle_offline_jobs';
 
@@ -141,6 +147,7 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
   final VisionTranslationClient _client;
   final GlossaryManager _glossary;
   final TranslationOptionsStore _options;
+  final BingTranslationClient _bing;
   Box<dynamic>? _box;
 
   /// 运行中的任务（id → 取消标记）。
@@ -222,7 +229,7 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
     required String videoTitle,
     required String subtitlePath,
     required String lang,
-    required AiEndpointConfig config,
+    AiEndpointConfig? config,
     int? chunkSize,
   }) async {
     final id = jobIdFor(
@@ -260,7 +267,7 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
   Future<void> _run(
     SubtitleOfflineJob job,
     List<SubtitleCue> cues,
-    AiEndpointConfig config,
+    AiEndpointConfig? config,
     int chunkSize,
   ) async {
     final id = job.id;
@@ -270,6 +277,7 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
       var glossary = const <GlossaryEntry>[];
       var style = TranslationStyle.standard;
       var lightweight = false;
+      var cot = false;
       try {
         final master =
             await NovelSummarySettings.instance.getTranslationTargetLanguage();
@@ -277,6 +285,7 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
             GlossaryManager.globalWorkId, job.lang, master);
         style = await _options.effectiveStyle(null);
         lightweight = await _options.getSubtitleLightweight();
+        cot = await _options.getCotEnabled();
       } on Object {
         // 选项读取失败按默认。
       }
@@ -285,26 +294,51 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
         glossary: glossary,
         style: style,
         lightweight: lightweight,
+        cot: cot,
       );
+
+      final flags = TranslationFeatureFlags.instance;
+      await flags.ensureLoaded();
+      final advanced = TranslationEnginePolicy.advanced(
+        hasGlossary: glossary.isNotEmpty,
+        nonStandardStyle: style != TranslationStyle.standard,
+        cot: cot,
+      );
+      final order = TranslationEnginePolicy.order(
+        bingEnabled: flags.bingEnabled,
+        preferBing: flags.bingFirst,
+        advancedOptions: advanced,
+      );
+      final bingAvailable =
+          flags.bingEnabled && TranslationLanguage.bingCode(job.lang) != null;
+
       for (var start = 0; start < cues.length; start += chunkSize) {
         if (_cancelled[id] == true) return;
         final end = (start + chunkSize).clamp(0, cues.length);
-        final already = <String>[
-          for (var i = start; i < end; i++) translations[i],
-        ];
-        if (already.every((t) => t.trim().isNotEmpty)) continue;
-        final texts = <String>[
-          for (var i = start; i < end; i++) cues[i].text,
-        ];
-        final result = await _client.translateBatch(
-          config: config,
-          targetLang: job.lang,
-          texts: texts,
-          lightweight: lightweight,
-          systemPrompt: system,
-        );
-        for (var i = 0; i < texts.length; i++) {
-          translations[start + i] = result[i].trim();
+        final indexes = <int>[];
+        final texts = <String>[];
+        for (var i = start; i < end; i++) {
+          if (translations[i].trim().isNotEmpty) continue;
+          if (!TranslationLanguage.shouldTranslate(cues[i].text, job.lang)) {
+            translations[i] = cues[i].text;
+            continue;
+          }
+          indexes.add(i);
+          texts.add(cues[i].text);
+        }
+        if (texts.isNotEmpty) {
+          final result = await _translateChunk(
+            texts: texts,
+            lang: job.lang,
+            config: config,
+            order: order,
+            bingAvailable: bingAvailable,
+            lightweight: lightweight,
+            system: system,
+          );
+          for (var i = 0; i < texts.length; i++) {
+            translations[indexes[i]] = result[i].trim();
+          }
         }
         // 逐块检查点（不重复计费）。
         await _save(job.copyWith(
@@ -333,6 +367,47 @@ class SubtitleOfflinePipeline extends ChangeNotifier {
       _cancelled.remove(id);
       notifyListeners();
     }
+  }
+
+  Future<List<String>> _translateChunk({
+    required List<String> texts,
+    required String lang,
+    required AiEndpointConfig? config,
+    required TranslationEngineOrder order,
+    required bool bingAvailable,
+    required bool lightweight,
+    required String system,
+  }) async {
+    Future<List<String>> viaBing() => _bing.translate(
+          texts: texts,
+          targetLang: lang,
+        );
+    if (order == TranslationEngineOrder.bingFirst && bingAvailable) {
+      try {
+        return await viaBing();
+      } on Object catch (e) {
+        AppLog.instance.w('[字幕离线] Bing 失败，转 AI: $e');
+      }
+    }
+    if (config != null && config.baseUrl.trim().isNotEmpty) {
+      try {
+        return await _client.translateBatch(
+          config: config,
+          targetLang: lang,
+          texts: texts,
+          lightweight: lightweight,
+          systemPrompt: system,
+        );
+      } on Object catch (e) {
+        if (order == TranslationEngineOrder.aiFirst && bingAvailable) {
+          AppLog.instance.w('[字幕离线] AI 失败，转 Bing: $e');
+          return viaBing();
+        }
+        rethrow;
+      }
+    }
+    if (bingAvailable) return viaBing();
+    throw const TranslationException('未配置 AI 接口，且 Bing 免费翻译不可用');
   }
 
   void cancel(String id) {

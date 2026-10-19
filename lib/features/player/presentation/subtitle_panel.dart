@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/ai/translation_exception.dart';
+import '../../../core/ai/translation_feature_flags.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../core/ai/vision_translation_client.dart';
 import '../../../core/player/player_controller.dart';
@@ -902,9 +903,11 @@ class _SubtitlePanelState extends State<SubtitlePanel> {
     try {
       final settings = NovelSummarySettings.instance;
       final cfg = await settings.getMediaTranslationConfig();
-      if (cfg.baseUrl.trim().isEmpty) {
-        throw const TranslationException('未配置 AI 接口：请先在 设置 → AI 配置 中填写'
-            '通用接口或视频翻译专用接口');
+      final flags = TranslationFeatureFlags.instance;
+      await flags.ensureLoaded();
+      if (cfg.baseUrl.trim().isEmpty && !flags.bingEnabled) {
+        throw const TranslationException(
+            '未配置 AI 接口，且 Bing 免费翻译已关闭：请先在 设置 → AI 配置 中填写接口或启用 Bing 翻译');
       }
       final lang = await settings.getMediaTranslationTargetLanguage();
       final id = await _offlinePipeline.start(

@@ -5302,5 +5302,22 @@
   "mediaServerPlayMethodDirectStream": "直接流",
   "mediaServerPlayMethodTranscode": "转码",
   "mediaServerSearchHistory": "搜索历史",
-  "mediaServerSearchHistoryClear": "清空搜索历史"
+  "mediaServerSearchHistoryClear": "清空搜索历史",
+  "bingTranslationTitle": "Bing 免费翻译",
+  "bingTranslationDesc": "无需 API Key，同时用于标题、标签、简介与评论",
+  "bingTranslationEnable": "启用 Bing 免费翻译",
+  "bingTranslationEnableHint": "关闭后小说/字幕仅走 AI，详情页自动翻译同时停用",
+  "bingTranslationPriority": "引擎优先级",
+  "bingTranslationBingFirst": "Bing 优先",
+  "bingTranslationAiFirst": "AI 优先",
+  "bingTranslationAutoTitle": "自动翻译标题",
+  "bingTranslationAutoTags": "自动翻译标签",
+  "bingTranslationAutoSummary": "自动翻译简介",
+  "bingTranslationAutoComments": "自动翻译评论",
+  "bingTranslationTest": "测试 Bing 连通性",
+  "bingTranslationTesting": "测试中...",
+  "bingTranslationTestOk": "Bing 翻译可用",
+  "bingTranslationTestFail": "Bing 当前不可用，将使用 AI 兜底",
+  "bingTranslationPrivacy": "文本会发送到 Microsoft 翻译服务；该接口非官方公开接口，可能随时调整或失效。",
+  "translationCacheUiText": "详情页与评论翻译"
 }

@@ -9719,4 +9719,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaServerSearchHistoryClear => 'Clear search history';
+
+  @override
+  String get bingTranslationTitle => 'Bing free translation';
+
+  @override
+  String get bingTranslationDesc =>
+      'No API key required; also powers titles, tags, summaries and comments';
+
+  @override
+  String get bingTranslationEnable => 'Enable Bing free translation';
+
+  @override
+  String get bingTranslationEnableHint =>
+      'When off, novels and subtitles use AI only; auto translation on detail pages is disabled';
+
+  @override
+  String get bingTranslationPriority => 'Engine priority';
+
+  @override
+  String get bingTranslationBingFirst => 'Bing first';
+
+  @override
+  String get bingTranslationAiFirst => 'AI first';
+
+  @override
+  String get bingTranslationAutoTitle => 'Auto-translate titles';
+
+  @override
+  String get bingTranslationAutoTags => 'Auto-translate tags';
+
+  @override
+  String get bingTranslationAutoSummary => 'Auto-translate summaries';
+
+  @override
+  String get bingTranslationAutoComments => 'Auto-translate comments';
+
+  @override
+  String get bingTranslationTest => 'Test Bing connection';
+
+  @override
+  String get bingTranslationTesting => 'Testing...';
+
+  @override
+  String get bingTranslationTestOk => 'Bing translation is available';
+
+  @override
+  String get bingTranslationTestFail =>
+      'Bing is unavailable right now; AI fallback will be used';
+
+  @override
+  String get bingTranslationPrivacy =>
+      'Text is sent to Microsoft\'s translation service. This is an unofficial endpoint and may change or stop working at any time.';
+
+  @override
+  String get translationCacheUiText => 'Detail page & comment translation';
 }
