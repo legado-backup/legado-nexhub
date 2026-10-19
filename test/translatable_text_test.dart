@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/core/ai/translation_feature_flags.dart';
 import 'package:nexhub/core/widgets/translatable_text.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,5 +39,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('这是中文简介'), findsOneWidget);
+  });
+
+  testWidgets('标签 Chip 在 material_ui 主题树下可渲染', (tester) async {
+    await resetFlags(<String, Object>{
+      'translation_bing_enabled_v1': false,
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TranslatableTagChip(
+          label: '奇幻',
+          onPressed: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('奇幻'), findsOneWidget);
   });
 }
