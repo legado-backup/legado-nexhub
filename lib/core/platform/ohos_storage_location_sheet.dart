@@ -26,42 +26,46 @@ Future<String?> showOhosStorageLocationSheet(
 }) async {
   final bool? pickSystem = await showModalBottomSheet<bool>(
     context: context,
+    // 默认弹层最高 9/16 屏高，横屏 / 小窗放不下两个双行选项，会直接溢出。
+    isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
     builder: (BuildContext ctx) {
       final ColorScheme scheme = Theme.of(ctx).colorScheme;
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTokens.spaceLg,
-                0,
-                AppTokens.spaceLg,
-                AppTokens.spaceSm,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTokens.spaceLg,
+                  0,
+                  AppTokens.spaceLg,
+                  AppTokens.spaceSm,
+                ),
+                child: Text(
+                  title,
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
               ),
-              child: Text(
-                title,
-                style: Theme.of(ctx).textTheme.titleMedium,
+              _LocationTile(
+                selected: !systemSelected,
+                title: appPrivateLabel,
+                subtitle: appPrivateHint,
+                onTap: () => Navigator.of(ctx).pop(false),
               ),
-            ),
-            _LocationTile(
-              selected: !systemSelected,
-              title: appPrivateLabel,
-              subtitle: appPrivateHint,
-              onTap: () => Navigator.of(ctx).pop(false),
-            ),
-            _LocationTile(
-              selected: systemSelected,
-              title: systemLabel,
-              subtitle: systemHint,
-              onTap: () => Navigator.of(ctx).pop(true),
-            ),
-            const SizedBox(height: AppTokens.spaceSm),
-            Divider(height: 1, color: scheme.outlineVariant),
-          ],
+              _LocationTile(
+                selected: systemSelected,
+                title: systemLabel,
+                subtitle: systemHint,
+                onTap: () => Navigator.of(ctx).pop(true),
+              ),
+              const SizedBox(height: AppTokens.spaceSm),
+              Divider(height: 1, color: scheme.outlineVariant),
+            ],
+          ),
         ),
       );
     },
