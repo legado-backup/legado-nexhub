@@ -7,12 +7,12 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../../core/platform/file_exporter.dart';
 import '../../../core/platform/platform_service.dart';
 import '../../../core/services/source_repository.dart';
+import '../../../core/utils/app_log.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/unified_source_tile.dart';
@@ -54,19 +54,27 @@ class _PluginManagementScreenState extends State<PluginManagementScreen> {
         all.map((c) => c.toJson()).toList();
     final jsonString = jsonEncode(exportList);
 
-    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），走系统分享保存——写应用
-    // 文档目录后调起分享面板，由用户选择保存位置（与 AI 配置导出同款）。
+    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），改走系统「另存为」对话框
+    // （原生 nexhub/file_export 通道），由用户选择保存位置。
     if (PlatformService.instance.isOHOS) {
+      final l10n = AppLocalizations.of(context);
       final messenger = ScaffoldMessenger.maybeOf(context);
       try {
-        final docs = await getApplicationDocumentsDirectory();
-        final file = File(
-            '${docs.path}/nexhub/nexhub_plugins_export_${DateTime.now().millisecondsSinceEpoch}.json');
-        await file.create(recursive: true);
-        await file.writeAsString(jsonString);
-        await Share.shareXFiles(<XFile>[XFile(file.path)]);
+        final String? saved = await FileExporter.saveTextFile(
+          fileName:
+              'nexhub_plugins_${DateTime.now().millisecondsSinceEpoch}.json',
+          content: jsonString,
+        );
+        // 用户取消另存为：不提示成功/失败。
+        if (saved == null) return;
+        messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.exportDataSuccess)),
+        );
       } on Object catch (e) {
-        messenger?.showSnackBar(SnackBar(content: Text(e.toString())));
+        AppLog.instance.w('[插件导出] 保存失败: $e');
+        messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.exportDataFailed)),
+        );
       }
       return;
     }

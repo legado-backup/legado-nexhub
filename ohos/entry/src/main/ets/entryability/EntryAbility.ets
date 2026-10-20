@@ -2,6 +2,7 @@
 import { FlutterAbility, FlutterEngine } from '@ohos/flutter_ohos';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import ClipboardPlugin from '../plugins/ClipboardPlugin';
+import FileExportPlugin from '../plugins/FileExportPlugin';
 import MediaStorePlugin from '../plugins/MediaStorePlugin';
 import OhosTtsPlugin from '../plugins/OhosTtsPlugin';
 
@@ -15,5 +16,7 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new OhosTtsPlugin())
     // 应用级原生通道：图片写入系统剪贴板（见 ClipboardPlugin 注释）。
     flutterEngine.getPlugins()?.add(new ClipboardPlugin())
+    // 应用级原生通道：导出文件到用户可见位置（见 FileExportPlugin 注释）。
+    flutterEngine.getPlugins()?.add(new FileExportPlugin())
   }
 }

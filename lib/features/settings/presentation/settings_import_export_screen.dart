@@ -12,10 +12,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../../core/platform/file_exporter.dart';
 import '../../../core/platform/platform_service.dart';
 import '../../../core/services/backup_archive.dart';
+import '../../../core/utils/app_log.dart';
 import '../../../core/settings/data_export_config.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_alert_dialog.dart';
@@ -243,13 +244,10 @@ class _SettingsImportExportScreenState
   Future<void> _showFolderThenExport() async {
     final l10n = AppLocalizations.of(context);
     String? folder = _exportFolder.isNotEmpty ? _exportFolder : null;
-    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），跳过目录询问，直接导出到
-    // 应用文档目录并调起系统分享（用户可在分享面板把文件保存出去）。
+    // 鸿蒙：目录选择接口不可用（已知缺陷 U2），改走系统「另存为」对话框
+    // （原生 nexhub/file_export 通道），由用户选择保存位置。
     if (PlatformService.instance.isOHOS) {
-      final dir = await getApplicationDocumentsDirectory();
-      final exportDir = Directory('${dir.path}/NexHub/Exports');
-      if (!exportDir.existsSync()) exportDir.createSync(recursive: true);
-      await _doExport(exportDir.path);
+      await _doExport(null);
       return;
     }
     if (folder == null) {
@@ -349,7 +347,7 @@ class _SettingsImportExportScreenState
     await _doExport(folder);
   }
 
-  Future<void> _doExport(String folder) async {
+  Future<void> _doExport(String? folder) async {
     final l10n = AppLocalizations.of(context);
     if (_selected.isEmpty) {
       _snack(l10n.backupScopeNone);
@@ -363,17 +361,25 @@ class _SettingsImportExportScreenState
           .toIso8601String()
           .replaceAll(':', '-')
           .replaceAll('.', '-');
-      final filePath = '$folder/nexhub_backup_$stamp.json';
+      final fileName = 'nexhub_backup_$stamp.json';
       final json = encodeBackupBundle(bundle);
-      await File(filePath).writeAsString(json);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _snack(l10n.backupExported(count));
-      // 鸿蒙：导出文件在应用沙箱内，调起系统分享让用户保存到可见位置。
       if (PlatformService.instance.isOHOS) {
-        await Share.shareXFiles(<XFile>[XFile(filePath)]);
+        final String? saved = await FileExporter.saveTextFile(
+          fileName: fileName,
+          content: json,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        // 用户取消另存为：不提示成功/失败。
+        if (saved == null) return;
+      } else {
+        await File('${folder!}/$fileName').writeAsString(json);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
       }
-    } on Object {
+      _snack(l10n.backupExported(count));
+    } on Object catch (e) {
+      AppLog.instance.w('[备份导出] 保存失败: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _snack(l10n.exportDataFailed);
