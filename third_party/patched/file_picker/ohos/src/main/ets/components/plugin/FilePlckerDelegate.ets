@@ -87,7 +87,8 @@ export class FilePickerDelegate {
 
           this.savaFilePath = photoSelectResult.photoUris
           if (photoSelectResult == null || photoSelectResult.photoUris.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           if (this.isMultipleSelection) {
             this.handlingMultipleResults(photoSelectResult.photoUris)
@@ -107,7 +108,8 @@ export class FilePickerDelegate {
         photoPicker.select(photoSelectOptions).then((photoSelectResult) => {
           this.savaFilePath = photoSelectResult.photoUris
           if (photoSelectResult == null || photoSelectResult.photoUris.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           let selectedUris: Array<string> = photoSelectResult.photoUris;
           if (this.isMultipleSelection) {
@@ -128,7 +130,8 @@ export class FilePickerDelegate {
         audioPicker.select(audioSelectOptions).then((audioSelectResult) => {
           this.savaFilePath = audioSelectResult
           if (audioSelectResult == null || audioSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           if (this.isMultipleSelection) {
             this.handlingMultipleResults(audioSelectResult);
@@ -149,7 +152,8 @@ export class FilePickerDelegate {
           this.savaFilePath = photoSelectResult.photoUris
           let selectedUris: Array<string> = photoSelectResult.photoUris;
           if (selectedUris == null || selectedUris.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           if (this.isMultipleSelection) {
             this.handlingMultipleResults(selectedUris)
@@ -169,7 +173,8 @@ export class FilePickerDelegate {
         documentPicker.select(documentSelectOptions).then((documentSelectResult: Array<string>) => {
           this.savaFilePath = documentSelectResult
           if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           let anySelectUris: Array<string> = documentSelectResult;
           if (this.isMultipleSelection) {
@@ -177,11 +182,9 @@ export class FilePickerDelegate {
           } else {
             this.handleSingleResult(anySelectUris[0]);
           }
-          if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
-          }
         }).catch((err: BusinessError) => {
           console.error('DocumentViewPicker.select failed with err: ' + JSON.stringify(err));
+          this.finishWithError(`${err.code}`, `${err.message}`);
         });
         break
       }
@@ -195,18 +198,17 @@ export class FilePickerDelegate {
           this.savaFilePath = documentSelectResult;
           let anySelectUris: Array<string> = documentSelectResult;
           if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           if (this.isMultipleSelection) {
             this.handlingMultipleResults(anySelectUris)
           } else {
             this.handleSingleResult(anySelectUris[0]);
           }
-          if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
-          }
         }).catch((err: BusinessError) => {
           console.error('DocumentViewPicker.select failed with err: ' + JSON.stringify(err));
+          this.finishWithError(`${err.code}`, `${err.message}`);
         });
         break
       }
@@ -218,7 +220,8 @@ export class FilePickerDelegate {
         }
         documentPicker.select(documentSelectOptions).then((documentSelectResult: Array<string>) => {
           if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
+            this.finishWithCancel();
+            return;
           }
           let anySelectUris: Array<string> = documentSelectResult;
           if (this.isMultipleSelection) {
@@ -226,11 +229,9 @@ export class FilePickerDelegate {
           } else {
             this.handleSingleResult(anySelectUris[0]);
           }
-          if (documentSelectResult == null || documentSelectResult.length == 0) {
-            this.finishWithError("unknown_activity", "Unknown activity error, please fill an issue.");
-          }
         }).catch((err: BusinessError) => {
           console.error('DocumentViewPicker.select failed with err: ' + JSON.stringify(err));
+          this.finishWithError(`${err.code}`, `${err.message}`);
         });
         break
       }
@@ -292,6 +293,17 @@ export class FilePickerDelegate {
       }
     }
     this.pendingResult?.success(result);
+    this.clearPendingResult();
+  }
+
+  // 用户取消选择时返回 null：Dart 侧 file_picker 以 null 表示取消。
+  // 旧实现把空结果当错误上报，取消后会在 Dart 侧抛 PlatformException。
+  finishWithCancel() {
+    if (this.pendingResult == null) {
+      return;
+    }
+    this.dispatchEventStatus(false);
+    this.pendingResult.success(null);
     this.clearPendingResult();
   }
 

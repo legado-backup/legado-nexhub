@@ -53,6 +53,8 @@ class BackupCategorySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final bool allSelected =
+        kSelectableBackupCategories.every(selected.contains);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -67,9 +69,13 @@ class BackupCategorySelector extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () => onChanged(
-                  Set<BackupCategory>.from(kSelectableBackupCategories),
+                  allSelected
+                      ? <BackupCategory>{}
+                      : Set<BackupCategory>.from(kSelectableBackupCategories),
                 ),
-                child: Text(l10n.backupSelectAll),
+                child: Text(
+                  allSelected ? l10n.deselectAll : l10n.backupSelectAll,
+                ),
               ),
             ],
           ),

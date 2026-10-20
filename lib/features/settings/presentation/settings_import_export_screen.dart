@@ -70,10 +70,19 @@ class _SettingsImportExportScreenState
 
   Future<void> _pickImportFile() async {
     final l10n = AppLocalizations.of(context);
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const <String>['json'],
-    );
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const <String>['json'],
+      );
+    } on Object catch (e) {
+      // 原生选择器失败（如鸿蒙插件异常）不应冒泡为未捕获异常。
+      AppLog.instance.w('[备份导入] 选择文件失败: $e');
+      if (!mounted) return;
+      _snack(l10n.importDataFailed);
+      return;
+    }
     if (result == null || !mounted) return;
 
     final filePath = result.files.single.path;
@@ -174,67 +183,71 @@ class _SettingsImportExportScreenState
           top: Radius.circular(AppTokens.radiusXl),
         ),
       ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (sheetCtx, _) => Padding(
-          padding: EdgeInsets.only(
-            left: AppTokens.spaceLg,
-            right: AppTokens.spaceLg,
-            top: AppTokens.spaceMd,
-            // 键盘弹起时贴键盘，收起时避让系统手势条。
-            bottom: math.max(
-                  MediaQuery.of(sheetCtx).viewInsets.bottom,
-                  MediaQuery.of(sheetCtx).padding.bottom,
-                ) +
-                AppTokens.spaceLg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: AppTokens.spaceMd),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(sheetCtx)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(AppTokens.radiusFull),
+      builder: (_) => StatefulBuilder(
+        builder: (_, setSheetState) => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (sheetCtx, _) => Padding(
+            padding: EdgeInsets.only(
+              left: AppTokens.spaceLg,
+              right: AppTokens.spaceLg,
+              top: AppTokens.spaceMd,
+              // 键盘弹起时贴键盘，收起时避让系统手势条。
+              bottom: math.max(
+                    MediaQuery.of(sheetCtx).viewInsets.bottom,
+                    MediaQuery.of(sheetCtx).padding.bottom,
+                  ) +
+                  AppTokens.spaceLg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: AppTokens.spaceMd),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(sheetCtx)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(AppTokens.radiusFull),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppTokens.spaceMd),
-              BackupCategorySelector(
-                selected: _selected,
-                onChanged: (next) => setState(() => _selected = next),
-              ),
-              const SizedBox(height: AppTokens.spaceMd),
-              FilledButton.icon(
-                onPressed: _selected.isEmpty
-                    ? null
-                    : () {
-                        Navigator.pop(sheetCtx);
-                        _showFolderThenExport();
-                      },
-                icon: const Icon(Icons.file_upload_rounded),
-                label: Text(l10n.exportData),
-              ),
-              if (_selected.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppTokens.spaceSm),
-                  child: Text(
-                    l10n.backupScopeNone,
-                    style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(sheetCtx).colorScheme.error,
-                        ),
-                  ),
+                const SizedBox(height: AppTokens.spaceMd),
+                BackupCategorySelector(
+                  selected: _selected,
+                  // 弹层在独立路由中：必须用 StatefulBuilder 的 setState
+                  // 重建弹层，页面级 setState 不会刷新这里的勾选状态。
+                  onChanged: (next) => setSheetState(() => _selected = next),
                 ),
-            ],
+                const SizedBox(height: AppTokens.spaceMd),
+                FilledButton.icon(
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () {
+                          Navigator.pop(sheetCtx);
+                          _showFolderThenExport();
+                        },
+                  icon: const Icon(Icons.file_upload_rounded),
+                  label: Text(l10n.exportData),
+                ),
+                if (_selected.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppTokens.spaceSm),
+                    child: Text(
+                      l10n.backupScopeNone,
+                      style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(sheetCtx).colorScheme.error,
+                          ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
