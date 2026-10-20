@@ -8,6 +8,8 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../../../core/platform/ohos_public_storage.dart' show isOhosDocPath;
+import '../../../core/platform/ohos_storage_location_sheet.dart';
 import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/player_settings.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -32,6 +34,37 @@ class _SettingsPlayerScreenState extends State<SettingsPlayerScreen> {
   /// （播放器运行时只读它）。player_settings_v1.screenshotSavePath 是
   /// 从不被运行时读取的影子字段，本页不再读写，避免双 key 互相过时。
   String _screenshotDir = '';
+
+  Future<void> _pickScreenshotDir() async {
+    final AppLocalizations l10n = AppLocalizations.of(context);
+    String? dir;
+    if (PlatformService.instance.isOHOS) {
+      final String? picked = await showOhosStorageLocationSheet(
+        context,
+        title: l10n.screenshotPathSetting,
+        appPrivateLabel: l10n.storageLocationAppPrivate,
+        appPrivateHint: l10n.screenshotPathDefault,
+        systemLabel: l10n.storageLocationSystemScreenshots,
+        systemHint: l10n.storageLocationSystemScreenshotsHint,
+        systemSelected: isOhosDocPath(_screenshotDir),
+        appendSubdir: 'Screenshots',
+      );
+      if (picked == null) return;
+      dir = picked.isEmpty ? null : picked;
+    } else {
+      dir = await FilePicker.platform.getDirectoryPath();
+      if (dir == null) return;
+    }
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (dir == null || dir.isEmpty) {
+      await prefs.remove('screenshot_custom_dir');
+    } else {
+      await prefs.setString('screenshot_custom_dir', dir);
+    }
+    if (!mounted) return;
+    setState(() => _screenshotDir = dir ?? '');
+  }
 
   /// BGR 十六进制字符串转 Color（mpv 使用 BGR 格式）。
   static Color _bgrToColor(String hex) {
@@ -488,7 +521,10 @@ class _SettingsPlayerScreenState extends State<SettingsPlayerScreen> {
                                   Text(
                                     _screenshotDir.isEmpty
                                         ? l10n.screenshotPathDefault
-                                        : _screenshotDir,
+                                        : (isOhosDocPath(_screenshotDir)
+                                            ? l10n
+                                                .storageLocationSystemScreenshots
+                                            : _screenshotDir),
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -504,24 +540,11 @@ class _SettingsPlayerScreenState extends State<SettingsPlayerScreen> {
                               ),
                             ),
                             const SizedBox(width: AppTokens.spaceSm),
-                            // 鸿蒙：目录选择接口不可用（已知缺陷 U2），隐藏
-                            // 自定义截图目录入口，截图按默认位置/系统相册保存。
-                            if (!PlatformService.instance.isOHOS)
-                              IconButton(
-                                icon: const Icon(Icons.folder_open_rounded),
-                                tooltip: l10n.screenshotPathSetting,
-                                onPressed: () async {
-                                  final dir = await FilePicker.platform
-                                      .getDirectoryPath();
-                                  if (dir != null && mounted) {
-                                    setState(() => _screenshotDir = dir);
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    await prefs.setString(
-                                        'screenshot_custom_dir', dir);
-                                  }
-                                },
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.folder_open_rounded),
+                              tooltip: l10n.screenshotPathSetting,
+                              onPressed: _pickScreenshotDir,
+                            ),
                           ],
                         ),
                       ),

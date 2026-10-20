@@ -946,11 +946,9 @@
   "maxConcurrentDownloads": "Max Concurrent Downloads",
   "maxConcurrentDownloadsDesc": "Number of simultaneous downloads",
   "downloadPath": "Download Path",
-  "downloadPathOhosUnsupported": "Custom download folder isn't supported on HarmonyOS yet. Files are saved to the app directory.",
   "folderImportOhosUnsupported": "Folder import isn't supported on HarmonyOS yet. Use file import instead.",
   "downloadPathSet": "Download path updated",
   "contentImportActions": "Actions",
-  "downloadPathDesc": "D:/Downloads",
   "downloaderType": "Downloader",
   "downloaderInternal": "Built-in Downloader",
   "downloaderExternal": "External Downloader",
@@ -5364,5 +5362,11 @@
   "bingTranslationTestOk": "Bing translation is available",
   "bingTranslationTestFail": "Bing is unavailable right now; AI fallback will be used",
   "bingTranslationPrivacy": "Text is sent to Microsoft's translation service. This is an unofficial endpoint and may change or stop working at any time.",
-  "translationCacheUiText": "Detail page & comment translation"
+  "translationCacheUiText": "Detail page & comment translation",
+  "storageLocationAppPrivate": "App private folder",
+  "storageLocationAppPrivateHint": "Inside the app; deleted with the app",
+  "storageLocationSystemDownloads": "System Downloads folder",
+  "storageLocationSystemDownloadsHint": "Visible in Files and kept after uninstall",
+  "storageLocationSystemScreenshots": "System Downloads / Screenshots",
+  "storageLocationSystemScreenshotsHint": "Visible in Files and kept after uninstall"
 }

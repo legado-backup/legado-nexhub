@@ -40,7 +40,7 @@ import '../utils/app_haptics.dart';
 /// 阅读器逐张显示时按需进行（见 [SourceImage]），从而打开含大量图片的文件夹时
 /// 不再因整本逐张拷贝而卡 1~2s。
 Future<List<String>> gatherLocalComicImages(String path) async {
-  if (isAndroidSafUri(path)) return gatherSafImages(path);
+  if (isDocUri(path)) return gatherSafImages(path);
   final f = File(path);
   if (await f.exists()) return <String>[path];
   final dir = Directory(path);
@@ -75,7 +75,7 @@ List<Episode> buildLocalChapterList(List<String> paths) {
     // SAF content:// 文件 URI 的 basename 是 URL 编码的 document id（形如
     // primary%3ADownload%2Ftxt%2F第1章.txt），直接用 p.basenameWithoutExtension
     // 会得到编码串；先经 safBaseName 还原真实文件名再取标题。
-    final rawName = isAndroidSafUri(path) ? safBaseName(path) : path;
+    final rawName = isDocUri(path) ? safBaseName(path) : path;
     final title = p.basenameWithoutExtension(rawName);
     chapters.add(Episode(
       id: path,
@@ -241,7 +241,7 @@ Future<void> openDownloadedWorkFolder(
   if (kind == LocalMediaKind.video) {
     List<String> files = const <String>[];
     try {
-      files = isAndroidSafUri(workDir)
+      files = isDocUri(workDir)
           ? await listFolderFilesByKindSaf(workDir, LocalMediaKind.video)
           : listFolderFilesByKind(workDir, LocalMediaKind.video);
     } on Object {
@@ -359,7 +359,7 @@ Future<void> openDownloadedWorkFolder(
   // 与真实路径 openLocalEntry → gatherLocalComicImages 行为一致）；仍无内容
   // 才提示。绝不把文件夹当文件去 resolveSafUri（会报"该路径是一个文件夹"）。
   // - 真实路径：保留原 openLocalEntry 单文件/散图回退（兼容单文件导入）。
-  if (!isAndroidSafUri(workDir)) {
+  if (!isDocUri(workDir)) {
     await openLocalEntry(
       context,
       LocalContentEntry(
@@ -410,12 +410,12 @@ Future<List<String>> _scanWorkDirFiles(
   LocalMediaKind kind,
 ) async {
   if (kind == LocalMediaKind.text) {
-    return isAndroidSafUri(workDir)
+    return isDocUri(workDir)
         ? await listFolderFilesByKindSaf(workDir, LocalMediaKind.text)
         : listFolderFilesByKind(workDir, LocalMediaKind.text);
   }
   if (kind == LocalMediaKind.images || kind == LocalMediaKind.pdf) {
-    if (isAndroidSafUri(workDir)) {
+    if (isDocUri(workDir)) {
       final r = await scanComicFolderSaf(workDir);
       if (r.archives.isNotEmpty || r.others.isNotEmpty) {
         return <String>[...r.archives, ...r.others];

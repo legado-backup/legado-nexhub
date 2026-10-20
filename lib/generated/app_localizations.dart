@@ -3938,12 +3938,6 @@ abstract class AppLocalizations {
   /// **'Download Path'**
   String get downloadPath;
 
-  /// No description provided for @downloadPathOhosUnsupported.
-  ///
-  /// In en, this message translates to:
-  /// **'Custom download folder isn\'t supported on HarmonyOS yet. Files are saved to the app directory.'**
-  String get downloadPathOhosUnsupported;
-
   /// No description provided for @folderImportOhosUnsupported.
   ///
   /// In en, this message translates to:
@@ -3961,12 +3955,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Actions'**
   String get contentImportActions;
-
-  /// No description provided for @downloadPathDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'D:/Downloads'**
-  String get downloadPathDesc;
 
   /// No description provided for @downloaderType.
   ///
@@ -18266,6 +18254,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detail page & comment translation'**
   String get translationCacheUiText;
+
+  /// No description provided for @storageLocationAppPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'App private folder'**
+  String get storageLocationAppPrivate;
+
+  /// No description provided for @storageLocationAppPrivateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside the app; deleted with the app'**
+  String get storageLocationAppPrivateHint;
+
+  /// No description provided for @storageLocationSystemDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'System Downloads folder'**
+  String get storageLocationSystemDownloads;
+
+  /// No description provided for @storageLocationSystemDownloadsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible in Files and kept after uninstall'**
+  String get storageLocationSystemDownloadsHint;
+
+  /// No description provided for @storageLocationSystemScreenshots.
+  ///
+  /// In en, this message translates to:
+  /// **'System Downloads / Screenshots'**
+  String get storageLocationSystemScreenshots;
+
+  /// No description provided for @storageLocationSystemScreenshotsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible in Files and kept after uninstall'**
+  String get storageLocationSystemScreenshotsHint;
 }
 
 class _AppLocalizationsDelegate

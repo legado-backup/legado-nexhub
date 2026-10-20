@@ -73,7 +73,7 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 | Feature | Status on HarmonyOS | Workaround / notes |
 | --- | --- | --- |
 | Local folder import | Directory picking unavailable | Use "import files" to pick files one by one |
-| Custom download directory / custom screenshot directory | Directory picking unavailable | Falls back to the in-app default location |
+| Custom download directory / custom screenshot directory | System Downloads folder supported | Phones cannot pick arbitrary folders; choose between the app-private folder and system Downloads (`Download/<bundleName>`, visible in Files) |
 | Plugin export / backup export | No directory picker | Saved to the default location, then shared via the system share sheet |
 | Per-source WebView network following | Does not follow per-source proxy / hosts / DoH | HTTP scraping is unaffected; only pages inside the WebView are affected |
 | Clipboard image import | Supported (native pasteboard) | Writes PixelMap to the system clipboard; device verification pending |

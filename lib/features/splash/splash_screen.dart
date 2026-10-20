@@ -14,8 +14,10 @@ import '../../core/article/article_reading_preferences.dart';
 import '../../core/auth/source_auth_manager.dart';
 import '../../core/download/download_file_system.dart';
 import '../../core/download/download_manager.dart';
+import '../../core/download/ohos_doc_file_system.dart';
 import '../../core/download/saf_download_file_system.dart';
 import '../../core/local/saf_bridge.dart' show normalizeSafTreeUri;
+import '../../core/platform/ohos_public_storage.dart' show isOhosDocPath;
 import '../../core/download/download_settings.dart';
 import '../../core/download/download_storage.dart';
 import '../../core/favorites/favorites_manager.dart';
@@ -198,8 +200,8 @@ class _SplashScreenState extends State<SplashScreen> {
     registerShuyuanResolver(ShuyuanNovelResolver.new);
     final mediaService = MediaApiService(registry);
 
-    // Download base path: 优先用用户配置的路径；未配置（或仍是桌面默认
-    // `D:/Downloads`，在 Android 上无效）时回退到平台相关默认目录。
+    // Download base path: 优先用用户配置的路径；未配置（空串或旧版
+    // `D:/Downloads` 遗留值，在 Android 上无效）时回退到平台相关默认目录。
     // `content://` 树 URI（Android SAF 用户目录）走 SafFileSystem。
     final downloadSettings = await DownloadSettingsStore().load();
     String configured = downloadSettings.downloadPath;
@@ -221,8 +223,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // 一律重置为平台默认目录；用户仍可在下载设置重选（现在的选择器走 SAF）。
     if (!kIsWeb &&
         !configured.startsWith('content://') &&
-        configured.isNotEmpty &&
-        configured != 'D:/Downloads' &&
+        !isUnsetDownloadPath(configured) &&
         await _isUnwritableScopedStoragePath(configured)) {
       AppLog.instance.w('[下载路径自修复] "$configured" 在分区存储下不可写，重置为平台默认目录');
       configured = await defaultDownloadPath();
@@ -232,9 +233,12 @@ class _SplashScreenState extends State<SplashScreen> {
     final DownloadFileSystem downloadFs;
     if (configured.startsWith('content://')) {
       downloadFs = SafFileSystem(configured);
+    } else if (isOhosDocPath(configured)) {
+      // 鸿蒙公共下载目录（`ohosdoc://`）：读写全部走原生通道。
+      downloadFs = OhosDocFileSystem(configured);
     } else {
       final String downloadBasePath;
-      if (configured.isNotEmpty && configured != 'D:/Downloads') {
+      if (!isUnsetDownloadPath(configured)) {
         downloadBasePath = configured;
       } else {
         downloadBasePath = await defaultDownloadPath();

@@ -58,10 +58,17 @@ import '../../verification/presentation/webview_verification_screen.dart';
 import '../../../core/settings/danmaku_config.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/utils/app_log.dart';
-import '../../../core/local/local_content_manager.dart' show isAndroidSafUri;
+import '../../../core/local/local_content_manager.dart' show isDocUri;
 import '../../../core/local/saf_bridge.dart' show resolveSafVideoFile;
 import '../../../core/widgets/app_error_state.dart';
 import '../../../core/player/player_runtime.dart';
+import '../../../core/platform/ohos_public_storage.dart'
+    show
+        OhosPublicStorage,
+        isOhosDocPath,
+        ohosDocJoin,
+        ohosDocToPlainPath;
+import '../../../core/platform/ohos_storage_location_sheet.dart';
 import '../../../core/platform/platform_service.dart';
 import 'dart:io';
 import 'dart:math' as math;
@@ -944,7 +951,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       // 会既不报错也不完成 → UI 无限转圈）。统一在此落为应用私有真实文件再打开，
       // 这样「下载页」（编码 SAF 路径）与「浏览页」（file_picker 的 content://）
       // 走同一可靠路径。
-      if (isAndroidSafUri(direct)) {
+      if (isDocUri(direct)) {
         try {
           direct = await resolveSafVideoFile(direct);
           AppLog.instance.i('[本地视频打开] SAF/content 已解析为真实文件：$direct');
@@ -3238,7 +3245,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // 合并为一部的本地视频（folderPaths 每文件=一集）依赖此分支实现上下集切换。
     if (_isDirectMode) {
       String direct = ep.url;
-      if (isAndroidSafUri(direct)) {
+      if (isDocUri(direct)) {
         try {
           direct = await resolveSafVideoFile(direct);
           AppLog.instance.i('[本地视频切集] SAF/content 已解析为真实文件：$direct');

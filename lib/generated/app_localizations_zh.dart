@@ -1994,9 +1994,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadPath => '下载路径';
 
   @override
-  String get downloadPathOhosUnsupported => '鸿蒙版暂不支持自定义下载目录，文件将保存到应用目录';
-
-  @override
   String get folderImportOhosUnsupported => '鸿蒙版暂不支持文件夹导入，请改用「选择文件」导入';
 
   @override
@@ -2004,9 +2001,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contentImportActions => '操作';
-
-  @override
-  String get downloadPathDesc => 'D:/Downloads';
 
   @override
   String get downloaderType => '下载器';
@@ -9537,4 +9531,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get translationCacheUiText => '详情页与评论翻译';
+
+  @override
+  String get storageLocationAppPrivate => '应用私有目录';
+
+  @override
+  String get storageLocationAppPrivateHint => '保存在应用内，卸载应用时一并删除';
+
+  @override
+  String get storageLocationSystemDownloads => '系统「下载」目录';
+
+  @override
+  String get storageLocationSystemDownloadsHint => '「文件」应用中可见，卸载应用后仍保留';
+
+  @override
+  String get storageLocationSystemScreenshots => '系统「下载」/ Screenshots';
+
+  @override
+  String get storageLocationSystemScreenshotsHint => '「文件」应用中可见，卸载应用后仍保留';
 }

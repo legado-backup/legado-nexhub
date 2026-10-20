@@ -4,6 +4,7 @@ import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant'
 import ClipboardPlugin from '../plugins/ClipboardPlugin';
 import FileExportPlugin from '../plugins/FileExportPlugin';
 import MediaStorePlugin from '../plugins/MediaStorePlugin';
+import OhosStoragePlugin from '../plugins/OhosStoragePlugin';
 import OhosTtsPlugin from '../plugins/OhosTtsPlugin';
 
 export default class EntryAbility extends FlutterAbility {
@@ -18,5 +19,7 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new ClipboardPlugin())
     // 应用级原生通道：导出文件到用户可见位置（见 FileExportPlugin 注释）。
     flutterEngine.getPlugins()?.add(new FileExportPlugin())
+    // 应用级原生通道：系统下载目录授权与读写（见 OhosStoragePlugin 注释）。
+    flutterEngine.getPlugins()?.add(new OhosStoragePlugin())
   }
 }

@@ -11,7 +11,7 @@ import '../models/plugin_config.dart';
 import '../network/dio_image_file_service.dart';
 import '../theme/app_tokens.dart';
 import '../scraper/http_fetcher.dart';
-import '../local/local_content_manager.dart' show isAndroidSafUri;
+import '../local/local_content_manager.dart' show isDocUri;
 import '../local/saf_bridge.dart' show resolveSafUri;
 
 /// 统一源图片 widget：按源配置注入防盗链 headers，带缓存、失败重试、圆角、Hero。
@@ -655,7 +655,7 @@ class _SafOrLocalImageState extends State<_SafOrLocalImage> {
 
   Future<void> _resolve() async {
     // 非 SAF 路径（真实文件路径）直接可用，无需异步拷贝。
-    if (!isAndroidSafUri(widget.uriOrPath)) {
+    if (!isDocUri(widget.uriOrPath)) {
       if (mounted) setState(() => _resolved = widget.uriOrPath);
       return;
     }
@@ -715,7 +715,7 @@ Future<Uint8List?> resolveSourceImageBytes({
       );
       return await file.readAsBytes();
     }
-    if (isAndroidSafUri(url)) {
+    if (isDocUri(url)) {
       final path = await resolveSafUri(url);
       final f = File(path);
       return f.existsSync() ? await f.readAsBytes() : null;

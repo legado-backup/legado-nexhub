@@ -15,6 +15,8 @@ import '../player/player_runtime.dart';
 import 'package:nexhub/core/local/archive_extractor.dart';
 import 'package:nexhub/core/local/local_novel_parser.dart';
 import 'package:nexhub/core/local/pdf_util.dart';
+import 'package:nexhub/core/platform/ohos_public_storage.dart'
+    show isOhosDocPath;
 import 'package:nexhub/core/utils/app_log.dart';
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:path/path.dart' as p;
@@ -103,6 +105,10 @@ LocalMediaKind? classifyByPath(String path) {
 /// 在部分设备返回的是真实路径（非 content://），拿到后必须据此分支处理，不能假设
 /// 一定是 SAF。调用方应给出明确提示而非静默失败——这是「选择目录却导入不了」的深层根因。
 bool isAndroidSafUri(String path) => path.startsWith('content://');
+
+/// 是否为需先解析落缓存才能用 dart:io 读取的「文档路径」：
+/// Android SAF（`content://`）或鸿蒙公共目录（`ohosdoc://`）。
+bool isDocUri(String path) => isAndroidSafUri(path) || isOhosDocPath(path);
 
 /// SAF content:// 条目的封面计算由 [saf_bridge] 注入（避免与 local_content_manager
 /// 形成循环依赖）。[computeLocalCover] 遇到 SAF URI 时转发给此函数，未注入则回退 null。

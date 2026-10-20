@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
-import '../local/local_content_manager.dart' show isAndroidSafUri;
+import '../local/local_content_manager.dart' show isDocUri;
 import '../local/saf_bridge.dart' show resolveSafUri;
 import '../models/plugin_config.dart';
 import '../theme/app_tokens.dart';
@@ -71,7 +71,7 @@ class AppCoverImage extends StatelessWidget {
       final String path = coverUrl!;
       // SAF 编码路径（content://…␟…）无法被 dart:io 直读，须先 resolveSafUri
       // 落缓存再显示（否则 FileImage 抛 PathNotFoundException 崩溃）。
-      if (isAndroidSafUri(path) || path.contains('␟')) {
+      if (isDocUri(path) || path.contains('␟')) {
         image = FutureBuilder<String>(
           future: resolveSafUri(path),
           builder: (context, snap) {

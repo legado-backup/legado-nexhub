@@ -17,7 +17,11 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/download/download_format_preferences.dart';
+import '../../../core/download/download_file_system.dart'
+    show defaultDownloadPath, resolveDownloadPath;
 import '../../../core/download/download_manager.dart';
+import '../../../core/platform/ohos_public_storage.dart' show isOhosDocPath;
+import '../../../core/platform/ohos_storage_location_sheet.dart';
 import '../../../core/platform/platform_service.dart';
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/download/download_settings.dart';
@@ -272,7 +276,7 @@ class _DownloadPathSetting extends StatefulWidget {
 }
 
 class _DownloadPathSettingState extends State<_DownloadPathSetting> {
-  String _path = 'D:/Downloads';
+  String _path = '';
   String _displayName = '';
   final DownloadSettingsStore _store = DownloadSettingsStore();
   final Saf _saf = Saf();
@@ -280,12 +284,15 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
   @override
   void initState() {
     super.initState();
-    _store.load().then((s) {
+    _store.load().then((s) async {
+      // 未设置（空串 / 旧版 D:/Downloads）时展示平台默认目录，而不是
+      // 让设置项空白或显示不存在的 D 盘路径。
+      final String path = await resolveDownloadPath(s.downloadPath);
       if (!mounted) return;
-      setState(() => _path = s.downloadPath);
+      setState(() => _path = path);
       // content:// 树 URI 显示系统文件夹名而非裸 URI。
-      if (s.downloadPath.startsWith('content://')) {
-        _saf.stat(s.downloadPath).then((doc) {
+      if (path.startsWith('content://')) {
+        _saf.stat(path).then((doc) {
           if (mounted && doc != null) setState(() => _displayName = doc.name);
         });
       }
@@ -294,6 +301,43 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
 
   Future<void> _pickPath() async {
     final l10n = AppLocalizations.of(context);
+
+    // 鸿蒙：不支持任意文件夹选择；在「应用私有目录」与系统「下载」目录
+    // （Download/<bundleName>，一次授权持久有效）之间选择。
+    if (PlatformService.instance.isOHOS) {
+      final String? picked = await showOhosStorageLocationSheet(
+        context,
+        title: l10n.downloadPath,
+        appPrivateLabel: l10n.storageLocationAppPrivate,
+        appPrivateHint: l10n.storageLocationAppPrivateHint,
+        systemLabel: l10n.storageLocationSystemDownloads,
+        systemHint: l10n.storageLocationSystemDownloadsHint,
+        systemSelected: isOhosDocPath(_path),
+      );
+      if (picked == null || !mounted) return;
+      final String applied =
+          picked.isEmpty ? await defaultDownloadPath() : picked;
+      try {
+        setState(() {
+          _path = applied;
+          _displayName = picked.isEmpty
+              ? ''
+              : l10n.storageLocationSystemDownloads;
+        });
+        await context.read<DownloadManager>().setDownloadBasePath(applied);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.downloadPathSet)),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.importFailed(e.toString()))),
+        );
+      }
+      return;
+    }
 
     // Android：file_picker 没有可用的目录选择器，改用系统 SAF 目录选择器
     // （ACTION_OPEN_DOCUMENT_TREE），返回 content:// 树 URI，权限默认持久化。
@@ -382,16 +426,11 @@ class _DownloadPathSettingState extends State<_DownloadPathSetting> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // 鸿蒙：原生目录选择接口不可用（插件把目录当文件读取，拿不到可写路径），
-    // 入口禁用并明确提示，下载统一落应用沙盒目录（阶段 5 再评估系统目录授权方案）。
-    if (PlatformService.instance.isOHOS) {
-      return SettingsTile(
-        icon: Icons.folder_rounded,
-        title: l10n.downloadPath,
-        subtitle: l10n.downloadPathOhosUnsupported,
-      );
-    }
-    final String subtitle = _displayName.isNotEmpty ? _displayName : _path;
+    final String subtitle = _displayName.isNotEmpty
+        ? _displayName
+        : (isOhosDocPath(_path)
+            ? l10n.storageLocationSystemDownloads
+            : _path);
     return SettingsTile(
       icon: Icons.folder_rounded,
       title: l10n.downloadPath,

@@ -20,6 +20,8 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/core/comic/image_favorite_manager.dart';
+import 'package:nexhub/core/local/local_content_manager.dart' show isDocUri;
+import 'package:nexhub/core/local/saf_bridge.dart' show resolveSafUri;
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import 'package:nexhub/core/settings/general_settings.dart';
 import 'package:nexhub/core/theme/app_tokens.dart';
@@ -224,7 +226,9 @@ class _ImageFavoriteGalleryScreenState
     final String url = imageFavoriteDisplayUrl(favorite);
     try {
       if (!url.startsWith('http')) {
-        final File file = File(url);
+        // 鸿蒙公共目录 / Android SAF 的编码路径需先落缓存为真实文件。
+        final String local = isDocUri(url) ? await resolveSafUri(url) : url;
+        final File file = File(local);
         if (await file.exists()) {
           await Share.shareXFiles(<XFile>[XFile(file.path)]);
           return;
@@ -626,18 +630,21 @@ class _ImageFavoriteGalleryScreenState
     if (_selected.isEmpty) return;
     final List<ImageFavorite> items =
         _favorites.where((f) => _selected.contains(f.key)).toList();
-    final List<String> local = items
-        .map((f) => f.imageUrl)
-        .where((u) => !u.startsWith('http'))
-        .toList();
+    final List<XFile> localFiles = <XFile>[];
+    for (final ImageFavorite f in items) {
+      final String u = f.imageUrl;
+      if (u.startsWith('http')) continue;
+      try {
+        // 鸿蒙公共目录 / Android SAF 的编码路径需先落缓存为真实文件。
+        final String p = isDocUri(u) ? await resolveSafUri(u) : u;
+        if (await File(p).exists()) localFiles.add(XFile(p));
+      } on Object {
+        // 单个文件解析失败不影响其余分享。
+      }
+    }
     try {
-      if (local.isNotEmpty) {
-        await Share.shareXFiles(
-          <XFile>[
-            for (final String p in local)
-              if (await File(p).exists()) XFile(p),
-          ],
-        );
+      if (localFiles.isNotEmpty) {
+        await Share.shareXFiles(localFiles);
       } else {
         final String text =
             items.map((f) => '${f.chapterTitle}\n${f.imageUrl}').join('\n\n');

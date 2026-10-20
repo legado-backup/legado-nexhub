@@ -29,6 +29,8 @@ import '../services/novel_export_upload_service.dart';
 import '../utils/app_log.dart';
 import '../platform/platform_service.dart';
 import '../local/saf_bridge.dart' show normalizeSafTreeUri;
+import '../platform/ohos_public_storage.dart'
+    show OhosPublicStorage, isOhosDocPath;
 import '../novel/novel_chinese_converter.dart';
 import '../novel/novel_reader_preferences.dart';
 import 'comic_download_handler.dart';
@@ -37,6 +39,7 @@ import 'download_format_preferences.dart';
 import 'download_handler.dart';
 import 'download_settings.dart';
 import 'saf_download_file_system.dart';
+import 'ohos_doc_file_system.dart';
 import 'download_storage.dart';
 import 'download_task.dart';
 import 'media_download_handler.dart';
@@ -173,14 +176,14 @@ class DownloadManager extends ChangeNotifier {
 
   /// 是否需要引导用户选择公开下载目录。
   ///
-  /// 仅 Android：若下载路径仍是出厂默认（`D:/Downloads`，在 Android 上会被
+  /// 仅 Android：若下载路径未设置（含旧版 `D:/Downloads`，在 Android 上会被
   /// 回退为应用私有外部存储 `Android/data/<pkg>/files/Download`），普通文件
   /// 管理器看不到下载内容。此时应引导用户用 SAF 选一个公开文件夹，使下载
   /// 对文件管理器可见。用户一旦主动设置过（路径变为 `content://` 或真实
   /// 路径）即不再触发。
   bool get needsPublicDownloadDir =>
       PlatformService.instance.isAndroid &&
-      _settings.downloadPath == DownloadSettings.defaults().downloadPath;
+      isUnsetDownloadPath(_settings.downloadPath);
 
   /// 正在执行中的下载数量（受 maxConcurrent 约束）。
   int _running = 0;
@@ -436,6 +439,8 @@ class DownloadManager extends ChangeNotifier {
   /// 持久化到 [DownloadSettingsStore]，并按路径形态重建文件系统根：
   /// - `content://` 树 URI（Android SAF 用户目录）→ 用 [SafFileSystem] 写入，
   /// 使下载真正落到用户指定的系统文件夹（修复 107/108）；
+  /// - `ohosdoc://`（鸿蒙公共 Download 目录）→ 用 [OhosDocFileSystem] 经原生
+  /// 通道写入（dart:io 无法直接读写该目录）；
   /// - 普通文件路径 → 用 [PathProviderFileSystem] 重建根路径。
   Future<void> setDownloadBasePath(String path) async {
     // pickDirectory 返回规范化 `tree/<id>/document/<id>`（4 段），saf 包的
@@ -447,7 +452,9 @@ class DownloadManager extends ChangeNotifier {
     await DownloadSettingsStore().save(_settings);
     if (normalized.startsWith('content://')) {
       fs = SafFileSystem(normalized);
-    } else if (fs is PathProviderFileSystem) {
+    } else if (isOhosDocPath(normalized)) {
+      fs = OhosDocFileSystem(normalized);
+    } else if (fs is PathProviderFileSystem || fs is OhosDocFileSystem) {
       fs = PathProviderFileSystem(normalized);
     }
     notifyListeners();
@@ -1388,7 +1395,10 @@ class DownloadManager extends ChangeNotifier {
       final uploader = NovelExportUploadService();
       for (final f in files) {
         try {
-          final result = await uploader.uploadFile(f);
+          // 鸿蒙公共目录产物：先落应用缓存为真实文件再上传。
+          final String local =
+              isOhosDocPath(f) ? await OhosPublicStorage.materialize(f) : f;
+          final result = await uploader.uploadFile(local);
           AppLog.instance.i(
               '[导出上传] ${completed.title} → ${result.remoteUrl}');
         } on Object catch (e) {

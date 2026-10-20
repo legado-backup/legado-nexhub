@@ -29,8 +29,12 @@ import 'package:nexhub/core/theme/app_tokens.dart';
 import 'package:nexhub/core/theme/theme_controller.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:nexhub/core/locale/locale_controller.dart';
+import 'package:nexhub/core/download/download_file_system.dart'
+    show defaultDownloadPath, resolveDownloadPath;
 import 'package:nexhub/core/download/download_manager.dart';
 import 'package:nexhub/core/download/download_settings.dart';
+import 'package:nexhub/core/platform/ohos_public_storage.dart' show isOhosDocPath;
+import 'package:nexhub/core/platform/ohos_storage_location_sheet.dart';
 import 'package:nexhub/core/utils/app_haptics.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -523,10 +527,22 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
 
   Future<void> _pick() async {
     final l10n = widget.l10n;
-    // 鸿蒙：入口已隐藏，兜底再挡一次（原生选目录接口不可用）。
     if (PlatformService.instance.isOHOS) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.downloadPathOhosUnsupported)),
+      final String? picked = await showOhosStorageLocationSheet(
+        context,
+        title: l10n.downloadPath,
+        appPrivateLabel: l10n.storageLocationAppPrivate,
+        appPrivateHint: l10n.storageLocationAppPrivateHint,
+        systemLabel: l10n.storageLocationSystemDownloads,
+        systemHint: l10n.storageLocationSystemDownloadsHint,
+        systemSelected: isOhosDocPath(
+          (await DownloadSettingsStore().load()).downloadPath,
+        ),
+      );
+      if (picked == null || !mounted) return;
+      await _save(
+        picked.isEmpty ? await defaultDownloadPath() : picked,
+        l10n,
       );
       return;
     }
@@ -538,23 +554,16 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
     }
     if (!kIsWeb) {
       String? result;
-      if (PlatformService.instance.isOHOS) {
-        // 鸿蒙：下面桌面分支硬编码 FilePickerWindows（会加载 ole32.dll 崩溃），
-        // 且后台 isolate 无法使用 MethodChannel → 直接在主 isolate 走插件已注册
-        // 的 FilePickerIO（鸿蒙原生目录选择器）。
-        result = await FilePicker.platform.getDirectoryPath();
-      } else {
-        try {
-          result = await Isolate.run<String?>(() {
-            FilePicker.platform = FilePickerWindows();
-            return FilePicker.platform.getDirectoryPath();
-          });
-        } catch (_) {
-          result = await Isolate.run<String?>(() {
-            FilePicker.platform = FilePickerWindows();
-            return FilePicker.platform.getDirectoryPath();
-          });
-        }
+      try {
+        result = await Isolate.run<String?>(() {
+          FilePicker.platform = FilePickerWindows();
+          return FilePicker.platform.getDirectoryPath();
+        });
+      } catch (_) {
+        result = await Isolate.run<String?>(() {
+          FilePicker.platform = FilePickerWindows();
+          return FilePicker.platform.getDirectoryPath();
+        });
       }
       if (result == null || !mounted) return;
       await _save(result, l10n);
@@ -582,46 +591,19 @@ class _DownloadPathSectionState extends State<_DownloadPathSection> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // 鸿蒙：原生目录选择接口不可用（插件把目录当文件读取，拿不到可写路径），
-    // 展示提示替代选择按钮（与设置页同款降级，规格 §6 入口可见性控制）。
-    if (PlatformService.instance.isOHOS) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.spaceMd,
-          vertical: AppTokens.spaceXs,
-        ),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.folder_off_rounded,
-                size: 20, color: scheme.onSurfaceVariant),
-            const SizedBox(width: AppTokens.spaceSm),
-            Expanded(
-              child: Text(
-                widget.l10n.downloadPathOhosUnsupported,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return FutureBuilder<DownloadSettings>(
-      future: DownloadSettingsStore().load(),
+    return FutureBuilder<String>(
+      future: DownloadSettingsStore()
+          .load()
+          .then((s) => resolveDownloadPath(s.downloadPath)),
       builder: (context, snap) {
-        final String path = snap.data?.downloadPath.isNotEmpty == true
-            ? snap.data!.downloadPath
-            : '';
+        final String path = snap.data ?? '';
         final String shown = path.startsWith('content://')
             ? Uri.parse(path).pathSegments.isNotEmpty
                 ? Uri.decodeComponent(Uri.parse(path).pathSegments.last)
                 : path
-            : path;
+            : isOhosDocPath(path)
+                ? widget.l10n.storageLocationSystemDownloads
+                : path;
         return Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppTokens.spaceMd,

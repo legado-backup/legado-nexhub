@@ -46,6 +46,8 @@ import '../../../core/models/plugin_config.dart';
 import '../../../core/navigation/app_page_route.dart';
 import '../../../core/novel/novel_toc_cache.dart';
 import '../../../core/novel/novel_toc_store.dart';
+import '../../../core/platform/ohos_public_storage.dart'
+    show OhosPublicStorage, isOhosDocPath;
 import '../../../core/progress/unified_progress_repository.dart';
 import '../../../core/resolver/webview_resolver.dart';
 import '../../../core/settings/detail_appearance_settings.dart';
@@ -837,7 +839,10 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
       var ok = 0;
       for (final f in files) {
         try {
-          await uploader.uploadFile(f);
+          // 鸿蒙公共目录产物：先落应用缓存为真实文件再上传。
+          final String local =
+              isOhosDocPath(f) ? await OhosPublicStorage.materialize(f) : f;
+          await uploader.uploadFile(local);
           ok++;
         } on Object {
           // 单文件失败继续尝试其余产物；全部失败时在最终提示中体现。

@@ -16,7 +16,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Color, HSLColor;
 
-import '../local/local_content_manager.dart' show isAndroidSafUri;
+import '../local/local_content_manager.dart' show isDocUri;
 import '../local/saf_bridge.dart' show resolveSafUri;
 import '../models/plugin_config.dart';
 import '../network/dio_image_file_service.dart';
@@ -103,7 +103,7 @@ Future<Color?> extractAccentColor({
         headers: SourceImage.buildHeaders(url: url, source: source),
       );
       bytes = await file.readAsBytes();
-    } else if (isAndroidSafUri(url)) {
+    } else if (isDocUri(url)) {
       final String resolved = await resolveSafUri(url);
       if (resolved.isEmpty) return null;
       bytes = await File(resolved).readAsBytes();

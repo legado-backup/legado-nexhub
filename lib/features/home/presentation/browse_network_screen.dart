@@ -6,6 +6,8 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/download/download_file_system.dart'
+    show resolveDownloadPath;
 import '../../../core/download/download_settings.dart';
 import '../../../core/local/local_content_manager.dart';
 import '../../../core/scraper/http_fetcher.dart';
@@ -262,9 +264,14 @@ class _BrowseNetworkScreenState extends State<BrowseNetworkScreen> {
     if (selected.isEmpty) return;
 
     final settings = await DownloadSettingsStore().load();
-    final basePath = settings.downloadPath;
-    final baseDir = Directory(basePath);
-    if (!baseDir.existsSync()) {
+    // 未设置时解析平台默认目录；默认目录首次使用时可能尚未创建。
+    final String basePath = await resolveDownloadPath(settings.downloadPath);
+    final Directory baseDir = Directory(basePath);
+    try {
+      if (!await baseDir.exists()) {
+        await baseDir.create(recursive: true);
+      }
+    } on Object {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.browseNetworkDownloadPathMissing)),

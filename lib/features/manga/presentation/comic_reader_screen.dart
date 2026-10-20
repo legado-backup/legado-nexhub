@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:nexhub/core/local/archive_extractor.dart';
 import 'package:nexhub/core/local/local_content_manager.dart'
-    show isAndroidSafUri, isImageFile;
+    show isDocUri, isImageFile;
 import 'package:nexhub/core/local/saf_bridge.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
@@ -1083,7 +1083,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// SAF content:// 目录 URI 用 [gatherSafImages]；真实路径目录用 dart:io 列目录。
   /// 返回空列表表示该话目录无可读图片（避免「空目录」假完成）。
   Future<List<String>> _gatherDirImages(String dirPath) async {
-    if (isAndroidSafUri(dirPath)) {
+    if (isDocUri(dirPath)) {
       final list = await gatherSafImages(dirPath);
       return list..sort(naturalCompare);
     }

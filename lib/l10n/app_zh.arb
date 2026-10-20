@@ -933,9 +933,7 @@
   "maxConcurrentDownloads": "最大同时下载数",
   "maxConcurrentDownloadsDesc": "同时进行的下载数量",
   "downloadPath": "下载路径",
-  "downloadPathOhosUnsupported": "鸿蒙版暂不支持自定义下载目录，文件将保存到应用目录",
   "folderImportOhosUnsupported": "鸿蒙版暂不支持文件夹导入，请改用「选择文件」导入",
-  "downloadPathDesc": "D:/Downloads",
   "downloadPathSet": "下载路径已更新",
   "contentImportActions": "操作",
   "downloaderType": "下载器",
@@ -5320,5 +5318,11 @@
   "bingTranslationTestOk": "Bing 翻译可用",
   "bingTranslationTestFail": "Bing 当前不可用，将使用 AI 兜底",
   "bingTranslationPrivacy": "文本会发送到 Microsoft 翻译服务；该接口非官方公开接口，可能随时调整或失效。",
-  "translationCacheUiText": "详情页与评论翻译"
+  "translationCacheUiText": "详情页与评论翻译",
+  "storageLocationAppPrivate": "应用私有目录",
+  "storageLocationAppPrivateHint": "保存在应用内，卸载应用时一并删除",
+  "storageLocationSystemDownloads": "系统「下载」目录",
+  "storageLocationSystemDownloadsHint": "「文件」应用中可见，卸载应用后仍保留",
+  "storageLocationSystemScreenshots": "系统「下载」/ Screenshots",
+  "storageLocationSystemScreenshotsHint": "「文件」应用中可见，卸载应用后仍保留"
 }

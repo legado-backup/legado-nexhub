@@ -18,7 +18,8 @@ class DownloadSettings {
   /// 下载线程数（1-16）。
   final int threadCount;
 
-  /// 下载路径。
+  /// 下载路径；空串表示未设置，运行时由平台默认目录解析
+  /// （见 `defaultDownloadPath`）。
   final String downloadPath;
 
   /// 下载器类型。
@@ -39,7 +40,7 @@ class DownloadSettings {
   const DownloadSettings({
     this.maxConcurrent = 3,
     this.threadCount = 4,
-    this.downloadPath = 'D:/Downloads',
+    this.downloadPath = '',
     this.downloaderType = DownloaderType.internal,
     this.wifiOnly = false,
     this.autoDeleteAfterRead = false,
@@ -50,7 +51,7 @@ class DownloadSettings {
   const DownloadSettings.defaults()
       : maxConcurrent = 3,
         threadCount = 4,
-        downloadPath = 'D:/Downloads',
+        downloadPath = '',
         downloaderType = DownloaderType.internal,
         wifiOnly = false,
         autoDeleteAfterRead = false,
@@ -100,7 +101,7 @@ class DownloadSettings {
       DownloadSettings(
         maxConcurrent: json['maxConcurrent'] as int? ?? 3,
         threadCount: json['threadCount'] as int? ?? 4,
-        downloadPath: json['downloadPath'] as String? ?? 'D:/Downloads',
+        downloadPath: json['downloadPath'] as String? ?? '',
         wifiOnly: json['wifiOnly'] as bool? ?? false,
         downloaderType: DownloaderType.values.firstWhere(
           (e) => e.name == json['downloaderType'],

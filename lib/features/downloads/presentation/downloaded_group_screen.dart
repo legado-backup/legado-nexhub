@@ -9,7 +9,7 @@ import '../../../core/local/local_content_actions.dart'
 import '../../../core/local/local_content_manager.dart'
     show
         LocalMediaKind,
-        isAndroidSafUri,
+        isDocUri,
         listFolderFilesByKind,
         scanComicFolder;
 import '../../../core/local/saf_bridge.dart'
@@ -82,11 +82,11 @@ class _DownloadedGroupScreenState extends State<DownloadedGroupScreen> {
     if (workDir.isEmpty) return <String>[];
     switch (kind) {
       case LocalMediaKind.text:
-        return isAndroidSafUri(workDir)
+        return isDocUri(workDir)
             ? await listFolderFilesByKindSaf(workDir, LocalMediaKind.text)
             : listFolderFilesByKind(workDir, LocalMediaKind.text);
       case LocalMediaKind.video:
-        return isAndroidSafUri(workDir)
+        return isDocUri(workDir)
             ? await listFolderFilesByKindSaf(workDir, LocalMediaKind.video)
             : listFolderFilesByKind(workDir, LocalMediaKind.video);
       case LocalMediaKind.images:
@@ -98,7 +98,7 @@ class _DownloadedGroupScreenState extends State<DownloadedGroupScreen> {
   /// 漫画：归档 + 其它非图片文件 = 每话一个（与导入目录一致）；仅散图时整个
   /// 文件夹作为一个条目（交给阅读器实时收集图片）。
   Future<List<String>> _scanComic(String workDir) async {
-    if (isAndroidSafUri(workDir)) {
+    if (isDocUri(workDir)) {
       final r = await scanComicFolderSaf(workDir);
       final chapterFiles = <String>[...r.archives, ...r.others];
       if (chapterFiles.isNotEmpty) return chapterFiles;
@@ -112,7 +112,7 @@ class _DownloadedGroupScreenState extends State<DownloadedGroupScreen> {
 
   /// 章节显示名：SAF 编码路径还原真实文件名后去扩展名。
   String _titleFor(String path) {
-    final rawName = isAndroidSafUri(path) ? safBaseName(path) : path;
+    final rawName = isDocUri(path) ? safBaseName(path) : path;
     final dot = rawName.lastIndexOf('.');
     final t = dot > 0 ? rawName.substring(0, dot) : rawName;
     return t.isEmpty ? path : t;

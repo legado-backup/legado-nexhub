@@ -2029,10 +2029,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadPath => 'Download Path';
 
   @override
-  String get downloadPathOhosUnsupported =>
-      'Custom download folder isn\'t supported on HarmonyOS yet. Files are saved to the app directory.';
-
-  @override
   String get folderImportOhosUnsupported =>
       'Folder import isn\'t supported on HarmonyOS yet. Use file import instead.';
 
@@ -2041,9 +2037,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contentImportActions => 'Actions';
-
-  @override
-  String get downloadPathDesc => 'D:/Downloads';
 
   @override
   String get downloaderType => 'Downloader';
@@ -9778,4 +9771,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get translationCacheUiText => 'Detail page & comment translation';
+
+  @override
+  String get storageLocationAppPrivate => 'App private folder';
+
+  @override
+  String get storageLocationAppPrivateHint =>
+      'Inside the app; deleted with the app';
+
+  @override
+  String get storageLocationSystemDownloads => 'System Downloads folder';
+
+  @override
+  String get storageLocationSystemDownloadsHint =>
+      'Visible in Files and kept after uninstall';
+
+  @override
+  String get storageLocationSystemScreenshots =>
+      'System Downloads / Screenshots';
+
+  @override
+  String get storageLocationSystemScreenshotsHint =>
+      'Visible in Files and kept after uninstall';
 }

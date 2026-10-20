@@ -12,7 +12,7 @@ import 'package:nexhub/generated/app_localizations.dart';
 import 'package:nexhub/core/local/saf_bridge.dart';
 import 'package:nexhub/core/local/text_encoding.dart';
 import 'package:nexhub/core/local/local_content_manager.dart'
-    show isAndroidSafUri;
+    show isDocUri;
 import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -976,7 +976,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 本地章节标题：SAF content:// 文件 URI 先还原真实文件名再去扩展名。
   String _chapterTitleFor(String path) {
-    final rawName = isAndroidSafUri(path) ? safBaseName(path) : path;
+    final rawName = isDocUri(path) ? safBaseName(path) : path;
     final t = p.basenameWithoutExtension(rawName);
     return t.isEmpty ? path : t;
   }

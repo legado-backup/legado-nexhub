@@ -171,7 +171,7 @@ class _LocalMediaViewerState extends State<LocalMediaViewer> {
     }
     // SAF 路径（本地导入 content:// 树，或下载编码 `<treeUri>␟<rel>`）：dart:io
     // 无法直接列举/读取，走 SAF 管线逐图落缓存（修复 Android 下载后图片打不开）。
-    if (isAndroidSafUri(path)) {
+    if (isDocUri(path)) {
       return gatherSafImages(path);
     }
     final f = File(path);

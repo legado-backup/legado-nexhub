@@ -11,6 +11,15 @@ import 'package:path_provider/path_provider.dart';
 
 import '../platform/platform_service.dart';
 
+/// 旧版本硬编码的桌面默认路径。
+///
+/// 历史配置可能仍保存该值；现在它只用于识别「未设置」，新代码不再写入。
+const String kLegacyDefaultDownloadPath = 'D:/Downloads';
+
+/// 配置值是否等价于「未设置下载路径」（空串或旧版硬编码默认值）。
+bool isUnsetDownloadPath(String path) =>
+    path.isEmpty || path == kLegacyDefaultDownloadPath;
+
 /// 平台相关的默认下载基路径。
 ///
 /// - Android：优先应用私有外部存储 `<pkg>/files/Download`（可被 dart:io 直接
@@ -20,8 +29,9 @@ import '../platform/platform_service.dart';
 /// Windows 专属的 `D:/Downloads`——那在 Android 上是相对路径，写入必然失败
 /// （Android 高版本「所有下载都失败」的根因之一）。
 /// - 鸿蒙：应用文档目录（沙箱内唯一稳定可写路径；系统公共目录需原生文件
-///   授权，暂未接入），同样不使用 `D:/Downloads`。
-/// - 其它平台（桌面）：沿用桌面默认 `D:/Downloads`。
+///   授权，见 `ohos_public_storage.dart`），同样不使用 `D:/Downloads`。
+/// - 桌面：系统「下载」目录（Windows 为 `%USERPROFILE%\Downloads`）；取不到
+///   时回落应用文档目录下的 Download，不再假设存在 D 盘。
 Future<String> defaultDownloadPath() async {
   if (PlatformService.instance.isOHOS) {
     final Directory docs = await getApplicationDocumentsDirectory();
@@ -35,8 +45,24 @@ Future<String> defaultDownloadPath() async {
     final Directory docs = await getApplicationDocumentsDirectory();
     return '${docs.path}${docs.path.endsWith('/') ? '' : '/'}Download';
   }
-  return 'D:/Downloads';
+  try {
+    final Directory? downloads = await getDownloadsDirectory();
+    if (downloads != null && downloads.path.isNotEmpty) {
+      return downloads.path;
+    }
+  } on Object {
+    // 平台不支持系统下载目录（如 iOS）时继续回落应用文档目录。
+  }
+  final Directory docs = await getApplicationDocumentsDirectory();
+  final String sep = Platform.pathSeparator;
+  return '${docs.path}${docs.path.endsWith(sep) ? '' : sep}Download';
 }
+
+/// 生效的下载路径：已设置则原样返回，未设置时解析平台默认目录。
+Future<String> resolveDownloadPath(String configured) async =>
+    isUnsetDownloadPath(configured)
+        ? defaultDownloadPath()
+        : configured;
 
 /// 文件系统后端接口。
 abstract class DownloadFileSystem {

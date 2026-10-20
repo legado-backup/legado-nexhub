@@ -16,6 +16,7 @@ library;
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:saf/saf.dart';
@@ -25,6 +26,7 @@ import 'local_content_manager.dart'
         LocalMediaKind,
         classifyByPath,
         isAndroidSafUri,
+        isDocUri,
         isImageFile,
         naturalCompare,
         isComicArchive,
@@ -33,6 +35,13 @@ import 'local_content_manager.dart'
         extractVideoThumbnail,
         kFolderCoverNames;
 import 'archive_extractor.dart' show extractFirstArchiveImage;
+import '../platform/ohos_public_storage.dart'
+    show
+        OhosPublicStorage,
+        OhosStorageEntry,
+        isOhosDocPath,
+        ohosDocJoin,
+        ohosDocToPlainPath;
 import '../platform/platform_service.dart';
 import '../local/pdf_util.dart' show extractPdfCover;
 import '../utils/app_log.dart';
@@ -185,6 +194,10 @@ String _normalizeSafDocUri(String uri) {
 /// 路径段定位真实文档 URI，再落缓存（修复 107/108 下载后打不开）。
 Future<String> resolveSafUri(String uriOrPath) async {
   _ensureRegistered();
+  if (isOhosDocPath(uriOrPath)) {
+    // 鸿蒙公共目录：原生分块拷贝到应用缓存后返回真实路径。
+    return OhosPublicStorage.materialize(uriOrPath);
+  }
   if (!isAndroidSafUri(uriOrPath)) return uriOrPath;
   final String docUri = uriOrPath.contains(_kSafSep)
       ? await _safEncodedToDocUri(uriOrPath)
@@ -333,6 +346,7 @@ Future<SafDocumentFile?> _safeStat(String uri) async {
 
 Future<List<String>> gatherSafImages(String uriOrPath) async {
   _ensureRegistered();
+  if (isOhosDocPath(uriOrPath)) return _gatherOhosImages(uriOrPath);
   // 解析目录文档 URI：编码路径先拆 treeUri + 相对段定位；纯 content:// 树直接用。
   final int idx = uriOrPath.indexOf(_kSafSep);
   final String dirUri;
@@ -394,6 +408,68 @@ Future<List<String>> gatherSafImages(String uriOrPath) async {
   return images.map((e) => e.$2).toList();
 }
 
+/// 鸿蒙公共目录版 [gatherSafImages]：原生列举目录，返回 `ohosdoc://` 编码路径，
+/// 落缓存仍由阅读器逐张调用 [resolveSafUri]（懒解析）。
+Future<List<String>> _gatherOhosImages(String encoded) async {
+  final String plain = ohosDocToPlainPath(encoded);
+  List<OhosStorageEntry> entries;
+  try {
+    if (!await OhosPublicStorage.exists(plain)) return const <String>[];
+    entries = await OhosPublicStorage.list(plain);
+  } on PlatformException catch (e) {
+    // 单文件：原生 list 对文件报错，不区分空目录时按扩展名判断。
+    AppLog.instance.w('[鸿蒙图片列举] 按单文件处理: $encoded (${e.code})');
+    return isImageFile(safBaseName(encoded))
+        ? <String>[encoded]
+        : const <String>[];
+  }
+  if (entries.isEmpty) {
+    return isImageFile(safBaseName(encoded))
+        ? <String>[encoded]
+        : const <String>[];
+  }
+  final List<(String, String)> images = <(String, String)>[];
+  for (final e in entries) {
+    if (e.isDir || !isImageFile(e.name)) continue;
+    images.add((e.name, ohosDocJoin(encoded, e.name)));
+  }
+  images.sort((a, b) => naturalCompare(a.$1, b.$1));
+  AppLog.instance.i('[鸿蒙图片收集] dir=$encoded 命中 ${images.length} 张');
+  return images.map((e) => e.$2).toList();
+}
+
+/// 递归列举鸿蒙公共目录下的文件（深度优先）。
+///
+/// 根目录列举失败向上抛 [FileSystemException]（区分「扫描失败」与「真的为空」）；
+/// 子目录失败跳过继续，与 [_walkSaf] 语义一致。
+Future<List<({String name, String path})>> _walkOhosDir(String encodedDir) async {
+  final List<OhosStorageEntry> children;
+  try {
+    children =
+        await OhosPublicStorage.list(ohosDocToPlainPath(encodedDir));
+  } on PlatformException catch (e) {
+    throw FileSystemException(
+      '鸿蒙公共目录列举失败（授权可能已失效）: ${e.code} ${e.message}',
+      encodedDir,
+    );
+  }
+  final List<({String name, String path})> out =
+      <({String name, String path})>[];
+  for (final c in children) {
+    final String child = ohosDocJoin(encodedDir, c.name);
+    if (c.isDir) {
+      try {
+        out.addAll(await _walkOhosDir(child));
+      } on Object {
+        continue;
+      }
+    } else {
+      out.add((name: c.name, path: child));
+    }
+  }
+  return out;
+}
+
 /// 列举 SAF 文件夹下的子文件名（不落缓存）。
 ///
 /// 用于「按集命名、扩展名未知」的视频定位：HLS 下载写出 `.ts`、直链写出 `.mp4`，
@@ -402,6 +478,16 @@ Future<List<String>> gatherSafImages(String uriOrPath) async {
 /// （可空/空 → root）。返回非目录子文件的文件名列表。
 Future<List<String>> listSafChildNames(String folderUriOrPath) async {
   _ensureRegistered();
+  if (isOhosDocPath(folderUriOrPath)) {
+    try {
+      final List<OhosStorageEntry> entries =
+          await OhosPublicStorage.list(ohosDocToPlainPath(folderUriOrPath));
+      return entries.where((e) => !e.isDir).map((e) => e.name).toList();
+    } on PlatformException catch (e) {
+      AppLog.instance.w('[鸿蒙目录列举] 失败: $folderUriOrPath (${e.code})');
+      return const <String>[];
+    }
+  }
   final int idx = folderUriOrPath.indexOf(_kSafSep);
   final String dirUri;
   if (idx >= 0) {
@@ -453,7 +539,7 @@ Future<List<String>> listSafChildNames(String folderUriOrPath) async {
 /// [resolveSafUri]（目录场景会由 [_copySafToLocal] 的目录守卫报明确错误，
 /// 绝不把 content:// 交给 media_kit 静默"打开成功"）。
 Future<String> resolveSafVideoFile(String uriOrPath) async {
-  if (!isAndroidSafUri(uriOrPath)) return uriOrPath;
+  if (!isDocUri(uriOrPath)) return uriOrPath;
   const videoExts = <String>[
     '.ts', '.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.flv',
   ];
@@ -508,7 +594,9 @@ Future<String> resolveSafVideoFile(String uriOrPath) async {
     }
   }
   if (found != null && found.isNotEmpty) {
-    return resolveSafUri('$folderEncoded/$found');
+    return resolveSafUri(isOhosDocPath(folderEncoded)
+        ? ohosDocJoin(folderEncoded, found)
+        : '$folderEncoded/$found');
   }
   // 找不到：回退对原路径落盘（文件场景直接可读；目录场景由目录守卫报错）。
   return resolveSafUri(uriOrPath);
@@ -592,6 +680,36 @@ LocalMediaKind? _mimeKind(String? mimeType) {
 /// content:// URI 列表（镜像 [scanComicFolder]）。
 Future<({List<String> rawImages, List<String> archives, List<String> others})>
     scanComicFolderSaf(String treeUri) async {
+  if (isOhosDocPath(treeUri)) {
+    final docs = await _walkOhosDir(treeUri);
+    final raw = <({String name, String path})>[];
+    final arch = <({String name, String path})>[];
+    final other = <({String name, String path})>[];
+    for (final d in docs) {
+      final lower = d.name.toLowerCase();
+      final ext = p.extension(lower);
+      if (<String>['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']
+          .contains(ext)) {
+        raw.add(d);
+      } else if (isComicArchive(lower) || lower.endsWith('.pdf')) {
+        arch.add(d);
+      } else if (isComicIgnored(lower)) {
+        // 忽略配置/元数据/文档/音视频等非漫画文件。
+      } else {
+        other.add(d);
+      }
+    }
+    int byName(({String name, String path}) a, ({String name, String path}) b) =>
+        naturalCompare(a.name, b.name);
+    raw.sort(byName);
+    arch.sort(byName);
+    other.sort(byName);
+    return (
+      rawImages: raw.map((d) => d.path).toList(),
+      archives: arch.map((d) => d.path).toList(),
+      others: other.map((d) => d.path).toList(),
+    );
+  }
   final docs = await _walkSaf(await resolveSafDirUri(treeUri));
   final raw = <SafDocumentFile>[];
   final arch = <SafDocumentFile>[];
@@ -639,6 +757,15 @@ Future<({List<String> rawImages, List<String> archives, List<String> others})>
 /// （镜像 [listFolderFilesByKind]）。
 Future<List<String>> listFolderFilesByKindSaf(
     String treeUri, LocalMediaKind kind) async {
+  if (isOhosDocPath(treeUri)) {
+    final docs = await _walkOhosDir(treeUri);
+    final files = docs
+        .where((d) => classifyByPath(d.name) == kind)
+        .map((d) => d.path)
+        .toList();
+    files.sort((a, b) => naturalCompare(safBaseName(a), safBaseName(b)));
+    return files;
+  }
   final docs = await _walkSaf(await resolveSafDirUri(treeUri));
   final files = docs
       .where((d) => _classifySafDoc(d) == kind)
@@ -699,7 +826,7 @@ Future<List<String>> listFolderSourceFilesSaf(String treeUri) async {
 /// 避免在 Android 上对 content:// 直接 `File().readAsString()` 抛错。
 Future<String> readSourceText(String pathOrUri) async {
   final String local;
-  if (isAndroidSafUri(pathOrUri)) {
+  if (isDocUri(pathOrUri)) {
     local = await resolveSafUri(pathOrUri);
   } else {
     local = pathOrUri;
@@ -709,6 +836,19 @@ Future<String> readSourceText(String pathOrUri) async {
 
 /// 按 SAF 文件夹内真实文件的多数扩展名决定媒体类型（镜像 [classifyFolderByContent]）。
 Future<LocalMediaKind?> classifyFolderByContentSaf(String treeUri) async {
+  if (isOhosDocPath(treeUri)) {
+    final docs = await _walkOhosDir(treeUri);
+    final counts = <LocalMediaKind, int>{};
+    for (final d in docs) {
+      final k = classifyByPath(d.name);
+      if (k == null) continue;
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return null;
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.first.key;
+  }
   final docs = await _walkSaf(await resolveSafDirUri(treeUri));
   final counts = <LocalMediaKind, int>{};
   for (final d in docs) {
@@ -743,7 +883,7 @@ String safBaseName(String uriOrPath) {
   final String last = lastRaw.contains('%')
       ? _tryDecodeComponent(lastRaw)
       : lastRaw;
-  final parts = last.split(RegExp(r'[:/]')).where((s) => s.isNotEmpty);
+  final parts = last.split(RegExp(r'[:/␟]')).where((s) => s.isNotEmpty);
   return parts.isEmpty ? '文件' : parts.last;
 }
 

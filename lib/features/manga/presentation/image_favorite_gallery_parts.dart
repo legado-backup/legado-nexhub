@@ -493,7 +493,9 @@ class _WorkPagerPageState extends State<_WorkPagerPage> {
     final String url = imageFavoriteDisplayUrl(f);
     try {
       if (!url.startsWith('http')) {
-        final File file = File(url);
+        // 鸿蒙公共目录 / Android SAF 的编码路径需先落缓存为真实文件。
+        final String local = isDocUri(url) ? await resolveSafUri(url) : url;
+        final File file = File(local);
         if (await file.exists()) {
           await Share.shareXFiles(<XFile>[XFile(file.path)]);
           return;
