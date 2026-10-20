@@ -5,9 +5,9 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 // NexImageCacheManager 与 SourceImage 同一图片磁盘缓存（同 URL 不重复下载）。
 import 'package:nexhub/core/network/dio_image_file_service.dart';
+import 'package:nexhub/core/platform/clipboard_image.dart';
 import 'package:nexhub/core/platform/image_saver.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:path/path.dart' as p;
@@ -160,9 +160,10 @@ Future<void> _setAsCover(
   }
 }
 
-/// 复制图片二进制到系统剪贴板（跨平台真复制，依赖 super_clipboard）。
+/// 复制图片二进制到系统剪贴板。
 ///
-/// [SystemClipboard] 不可用时（部分平台 / 测试环境）回退为复制本地路径。
+/// 鸿蒙走原生 pasteboard 通道，其余平台依赖 super_clipboard；均不可用时
+/// 回退为复制本地路径（见 [copyImageToSystemClipboard]）。
 Future<void> _copyImage(
   BuildContext context,
   String url,
@@ -179,28 +180,16 @@ Future<void> _copyImage(
   }
   try {
     final Uint8List bytes = await file.readAsBytes();
-    // SystemClipboard.instance 在无实现平台（如鸿蒙，super_native_extensions
-    // 无 ohos runner）可能抛异常而非返回 null——探针单独包 try。
-    SystemClipboard? clipboard;
-    try {
-      clipboard = SystemClipboard.instance;
-    } on Object {
-      clipboard = null;
-    }
-    if (clipboard == null) {
+    final bool copied = await copyImageToSystemClipboard(
+      bytes: bytes,
+      extension: _pickExt(url),
+    );
+    if (!copied) {
       // 平台不支持剪贴板图片：回退为复制本地路径。
       await Clipboard.setData(ClipboardData(text: file.path));
       messenger.showSnackBar(SnackBar(content: Text(l10n.imagePathCopied)));
       return;
     }
-    final item = DataWriterItem();
-    final ext = _pickExt(url).toLowerCase();
-    if (ext == '.jpg' || ext == '.jpeg') {
-      item.add(Formats.jpeg(bytes));
-    } else {
-      item.add(Formats.png(bytes));
-    }
-    await clipboard.write(<DataWriterItem>[item]);
     messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageSuccess)));
   } on Object {
     // 复制失败：回退为复制本地路径，保证菜单项「有反应」。

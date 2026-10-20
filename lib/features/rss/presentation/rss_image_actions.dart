@@ -12,12 +12,12 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:nexhub/core/network/dio_image_file_service.dart';
+import 'package:nexhub/core/platform/clipboard_image.dart';
 import 'package:nexhub/core/platform/image_saver.dart';
 import 'package:nexhub/core/scraper/http_fetcher.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 
 /// 构造与 [SourceImage] 一致的防盗链请求头。
 Map<String, String>? _buildHeaders(String? pageUrl, String url) {
@@ -145,26 +145,15 @@ Future<void> _copyImage(
   }
   try {
     final Uint8List bytes = await file.readAsBytes();
-    // SystemClipboard.instance 在无实现平台（如鸿蒙）可能抛异常而非返回 null。
-    SystemClipboard? clipboard;
-    try {
-      clipboard = SystemClipboard.instance;
-    } on Object {
-      clipboard = null;
-    }
-    if (clipboard == null) {
+    final bool copied = await copyImageToSystemClipboard(
+      bytes: bytes,
+      extension: _pickExt(url),
+    );
+    if (!copied) {
       await Clipboard.setData(ClipboardData(text: file.path));
       messenger.showSnackBar(SnackBar(content: Text(l10n.imagePathCopied)));
       return;
     }
-    final item = DataWriterItem();
-    final ext = _pickExt(url).toLowerCase();
-    if (ext == '.jpg' || ext == '.jpeg') {
-      item.add(Formats.jpeg(bytes));
-    } else {
-      item.add(Formats.png(bytes));
-    }
-    await clipboard.write(<DataWriterItem>[item]);
     messenger.showSnackBar(SnackBar(content: Text(l10n.copyImageSuccess)));
   } on Object {
     // 复制失败：回退为复制本地路径，保证菜单项「有反应」。

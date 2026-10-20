@@ -76,7 +76,7 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 | Custom download directory / custom screenshot directory | Directory picking unavailable | Falls back to the in-app default location |
 | Plugin export / backup export | No directory picker | Saved to the default location, then shared via the system share sheet |
 | Per-source WebView network following | Does not follow per-source proxy / hosts / DoH | HTTP scraping is unaffected; only pages inside the WebView are affected |
-| Clipboard image import | Unavailable | Path-copy fallback exists |
+| Clipboard image import | Supported (native pasteboard) | Writes PixelMap to the system clipboard; device verification pending |
 | Volume-key page turning | Unavailable (Android-only channel) | — |
 | Screen casting | Unavailable (entry hidden) | — |
 | Material You dynamic color | Not supported yet | Falls back to the default theme color |
