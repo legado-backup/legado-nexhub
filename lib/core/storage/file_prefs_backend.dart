@@ -6,6 +6,7 @@
 /// 文件直写没有此约束，也便于用户侧直接查看/备份。
 ///
 /// 原子性：先写 `<key>.json.tmp` 再改名覆盖，写一半被杀不会留下损坏数据。
+/// 并发：同一键的写入串行执行，避免共用临时文件互相踩（见 [set]）。
 /// 错误策略：读失败（含不存在）返回 null；写失败向上抛出由调用方记录。
 library;
 
@@ -23,6 +24,9 @@ class FilePrefsBackend implements PrefsBackend {
   final String _dirName;
 
   Directory? _cachedDir;
+
+  /// 每个键的写入队列（见 [set]）。
+  final Map<String, Future<void>> _writeQueues = {};
 
   Future<Directory> _dir() async {
     final cached = _cachedDir;
@@ -55,8 +59,22 @@ class FilePrefsBackend implements PrefsBackend {
     }
   }
 
+  /// 同一键的写入必须串行：并发写共用 `<key>.json.tmp`，交错时先完成者
+  /// 会把 tmp 改名走，后完成者 rename 失败且兜底清理会删到已不存在的 tmp；
+  /// 串行还保证后调用的快照最后落盘，不会被更旧的快照覆盖。
   @override
-  Future<void> set(String key, String value) async {
+  Future<void> set(String key, String value) {
+    final prev = _writeQueues[key] ?? Future<void>.value();
+    final next = prev.then(
+      (_) => _write(key, value),
+      // 前一次写入失败不应阻塞后续写入。
+      onError: (Object _) => _write(key, value),
+    );
+    _writeQueues[key] = next;
+    return next;
+  }
+
+  Future<void> _write(String key, String value) async {
     final file = await _fileFor(key);
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(value, flush: true);
@@ -65,7 +83,12 @@ class FilePrefsBackend implements PrefsBackend {
     } on Object {
       // 跨设备/占用导致改名失败时退化为直接覆盖。
       await file.writeAsString(value, flush: true);
-      if (await tmp.exists()) await tmp.delete();
+      try {
+        if (await tmp.exists()) await tmp.delete();
+      } on Object catch (e) {
+        // 数据已落盘，临时文件清不掉不值得让写入失败。
+        debugPrint('FilePrefsBackend.set($key) 清理临时文件失败: $e');
+      }
     }
   }
 }
