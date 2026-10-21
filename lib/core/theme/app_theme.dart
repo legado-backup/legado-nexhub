@@ -9,8 +9,11 @@ import 'app_tokens.dart';
 /// 可通过 `scheme` 注入莫奈动态色或自定义 seed 生成的 ColorScheme。
 /// - `app.dart` 中：`theme: AppTheme.light()`、`darkTheme: AppTheme.dark()`，
 /// 并删除任何内联 `ThemeData(colorSchemeSeed: ...)`。
-/// - 页面转场不覆盖 [PageTransitionsTheme]，由 Flutter 按各平台取系统默认
-///   （Android 预测性返回/Zoom、iOS/macOS Cupertino 侧滑、桌面与鸿蒙 Zoom）。
+/// - 页面转场：Android 走系统默认（预测性返回，程序化导航回落
+/// FadeForwards），iOS/macOS Cupertino 侧滑；鸿蒙必须显式声明 Zoom 并
+/// 关闭快照——material_ui 对 ohos 默认兜底 Zoom 但开启 SnapshotWidget，
+/// 被覆盖页会被冻结在「点击瞬间」的画面（含墨水高亮），返回转场先放
+/// 旧快照再切回实时渲染，形成 <1s 的强调色突变。
 class AppTheme {
   const AppTheme._();
 
@@ -248,6 +251,17 @@ class AppTheme {
       colorScheme: colorScheme,
       brightness: colorScheme.brightness,
       scaffoldBackgroundColor: colorScheme.surface,
+      // 鸿蒙转场：material_ui 默认无 ohos 条目（兜底到 Zoom 但开快照）。
+      // 显式声明同款 Zoom 并关快照，让被覆盖页在转场中实时渲染，
+      // 消除「返回时先显示点击瞬间的旧快照（墨水高亮），转场结束突然
+      // 换成实时画面」导致的强调色突变。其余平台不在此覆盖。
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.ohos: ZoomPageTransitionsBuilder(
+            allowSnapshotting: false,
+          ),
+        },
+      ),
       // 界面字体（外观设置「字体」组）：ThemeData.fontFamily 作为默认字族
       // 与显式 textTheme 合并——显式样式未设字族的字段（本项目全部如此）
       // 都会落到该字族；null = 平台默认字体（跟随系统）。
