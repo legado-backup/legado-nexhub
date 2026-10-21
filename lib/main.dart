@@ -14,6 +14,7 @@ import 'features/splash/splash_screen.dart';
 import 'core/player/audio_playback_service.dart';
 import 'core/rss/rss_notification_service.dart';
 import 'core/theme/app_tokens.dart';
+import 'core/theme/system_wallpaper_color.dart';
 
 /// Entry point: defers all initialization to [SplashScreen] so the user sees
 /// a branded splash while Hive boxes, sources, and managers come online.
@@ -146,6 +147,12 @@ void main() {
     } on Object catch (e, st) {
       debugPrint('RssNotificationService.init failed: $e\n$st');
     }
+
+    // 鸿蒙壁纸主色：dynamic_color 无 ohos 实现，在首帧渲染前解析壁纸主色，
+    // 对齐 Android DynamicColorBuilder「先解析动态色再构建 MaterialApp」的
+    // 行为，保证加载页首帧即用壁纸色、主题不再从默认色过渡。其他平台立即
+    // 返回 null；取色失败也不阻塞启动（回退默认主题，回前台后由 app.dart 补读）。
+    await SystemWallpaperColor.readSeed();
 
     runApp(const SplashScreen());
   }, (Object error, StackTrace stack) {

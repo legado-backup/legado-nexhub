@@ -18,6 +18,11 @@ import '../platform/platform_service.dart';
 ///
 /// [readSeed] 成功后结果在进程内记忆：页面切换、回前台等再次调用直接返回
 /// 缓存，不再触发原生取色；壁纸变化由 [changes] 的反向推送更新缓存。
+///
+/// 启动顺序（见 main）：runApp 前先 `await [readSeed]` 预取，splash 再经
+/// [latestSeed] 同步注入 ThemeController——首个带主题的界面首帧即用壁纸
+/// 色，避免主题从默认色过渡到壁纸色（对齐 Android `DynamicColorBuilder`
+/// 先解析动态色再构建 MaterialApp 的行为）。
 class SystemWallpaperColor {
   const SystemWallpaperColor._();
 
@@ -55,6 +60,12 @@ class SystemWallpaperColor {
     }
     return _changeController!.stream;
   }
+
+  /// 已解析的壁纸主色同步快照；null 表示尚未成功取到。
+  ///
+  /// main() 在 runApp 前预取后，splash 启动路径经此同步注入
+  /// ThemeController，保证首帧即用壁纸色（启动顺序见类注释）。
+  static Color? get latestSeed => _latestSeed;
 
   /// 读取系统壁纸主色；不可用时返回 null。
   ///

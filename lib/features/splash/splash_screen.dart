@@ -161,9 +161,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<InitResult> _initializeInner() async {
-    // 鸿蒙壁纸主色：dynamic_color 无 ohos 实现，启动时经原生通道取壁纸主色
-    // 作莫奈 seed。取不到返回 null，主题保持默认，不阻塞也不影响启动。
-    _themeController.setSystemDynamicSeed(await SystemWallpaperColor.readSeed());
+    // 鸿蒙壁纸主色：main() 已在首帧前预取（进程内缓存），这里同步注入即可，
+    // 保证加载页首帧即用壁纸色，避免主题从默认色过渡到壁纸色。取不到时保持
+    // 默认主题，回前台后由 app.dart 补读。
+    _themeController.setSystemDynamicSeed(SystemWallpaperColor.latestSeed);
 
     final appDir = await getApplicationDocumentsDirectory();
     await Hive.initFlutter(appDir.path);

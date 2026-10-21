@@ -31,8 +31,11 @@ export default class WallpaperColorPlugin implements FlutterPlugin, MethodCallHa
   private channel: MethodChannel | null = null;
 
   private readonly colorChangeCallback =
-    (colors: wallpaper.RgbaColor[], _wallpaperType: wallpaper.WallpaperType): void => {
+    (colors: wallpaper.RgbaColor[], wallpaperType: wallpaper.WallpaperType): void => {
       const rgba = toRgba(colors);
+      // 诊断：动态壁纸（如「入画」）颜色可能只在推送里出现，静态 getColors 为空。
+      hilog.info(0x0000, TAG, 'colorChange push: type=%{public}d -> %{public}s',
+        wallpaperType, JSON.stringify(rgba));
       if (rgba === null || this.channel === null) {
         return;
       }
@@ -48,6 +51,7 @@ export default class WallpaperColorPlugin implements FlutterPlugin, MethodCallHa
     this.channel.setMethodCallHandler(this);
     try {
       wallpaper.on('colorChange', this.colorChangeCallback);
+      hilog.info(0x0000, TAG, 'colorChange subscribed');
     } catch (e) {
       const err = e as BusinessError;
       hilog.warn(0x0000, TAG, 'colorChange subscribe failed: %{public}d %{public}s', err.code, err.message);
@@ -79,7 +83,11 @@ export default class WallpaperColorPlugin implements FlutterPlugin, MethodCallHa
     try {
       const colors: wallpaper.RgbaColor[] =
         await wallpaper.getColors(wallpaper.WallpaperType.WALLPAPER_SYSTEM);
-      result.success(toRgba(colors));
+      const rgba = toRgba(colors);
+      // 诊断：确认启动期静态取色是否有值（首帧主题是否直接带壁纸色取决于它）。
+      hilog.info(0x0000, TAG, 'getColors: %{public}d colors -> %{public}s',
+        colors?.length ?? -1, JSON.stringify(rgba));
+      result.success(rgba);
     } catch (e) {
       const err = e as BusinessError;
       hilog.warn(0x0000, TAG, 'getColors failed: %{public}d %{public}s', err.code, err.message);
