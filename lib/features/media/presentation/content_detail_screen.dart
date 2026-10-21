@@ -917,7 +917,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           initialSourceId: sid,
           onItemTap: (MediaItem tapped, String? heroTag) =>
               Navigator.of(context).push(
-            AppHeroPageRoute<void>(
+            AppPageRoute<void>(
               builder: (_) =>
                   ContentDetailScreen(item: tapped, heroTag: heroTag),
             ),
@@ -943,7 +943,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           seedUrl: seedUrl,
           onItemTap: (MediaItem tapped, String? heroTag) =>
               Navigator.of(context).push(
-            AppHeroPageRoute<void>(
+            AppPageRoute<void>(
               builder: (_) =>
                   ContentDetailScreen(item: tapped, heroTag: heroTag),
             ),
@@ -1541,7 +1541,7 @@ class _RecommendationList extends StatelessWidget {
                     width: cardW,
                     heroTag: 'rel-${m.id}',
                     onTap: () => Navigator.of(context).push(
-                      AppHeroPageRoute<void>(
+                      AppPageRoute<void>(
                         builder: (_) => ContentDetailScreen(
                           item: m,
                           heroTag: 'rel-${m.id}',

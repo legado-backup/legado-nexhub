@@ -723,7 +723,7 @@ class _ImageFavoriteGalleryScreenState
   /// 打开全屏大图（Hero 飞入 + InteractiveViewer 缩放）。
   void _openFullscreen(ImageFavorite favorite) {
     Navigator.of(context).push(
-      AppHeroPageRoute<void>(
+      AppPageRoute<void>(
         builder: (_) => _ImageFavoriteViewer(favorite: favorite),
       ),
     );

@@ -60,7 +60,7 @@ class NovelHomeScreen extends StatelessWidget {
               item: item,
               heroTag: heroTag,
               onOnline: (it, tag) => Navigator.of(context).push(
-                AppHeroPageRoute<void>(
+                AppPageRoute<void>(
                   builder: (_) =>
                       ContentDetailScreen(item: it, heroTag: tag),
                 ),

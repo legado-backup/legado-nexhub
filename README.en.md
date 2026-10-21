@@ -83,7 +83,7 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 | ECH acceleration | Not supported yet | Direct connection |
 | Podcast background notification | Unavailable | In-app playback unaffected |
 | Emulator (x64) | Video playback and ECH unsupported | Playback and ECH engines ship arm64-only artifacts; x64 debug builds now bundle QuickJS / WebView native libs (emulator verification pending) |
-| Page transition animations | Slightly different from Android | Framework default transitions; no functional impact |
+| Page transition animations | Platform default | Zoom on HarmonyOS and desktop, predictive back / Zoom on Android, swipe on iOS / macOS; instant switching is no longer forced |
 
 > The HarmonyOS build is a preview. This list keeps evolving with on-device verification and upstream progress; fixes and feature recoveries will be noted in future release notes.
 
