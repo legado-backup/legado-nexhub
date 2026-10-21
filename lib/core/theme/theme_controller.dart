@@ -26,6 +26,8 @@ import 'palette_style.dart';
 /// ColorScheme 时，以系统动态色为准——风格为 [PaletteStyle.tonalSpot] 时
 /// 直接使用系统 scheme；其余风格取系统 scheme 的 primary 作 seed，按所选
 /// [PaletteStyle] 重新 `fromSeed`，实现「壁纸 + 风格」组合。
+/// 鸿蒙（`dynamic_color` 无 ohos 实现）改由 [setSystemDynamicSeed] 注入
+/// 壁纸主色，视同系统 scheme 的 primary 参与上述组合。
 /// 否则回退到 [seed] 生成的浅蓝主题。
 ///
 /// 优先级（从高到低）：玄色手工主题 > 莫奈动态色 > 自定义 seed。
@@ -59,6 +61,7 @@ class ThemeController extends ChangeNotifier {
   Color _seed;
   bool _useMonet;
   PaletteStyle _paletteStyle;
+  Color? _systemDynamicSeed;
   String _appFontId = kAppFontSystemId;
   String? _appFontCustomPath;
   String? _appFontCustomFamily;
@@ -75,6 +78,18 @@ class ThemeController extends ChangeNotifier {
 
   /// 调色板风格（莫奈与自定义 seed 路径共同生效；玄色除外）。
   PaletteStyle get paletteStyle => _paletteStyle;
+
+  /// 系统壁纸主色（鸿蒙莫奈 seed；未取到或非鸿蒙时为 null）。
+  Color? get systemDynamicSeed => _systemDynamicSeed;
+
+  /// 注入系统壁纸主色（null = 不可用，回退默认 seed）。不参与持久化——
+  /// 取值由 [SystemWallpaperColor] 在进程内缓存（壁纸变化实时推送），
+  /// 因此页面重建 / 回前台不会重复取色，下次启动再向系统确认一次。
+  void setSystemDynamicSeed(Color? seed) {
+    if (_systemDynamicSeed == seed) return;
+    _systemDynamicSeed = seed;
+    notifyListeners();
+  }
 
   /// 界面字体标识（[kAppFontSystemId] / 内置字体 id / [kAppFontCustomId]）。
   String get appFontId => _appFontId;
@@ -327,8 +342,10 @@ class ThemeController extends ChangeNotifier {
   ThemeData lightTheme([ColorScheme? systemScheme]) {
     // 玄色优先：显式手工主题不被莫奈动态色覆盖。
     if (isXuanSe) return AppTheme.xuanSe(fontFamily: appFontFamily);
-    if (_useMonet && systemScheme != null) {
-      if (_paletteStyle == PaletteStyle.tonalSpot) {
+    // 系统动态色优先；鸿蒙无 system scheme 时用壁纸主色兜底。
+    final Color? dynamicSeed = systemScheme?.primary ?? _systemDynamicSeed;
+    if (_useMonet && dynamicSeed != null) {
+      if (_paletteStyle == PaletteStyle.tonalSpot && systemScheme != null) {
         return AppTheme.light(
           scheme: systemScheme,
           fontFamily: appFontFamily,
@@ -336,7 +353,7 @@ class ThemeController extends ChangeNotifier {
       }
       // 壁纸 + 风格：取系统动态色 primary 作 seed，按所选风格重建配色。
       return AppTheme.light(
-        seed: systemScheme.primary,
+        seed: dynamicSeed,
         variant: _paletteStyle.variant,
         fontFamily: appFontFamily,
       );
@@ -350,12 +367,13 @@ class ThemeController extends ChangeNotifier {
 
   ThemeData darkTheme([ColorScheme? systemScheme]) {
     if (isXuanSe) return AppTheme.xuanSe(fontFamily: appFontFamily);
-    if (_useMonet && systemScheme != null) {
-      if (_paletteStyle == PaletteStyle.tonalSpot) {
+    final Color? dynamicSeed = systemScheme?.primary ?? _systemDynamicSeed;
+    if (_useMonet && dynamicSeed != null) {
+      if (_paletteStyle == PaletteStyle.tonalSpot && systemScheme != null) {
         return AppTheme.dark(scheme: systemScheme, fontFamily: appFontFamily);
       }
       return AppTheme.dark(
-        seed: systemScheme.primary,
+        seed: dynamicSeed,
         variant: _paletteStyle.variant,
         fontFamily: appFontFamily,
       );

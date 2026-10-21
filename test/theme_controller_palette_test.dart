@@ -108,5 +108,65 @@ void main() {
 
       expect(theme.colorScheme.primary, systemScheme.primary);
     });
+
+    test('鸿蒙壁纸主色：无 system scheme 时作莫奈 seed 参与 fromSeed', () {
+      const wallpaperSeed = Color(0xFF6750A4);
+      final controller = ThemeController(useMonet: true)
+        ..setSystemDynamicSeed(wallpaperSeed);
+
+      final theme = controller.lightTheme();
+
+      final expected = ColorScheme.fromSeed(
+        seedColor: wallpaperSeed,
+        brightness: Brightness.light,
+        dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
+      );
+      expect(theme.colorScheme.primary, expected.primary);
+      expect(controller.systemDynamicSeed, wallpaperSeed);
+    });
+
+    test('系统 scheme 优先于鸿蒙壁纸主色（安卓路径不被覆盖）', () {
+      final controller = ThemeController(useMonet: true)
+        ..setSystemDynamicSeed(const Color(0xFFFF0000));
+
+      final systemScheme = ColorScheme.fromSeed(
+        seedColor: const Color(0xFF6750A4),
+      );
+      final theme = controller.lightTheme(systemScheme);
+
+      expect(theme.colorScheme.primary, systemScheme.primary);
+    });
+
+    test('关闭莫奈后壁纸主色不生效，仍用自定义 seed', () {
+      const customSeed = Color(0xFF0EA5E9);
+      final controller = ThemeController(useMonet: true)
+        ..setSystemDynamicSeed(const Color(0xFF6750A4))
+        ..setSeed(customSeed);
+
+      expect(controller.useMonet, isFalse);
+      final theme = controller.lightTheme();
+
+      final expected = ColorScheme.fromSeed(
+        seedColor: customSeed,
+        brightness: Brightness.light,
+        dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
+      );
+      expect(theme.colorScheme.primary, expected.primary);
+    });
+
+    test('壁纸主色置空（取不到）时回退默认 seed', () {
+      final controller = ThemeController(useMonet: true)
+        ..setSystemDynamicSeed(const Color(0xFF6750A4))
+        ..setSystemDynamicSeed(null);
+
+      final theme = controller.lightTheme();
+
+      final expected = ColorScheme.fromSeed(
+        seedColor: AppTokens.seedYouthfulPrimary,
+        brightness: Brightness.light,
+        dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
+      );
+      expect(theme.colorScheme.primary, expected.primary);
+    });
   });
 }

@@ -56,6 +56,7 @@ import '../../core/services/config_loader.dart';
 import '../../core/scraper/cookie_store.dart';
 import '../../core/scraper/http_fetcher.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../core/theme/system_wallpaper_color.dart';
 import '../../core/update/update_manager.dart';
 import '../../core/update/update_settings.dart';
 import '../shuyuan/presentation/shuyuan_novel_resolver.dart';
@@ -160,6 +161,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<InitResult> _initializeInner() async {
+    // 鸿蒙壁纸主色：dynamic_color 无 ohos 实现，启动时经原生通道取壁纸主色
+    // 作莫奈 seed。取不到返回 null，主题保持默认，不阻塞也不影响启动。
+    _themeController.setSystemDynamicSeed(await SystemWallpaperColor.readSeed());
+
     final appDir = await getApplicationDocumentsDirectory();
     await Hive.initFlutter(appDir.path);
 

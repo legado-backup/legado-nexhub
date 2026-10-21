@@ -17,7 +17,6 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/theme/palette_style.dart';
 import '../../../core/locale/locale_controller.dart';
-import '../../../core/platform/platform_service.dart';
 import '../../../core/settings/detail_appearance_settings.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/widgets/app_animations.dart';
@@ -404,21 +403,20 @@ class _SettingsAppearanceScreenState extends State<SettingsAppearanceScreen> {
                       onSelected: controller.setMode,
                     ),
                   ),
-                  // 鸿蒙：dynamic_color 无 ohos 实现（上游适配版仅 1.8.1，与本项目
-                  // 2.x 的 material_ui 类型链不兼容），取色恒回退默认主题——入口隐藏，
-                  // 避免「开关无效」（规格 §6：入口可见性 > 功能桩 > 静默失败）。
-                  if (!PlatformService.instance.isOHOS)
-                    SettingsTile(
-                      icon: Icons.auto_awesome_rounded,
-                      title: l10n.useMonet,
-                      trailing: Switch(
-                        value: controller.useMonet,
-                        onChanged: (bool v) {
-                          v ? AppHaptics.toggleOn() : AppHaptics.toggleOff();
-                          controller.setUseMonet(v);
-                        },
-                      ),
+                  // 鸿蒙：dynamic_color 无 ohos 实现，改由应用级原生通道读取
+                  // 壁纸主色作莫奈 seed（见 SystemWallpaperColor）；取不到时
+                  // 与安卓一样回退默认主题，入口保持可见。
+                  SettingsTile(
+                    icon: Icons.auto_awesome_rounded,
+                    title: l10n.useMonet,
+                    trailing: Switch(
+                      value: controller.useMonet,
+                      onChanged: (bool v) {
+                        v ? AppHaptics.toggleOn() : AppHaptics.toggleOff();
+                        controller.setUseMonet(v);
+                      },
                     ),
+                  ),
                   // 界面毛玻璃效果：开关 + 模糊强度 / 不透明度自定义，
                   // 监听通用设置即时生效（侧栏与底栏共用这套参数）。
                   ListenableBuilder(

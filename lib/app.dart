@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
@@ -6,6 +8,7 @@ import 'package:saf/saf.dart';
 import 'core/locale/locale_controller.dart';
 import 'core/platform/platform_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/system_wallpaper_color.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/download/download_manager.dart';
 import 'core/settings/general_settings.dart';
@@ -16,8 +19,51 @@ import 'features/home/presentation/home_screen.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
 
 /// 应用根：Material 3 + 莫奈动态色 + Provider 主题状态 + 统一 l10n。
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> with WidgetsBindingObserver {
+  StreamSubscription<Color?>? _wallpaperSeedSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 鸿蒙壁纸颜色变化由原生通道实时推送；其他平台为空流，
+    // Android 的动态色仍由 DynamicColorBuilder 提供。
+    _wallpaperSeedSub =
+        SystemWallpaperColor.changes.listen(_applyWallpaperSeedIfAvailable);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _wallpaperSeedSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 仅在首次取色失败（如启动早期系统服务未就绪）时回前台补读一次；
+    // 已取得壁纸主色后不再重复取色——鸿蒙窗口 resumed 事件可能被页面
+    // 切换等场景频繁触发。壁纸变化由原生 colorChange 推送。
+    if (state != AppLifecycleState.resumed) return;
+    if (context.read<ThemeController>().systemDynamicSeed != null) return;
+    SystemWallpaperColor.readSeed().then(_applyWallpaperSeedIfAvailable);
+  }
+
+  void _applyWallpaperSeedIfAvailable(Color? seed) {
+    if (seed != null) _applyWallpaperSeed(seed);
+  }
+
+  void _applyWallpaperSeed(Color seed) {
+    if (!mounted) return;
+    context.read<ThemeController>().setSystemDynamicSeed(seed);
+  }
 
   @override
   Widget build(BuildContext context) {
