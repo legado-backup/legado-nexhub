@@ -3,18 +3,24 @@
   "apiType": 'stageMode',
   "buildOption": {
     // 原生库：QuickJS 桥（third_party/quickjs_bridge）→ libnexhub_quickjs.so，
-    // 供书源 JS 沙箱的 dart:ffi 运行时加载。真机 arm64；模拟器调测再补 x86_64。
+    // 供书源 JS 沙箱的 dart:ffi 运行时加载。release 仅真机 arm64；
+    // debug 额外带 x86_64，供模拟器调测（见 buildOptionSet）。
     "externalNativeOptions": {
       "path": "./src/main/cpp/CMakeLists.txt",
-      "arguments": "",
-      "abiFilters": [
-        "arm64-v8a"
-      ],
-      "targets": [
-        "nexhub_quickjs_bridge"
-      ]
+      "arguments": ""
     }
   },
+  "buildOptionSet": [
+    {
+      "name": "debug",
+      "externalNativeOptions": {
+        "abiFilters": [
+          "arm64-v8a",
+          "x86_64"
+        ]
+      }
+    }
+  ],
   "targets": [
     {
       "name": "default",

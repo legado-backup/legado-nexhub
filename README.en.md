@@ -82,7 +82,7 @@ A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, 
 | Material You dynamic color | Not supported yet | Falls back to the default theme color |
 | ECH acceleration | Not supported yet | Direct connection |
 | Podcast background notification | Unavailable | In-app playback unaffected |
-| Emulator (x64) | Video playback unsupported | The playback engine only ships arm64 device artifacts; emulators work for image/text development |
+| Emulator (x64) | Video playback and ECH unsupported | Playback and ECH engines ship arm64-only artifacts; x64 debug builds now bundle QuickJS / WebView native libs (emulator verification pending) |
 | Page transition animations | Slightly different from Android | Framework default transitions; no functional impact |
 
 > The HarmonyOS build is a preview. This list keeps evolving with on-device verification and upstream progress; fixes and feature recoveries will be noted in future release notes.

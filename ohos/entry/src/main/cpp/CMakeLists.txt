@@ -10,3 +10,12 @@ add_subdirectory(
   "${CMAKE_CURRENT_LIST_DIR}/../../../../../third_party/quickjs_bridge"
   "${CMAKE_CURRENT_BINARY_DIR}/quickjs_bridge"
 )
+
+# 模拟器（x86_64）补齐 flutter_inappwebview_ohos 的 NAPI 垫片：上游模块只按
+# arm64 构建，但插件 ETS 在注册时静态导入 libinappwebview.so，缺失会启动即失败。
+if(OHOS_ARCH STREQUAL "x86_64")
+  add_library(inappwebview SHARED
+    "${CMAKE_CURRENT_LIST_DIR}/inappwebview_napi/napi_init.cpp"
+  )
+  target_link_libraries(inappwebview PUBLIC libace_napi.z.so libuv.so)
+endif()
