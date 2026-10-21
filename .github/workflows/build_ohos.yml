@@ -1,10 +1,11 @@
 # =============================================================================
 # NexHub 鸿蒙（OHOS）构建工作流
 # -----------------------------------------------------------------------------
-# 触发：推送 v* 标签自动发布（与 build.yml 同一标签联动：标签名含 "ohos" 时
-#       build.yml 全平台 job 跳过，本工作流单独发布鸿蒙包；普通 v* 标签时
-#       本工作流把 HAP 追加到同一 Release）；也支持网页手动 Run workflow
-#       试跑（产物走 artifact）。
+# 触发：推送 v* 标签自动发布，与 build.yml 共用**同一个标签、同一个 Release**：
+#       本工作流只负责编译鸿蒙 HAP，并把它追加到该标签的 Release（Android /
+#       Windows / Linux / macOS / iOS 产物由 build.yml 并行构建后一并发布）。
+#       鸿蒙不再单独发版，**不使用 `-ohos` 后缀标签**。
+#       也支持网页手动 Run workflow 试跑（产物走 artifact，不建 Release）。
 #
 # 产物：未签名 HAP（unsigned）——发布物一律不带签名，安装签名由下载用户
 #       自行完成（侧载惯例，端侧签名安装工具可直接安装 unsigned 包）。
@@ -329,10 +330,10 @@ jobs:
           path: NexHub-ohos-arm64-unsigned.hap
           if-no-files-found: error
 
-      - name: 发布到 GitHub Releases
-        # ohos 标签时本工作流是唯一发布流（build.yml 各 job 对 ohos 标签跳过），
-        # 由本步骤创建 Release 并写入正文；与 build.yml 共用同一份
-        # RELEASE_BODY.md，两个工作流先后更新同一正文内容一致，互不冲突。
+      - name: 追加产物到 Release（与全平台同一条）
+        # 与 build.yml 共用同一个标签、同一个 Release：谁先跑完谁先建，后到的用
+        # allowUpdates 追加自己的文件。两边写入同一份 RELEASE_BODY.md，正文一致；
+        # 文件清单互不重叠（本步只加 HAP），故并发安全。
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:

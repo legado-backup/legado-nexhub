@@ -1,8 +1,10 @@
 # =============================================================================
-# NexHub 自动打包 + 发布工作流（v22 — APK 单架构分包; Windows 直装/安装包留待下版）
+# NexHub 自动打包 + 发布工作流（v30 — 全平台统一发布到同一个 Release）
 # -----------------------------------------------------------------------------
 # 触发：推送 v* 标签自动发布；也支持网页手动 Run workflow 试跑。
-#       标签名含 "ohos" 时本工作流全部 job 跳过（鸿蒙包由 build-ohos.yml 单独发布）。
+#       任何 v* 标签都会构建全部平台（Android / Windows / Linux / macOS / iOS），
+#       产物统一发布到该标签对应的**同一个** GitHub Release；
+#       鸿蒙 HAP 由 build_ohos.yml 并行构建后追加到同一个 Release（不再单独发布）。
 #
 # 修复记录：
 #   v1: 初始版（全部失败：flutter pub get exit code 1）
@@ -200,6 +202,15 @@
 #     - **包名统一**：ios/Runner.xcodeproj/project.pbxproj 的 PRODUCT_BUNDLE_IDENTIFIER
 #       已从默认 com.example.nexhub 改为 com.nexhub.app，与 Android 的 com.nexhub.app 一致；
 #       侧载用户用本地自签工具（AltStore / Sideloadly 等）对未签名 IPA 重新签名即可安装。
+#   v30（当前）：
+#     - **发布统一**：取消「标签含 ohos 就跳过本工作流」的特例。此前用 `vX.Y.Z-ohos-beta.N`
+#       这类标签发鸿蒙包时，本工作流 5 个平台 job 全部跳过，鸿蒙工作流自成一条独立 Release，
+#       结果是同一版本在 Release 列表里出现两个条目（一个只有 HAP、一个没有 HAP）。
+#       现改为：**任何 v* 标签都构建全部平台**，Android/Windows/Linux/macOS/iOS 与鸿蒙 HAP
+#       全部落到同一个 Release 页面；鸿蒙工作流（build_ohos.yml）只负责并行编译 + 追加产物，
+#       不再有「鸿蒙独占发布」的概念。
+#     - **发版纪律**：一个版本只打一个标签（如 `v3.1.2` / `v3.1.2-beta.1`），
+#       **不再使用 `-ohos` 后缀标签**；鸿蒙产物不再单独发版。
 # =============================================================================
 
 name: Build & Release NexHub
@@ -217,7 +228,6 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -490,7 +500,6 @@ jobs:
   windows:
     name: Windows
     runs-on: windows-2022
-    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -621,7 +630,6 @@ jobs:
   linux:
     name: Linux
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - name: 安装 Linux 编译依赖（更完整）
@@ -834,7 +842,6 @@ jobs:
   macos:
     name: macOS
     runs-on: macos-latest
-    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -889,7 +896,6 @@ jobs:
   ios:
     name: iOS (无签名)
     runs-on: macos-latest
-    if: ${{ !contains(github.ref_name, 'ohos') }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -968,9 +974,11 @@ jobs:
 
   release:
     name: 发布到 GitHub Releases
+    # 注意：鸿蒙 HAP 不在下方 files 清单里——它由并行的 build_ohos.yml 追加到同一条
+    # Release（跨 workflow 无法用 needs 汇总，故两条工作流各自 append 同一 Release）。
     needs: [android, windows, linux, macos, ios]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, 'ohos')
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:

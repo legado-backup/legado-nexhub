@@ -1,8 +1,8 @@
 **English** | [简体中文](./README.md)
 
-> Latest release: **v3.1.0 (stable)**. The previous release is **v3.0.0** (stable — the 3.0.0 beta line consolidated: Material 3 visual system + media server + multi-platform ECH + reader enhancements and manga motion effects). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
+> Latest release: **v3.2.0 (stable)**. The previous release is **v3.1.0** (stable — frame-by-frame stepping / auto-fullscreen playback, sniffer candidate ranking and live search hot words). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
 >
-> 🚧 **HarmonyOS / OpenHarmony port in progress**: the first HarmonyOS build has entered on-device verification. See [Platform Support & HarmonyOS Port](#2-platform-support--harmonyos-port-in-progress) below.
+> 📱 **HarmonyOS / OpenHarmony is officially supported**: fully usable on arm64 devices; an unsigned iOS build is also provided. See [Platform Support](#2-platform-support) below.
 
 # NexHub
 
@@ -40,7 +40,7 @@ Benefits of this design:
 
 ---
 
-## 2. Platform Support & HarmonyOS Port (in progress)
+## 2. Platform Support
 
 ### Platform status
 
@@ -50,42 +50,38 @@ Benefits of this design:
 | Windows | ✅ Fully supported | zip / installer from the Releases page |
 | Linux | ✅ Fully supported | tar.gz / deb / AppImage from the Releases page |
 | macOS | ✅ Fully supported | zip / dmg from the Releases page |
-| **HarmonyOS / OpenHarmony (arm64 device)** | 🚧 Port in progress (preview) | Unsigned HAP from the Releases page (sideload) |
+| iOS | ✅ Supported (unsigned IPA) | IPA from the Releases page (self-sign & sideload) |
+| **HarmonyOS / OpenHarmony (arm64 device)** | ✅ Fully supported | Unsigned HAP from the Releases page (sign it yourself and sideload) |
 
-### 🚧 HarmonyOS port notes
+### 📱 HarmonyOS notes
 
-A HarmonyOS port of NexHub is underway. Just like the Android / desktop builds, the HarmonyOS build is a **full "Source-as-Plugin" client**: the core chains — all four content modules, source import & parsing (including JS-scripted sources), manga / novel / video reading & watching, danmaku, downloads, favorites, and Bangumi sync — are already working.
+The HarmonyOS (HarmonyOS / OpenHarmony, arm64 device) build is officially supported. Just like the Android / desktop builds, it is a **full "Source-as-Plugin" client**.
 
-**Available on HarmonyOS (aligned with Android)**:
+**Available on HarmonyOS**:
 
-- Full source parsing & reading chain (including JS-scripted sources, QuickJS engine);
+- Full source parsing & reading chain (including JS-scripted sources, native QuickJS bridge);
 - Video playback (libmpv engine, same lineage as Android: playback speed / audio tracks / subtitles / anti-leech headers) with on-screen danmaku;
-- Picture-in-picture (system floating window), system notifications, saving images into the system gallery (system confirmation dialog, permission-free);
+- Picture-in-picture (system floating window with control panel), system notifications, saving images into the system gallery (system confirmation dialog, permission-free), clipboard image paste;
 - Offline TTS reading for novels (system CoreSpeechKit engine with speech rate / sleep timer / background playback) and self-hosted online HTTP TTS;
+- Volume-key page turning in the reader (native key channel, long-press to repeat);
+- Screen casting (native mDNS discovery), Material You dynamic color (live wallpaper-seed following), ECH acceleration (engine bundled in the HAP);
 - Local persistence for favorites / download tasks / history (standalone file storage — survives force-kill);
 - Bangumi login & sync (authorization completed in an in-app WebView);
 - In-app updates (opens the browser on the Releases page for the new HAP).
 
 **Installation (sideload)**: download `NexHub-ohos-arm64-unsigned.hap` from the Releases page → sign it yourself with an on-device signing tool and install (or install via DevEco Studio / hdc). Release artifacts are consistently unsigned; signing is left to the user.
 
-### HarmonyOS: known issues / platform differences (preview)
+### HarmonyOS: remaining platform differences
 
 | Feature | Status on HarmonyOS | Workaround / notes |
 | --- | --- | --- |
 | Local folder import | Directory picking unavailable | Use "import files" to pick files one by one |
 | Custom download directory / custom screenshot directory | System Downloads folder supported | Phones cannot pick arbitrary folders; choose between the app-private folder and system Downloads (`Download/<bundleName>`, visible in Files) |
-| Plugin export / backup export | No directory picker | Saved to the default location, then shared via the system share sheet |
-| Per-source WebView network following | Does not follow per-source proxy / hosts / DoH | HTTP scraping is unaffected; only pages inside the WebView are affected |
-| Clipboard image import | Supported (native pasteboard) | Writes PixelMap to the system clipboard; device verification pending |
-| Volume-key page turning | Unavailable (Android-only channel) | — |
-| Screen casting | Unavailable (entry hidden) | — |
-| Material You dynamic color | Not supported yet | Falls back to the default theme color |
-| ECH acceleration | Not supported yet | Direct connection |
+| Plugin export / backup export | No directory picker | Saved through the system "Save as" / share sheet |
 | Podcast background notification | Unavailable | In-app playback unaffected |
-| Emulator (x64) | Video playback and ECH unsupported | Playback and ECH engines ship arm64-only artifacts; x64 debug builds now bundle QuickJS / WebView native libs (emulator verification pending) |
-| Page transition animations | Platform default | Zoom on HarmonyOS and desktop, predictive back / Zoom on Android, swipe on iOS / macOS; instant switching is no longer forced |
+| Emulator (x64) | Video playback and ECH unsupported | Playback and ECH engines ship arm64-only artifacts; x64 debug builds bundle QuickJS / WebView native libs |
 
-> The HarmonyOS build is a preview. This list keeps evolving with on-device verification and upstream progress; fixes and feature recoveries will be noted in future release notes.
+> These differences keep converging as system capabilities and upstream ports progress; fixes are noted in future release notes.
 
 ---
 
