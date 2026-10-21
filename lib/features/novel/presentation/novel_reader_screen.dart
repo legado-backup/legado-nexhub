@@ -17,7 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import '../../../core/platform/brightness_compat.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -351,7 +351,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// 收藏管理器（dispose 阶段查排除分类用）。
   FavoritesManager? _favorites;
   final NovelBookmarkManager _bookmarks = NovelBookmarkManager();
-  final ScreenBrightness _brightnessPlugin = ScreenBrightness();
+  final BrightnessCompat _brightnessPlugin = BrightnessCompat();
 
   /// 选区控制器：维护活动选区与已存划线的章节全局偏移锚点，
   /// 并负责渲染层（[_NovelPageWidget]）的实时刷新。

@@ -87,9 +87,6 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
-  # 鸿蒙播放内核：随 HAP 打进 libs/arm64-v8a/libmpv.so（仅 ohos 平台有声明，
-  # 其它平台不参与构建）。实际启用由构建开关 NEXHUB_OHOS_PLAYER 控制。
-  media_kit_libs_ohos: ^1.0.0
   # 系统通知（OS 通知）。注意：Windows 平台 flutter_local_notifications 无官方后端，
   # 故代码中做平台降级——仅 Android / iOS / Linux / macOS 发 OS 通知，Windows 跳过并
   # 保留应用内未读 badge（与 RssUpdateChecker 既有设计一致）。
@@ -136,13 +133,6 @@ dependencies:
   flutter_tts: ^4.2.0
   # 安全存储敏感凭据（WebDAV 密码）
   flutter_secure_storage: ^9.0.0
-  # 鸿蒙专属：安全存储的原生平台实现（非 endorsed 联邦包，必须显式进入依赖图才生效；
-  # 仅 feature/ohos 分支需要，主分支不含此行）。版本与上面的 9.2.4 对齐。
-  flutter_secure_storage_ohos:
-    git:
-      url: https://gitcode.com/CPF-Flutter/fluttertpc_flutter_secure_storage.git
-      path: flutter_secure_storage_ohos
-      ref: br_v9.2.4_ohos
   # 深链回调捕获（OAuth 登录：nexhub://oauth/callback）
   app_links: ^6.3.0
   # 网络状态检测（仅 WiFi 下载模式：判断是否连接 WiFi）

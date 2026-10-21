@@ -1,3 +1,11 @@
+# ⚠️ 本文件是「鸿蒙专用依赖覆盖模板」，不是生效中的覆盖文件。
+# 使用方式：
+#   · 鸿蒙本地构建：复制为 pubspec_overrides.yaml（该名称已被 .gitignore 忽略）
+#   · 鸿蒙 CI：build_ohos.yml 在 pub get 前自动复制本模板，并补入两条 ohos 专属依赖
+#     （media_kit_libs_ohos / flutter_secure_storage_ohos）。
+#   · 官方 Flutter SDK 构建（Android / Windows / Linux / macOS / iOS）**不启用**本文件，
+#     仓库主 pubspec.yaml 只保留官方依赖集，避免 CI 被 gitcode 适配源阻塞。
+#
 # 鸿蒙（OHOS）依赖换源 —— 仅 feature/ohos 分支生效。
 # 主 pubspec.yaml 的版本约束保持不动，这里集中放鸿蒙化适配源（git + path + ref）。
 # 适配仓库：gitcode CPF-Flutter 组织（ohos Flutter 生态迁移目的地）。

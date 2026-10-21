@@ -208,7 +208,9 @@ extension _VideoCastPip on _VideoPlayerScreenState {
         _pipActionSub ??=
             PipActionsBridge.instance.actionStream.listen(_onPipEvent);
       }
-      await floating.enable(EnableManual());
+      // 官方 floating 的参数类型为 ImmediatePiP；鸿蒙适配 fork 改名为 EnableManual，
+      // 由 tool/ohos/ohos_src.patch 在鸿蒙构建前替换。
+      await floating.enable(ImmediatePiP());
     } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -225,10 +227,11 @@ extension _VideoCastPip on _VideoPlayerScreenState {
   ///   直接设置，快进/快退按应用侧约定取 30s / 10s。
   void _wireOhosPipCallbacks() {
     final Floating floating = Floating();
-    floating.onPipModeChanged ??= (bool inPip) {
+    // 以下两个回调为鸿蒙 fork 新增（官方包无），动态挂载，仅鸿蒙分支会执行。
+    (floating as dynamic).onPipModeChanged ??= (bool inPip) {
       _onPipEvent(inPip ? 'pip:enabled' : 'pip:disabled');
     };
-    floating.onPipAction ??= (String event, int? status) {
+    (floating as dynamic).onPipAction ??= (String event, int? status) {
       switch (event) {
         case 'playbackStateChanged':
           // status：1 = 请求播放，0 = 请求暂停。

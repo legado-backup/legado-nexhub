@@ -19,7 +19,7 @@ import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import '../../../core/platform/brightness_compat.dart';
 
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/scraper/http_fetcher.dart';
@@ -469,7 +469,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   StreamSubscription<Object?>? _batterySubscription;
 
   // ── 系统亮度双轨──
-  final ScreenBrightness _brightnessPlugin = ScreenBrightness();
+  final BrightnessCompat _brightnessPlugin = BrightnessCompat();
 
   /// 是否为负亮度（压暗 + 黑遮罩）模式，避免两轨互相覆盖。
   bool _dimBrightnessActive = false;

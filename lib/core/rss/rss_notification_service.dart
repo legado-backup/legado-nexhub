@@ -37,8 +37,6 @@ class RssNotificationService {
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
       linux: LinuxInitializationSettings(defaultActionName: '打开'),
-      // 鸿蒙：插件强制要求提供该平台设置，否则 initialize 抛参数错误。
-      ohos: OhosInitializationSettings('app_icon'),
     );
     try {
       await _plugin.initialize(settings);
@@ -69,11 +67,7 @@ class RssNotificationService {
               AndroidFlutterLocalNotificationsPlugin>();
       final granted = await android?.requestNotificationsPermission();
       if (granted != null) return granted;
-      // 鸿蒙：插件同样是显式授权模型，未请求时通知不会弹出。
-      final ohos = _plugin.resolvePlatformSpecificImplementation<
-          OhosFlutterLocalNotificationsPlugin>();
-      final bool? ohosGranted = await ohos?.requestNotificationsPermission();
-      return ohosGranted ?? true;
+      return true;
     } catch (e, st) {
       debugPrint('RssNotificationService.requestPermission failed: $e\n$st');
       return false;
@@ -98,12 +92,6 @@ class RssNotificationService {
           iOS: DarwinNotificationDetails(),
           macOS: DarwinNotificationDetails(),
           linux: LinuxNotificationDetails(),
-          // 鸿蒙：slotType 为必填位参数，缺失时原生侧拿不到通知槽位，
-          // show 会失败（消息体也只带 platformSpecifics=null）。
-          ohos: OhosNotificationDetails(
-            OhosNotificationSlotType.CONTENT_INFORMATION,
-            slotDesc: 'RSS 订阅源有新内容时通知',
-          ),
         ),
       );
     } catch (e, st) {

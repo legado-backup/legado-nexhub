@@ -79,7 +79,7 @@ import 'package:cast/cast.dart';
 import 'package:floating/floating.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import '../../../core/platform/brightness_compat.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/widgets/danmaku.dart';
@@ -475,7 +475,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // 鸿蒙 PiP 控制面板的播放/暂停按钮图标随实际播放态同步（Android 通道
     // 无此需求——动作列表进入时下发；该调用在 Android 原生侧无实现，静默无效）。
     if (PlatformService.instance.isOHOS) {
-      unawaited(Floating().updatePipControlStatus(playing: p));
+      // 动态调用：官方 floating 无此方法（鸿蒙适配 fork 新增），仅鸿蒙分支会执行。
+      unawaited((Floating() as dynamic).updatePipControlStatus(playing: p));
     }
     // 播放 → 启动自动隐藏倒计时；暂停 → 取消倒计时保持常显。
     if (p) {
@@ -632,7 +633,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   final FocusNode _focusNode = FocusNode();
 
   /// 屏幕亮度插件实例（手势调节系统亮度）。
-  final ScreenBrightness _brightnessPlugin = ScreenBrightness();
+  final BrightnessCompat _brightnessPlugin = BrightnessCompat();
 
   /// 进入 PiP 时的播放位置（退出时若进度被系统回收则续播）。
   Duration _pipEnterPosition = Duration.zero;

@@ -109,6 +109,13 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/ || true
           ohpm config set strict_ssl false || true
 
+      - name: 准备鸿蒙专用依赖（覆盖模板 + ohos 专属依赖 + 源码补丁）
+        # 主仓库只保留官方依赖集（官方 SDK 的 CI 不做任何鸿蒙换源）；
+        # 脚本与本地鸿蒙构建共用，避免两套流程漂移。
+        shell: bash
+        run: |
+          bash tool/ohos/prepare_ohos.sh
+
       - name: 预热 git 依赖 mirror
         # 解析 pubspec.lock 的 git 依赖，逐个 clone --mirror 到 pub cache
         # （mirror 目录名 = <repo>-<sha1(url)>，与 pub 内部命名一致）。
@@ -122,11 +129,14 @@ jobs:
           cachedir = os.path.join(cache, "git", "cache")
           os.makedirs(cachedir, exist_ok=True)
           urls = set()
-          with open("pubspec.lock", encoding="utf-8") as f:
-              for line in f:
-                  m = re.search(r'url:\s*"?((?:https?)://[^"\s]+\.git)"?', line)
-                  if m:
-                      urls.add(m.group(1))
+          for name in ("pubspec.lock", "pubspec.yaml", "pubspec_overrides.yaml"):
+              if not os.path.exists(name):
+                  continue
+              with open(name, encoding="utf-8") as f:
+                  for line in f:
+                      m = re.search(r'url:\s*"?((?:https?)://[^"\s]+\.git)"?', line)
+                      if m:
+                          urls.add(m.group(1))
           print("::notice::git deps found: %d" % len(urls))
           failed = []
           for u in sorted(urls):

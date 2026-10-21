@@ -246,6 +246,11 @@ class AppTheme {
   }
 
   static ThemeData _build(ColorScheme colorScheme, {String? fontFamily}) {
+    // 官方 Flutter SDK 的 TargetPlatform 不含 ohos（仅鸿蒙 fork 有该枚举值）。
+    // 这里按运行时名称筛选，同一份代码在两套 SDK 下都能编译：非鸿蒙 SDK 下为空集，
+    // 转场完全走各平台默认；鸿蒙 SDK 下命中 ohos 并关闭页面快照。
+    final ohosPlatforms = TargetPlatform.values
+        .where((platform) => platform.name == 'ohos');
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
@@ -255,11 +260,12 @@ class AppTheme {
       // 显式声明同款 Zoom 并关快照，让被覆盖页在转场中实时渲染，
       // 消除「返回时先显示点击瞬间的旧快照（墨水高亮），转场结束突然
       // 换成实时画面」导致的强调色突变。其余平台不在此覆盖。
-      pageTransitionsTheme: const PageTransitionsTheme(
+      pageTransitionsTheme: PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.ohos: ZoomPageTransitionsBuilder(
-            allowSnapshotting: false,
-          ),
+          for (final platform in ohosPlatforms)
+            platform: const ZoomPageTransitionsBuilder(
+              allowSnapshotting: false,
+            ),
         },
       ),
       // 界面字体（外观设置「字体」组）：ThemeData.fontFamily 作为默认字族
