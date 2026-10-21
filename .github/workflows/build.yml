@@ -225,6 +225,7 @@ permissions:
   contents: write
 
 jobs:
+
   android:
     name: Android APK
     runs-on: ubuntu-latest
@@ -907,21 +908,16 @@ jobs:
         run: flutter config --enable-ios
       - name: 清理旧缓存（强制重建 Pods）
         run: flutter clean || true
-      - name: 确保 iOS 工程存在（缺失 Podfile 则生成）
-        # iOS 工程的 Podfile 未入库（仓库历史未提交），`flutter build ios` 在 pod install
-        # 阶段会因找不到 Podfile 失败。缺失时重新生成 iOS 工程文件（含 Podfile），
-        # 保留既有 Runner 代码与配置；已存在则跳过。
+      - name: 校验 iOS 工程文件（Podfile 随仓库提交）
+        # Podfile 已入库，直接校验存在性；不再现场 flutter create 生成
+        # （那会覆写 Runner.xcodeproj 的包名与工程配置）。
         shell: bash
         run: |
           set -e
-          if [ -f ios/Podfile ]; then
-            echo "ios/Podfile 已存在，跳过生成"
-          else
-            echo "缺失 ios/Podfile，重新生成 iOS 工程"
-            flutter create --platforms=ios .
-          fi
-          echo "== ios/ 结构 =="
+          test -f ios/Podfile || { echo "::error::缺少 ios/Podfile"; exit 1; }
+          echo "ios/Podfile 就绪"
           ls -la ios
+
       - name: 获取依赖
         run: flutter pub get 2>&1
       - name: 生成多语言文件 (gen-l10n)
@@ -958,14 +954,16 @@ jobs:
         shell: bash
         run: |
           set -e
-          APP_DIR=build/ios/iphoneos
-          rm -rf "$APP_DIR/Payload" NexHub-ios.ipa
+          ROOT="$PWD"
+          APP_DIR="$ROOT/build/ios/iphoneos"
+          rm -rf "$APP_DIR/Payload" "$ROOT/NexHub-ios.ipa"
           mkdir -p "$APP_DIR/Payload"
           cp -r "$APP_DIR/Runner.app" "$APP_DIR/Payload/"
-          cd "$APP_DIR"
-          zip -r NexHub-ios.ipa Payload
-          cd -
-          ls -la NexHub-ios.ipa
+          # zip 在 Payload 同级目录执行，产物落在 APP_DIR；随后移回仓库根，
+          # 与下方 upload-artifact 的 path 保持一致。
+          ( cd "$APP_DIR" && zip -qr NexHub-ios.ipa Payload )
+          mv "$APP_DIR/NexHub-ios.ipa" "$ROOT/NexHub-ios.ipa"
+          ls -la "$ROOT/NexHub-ios.ipa"
       - uses: actions/upload-artifact@v4
         with:
           name: ios-build
