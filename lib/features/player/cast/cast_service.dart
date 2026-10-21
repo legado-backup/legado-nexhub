@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:cast/cast.dart';
 
+import '../../../core/platform/platform_service.dart';
+import 'ohos_mdns_discovery.dart';
+
 /// 真实 Chromecast 投屏服务（基于纯 Dart 的 cast 包，无需 Google Cast SDK）。
 ///
 /// 流程：发现设备 -> 建立会话 -> 启动媒体接收器(CC1AD845) -> 发送 LOAD 播放视频地址。
@@ -46,7 +49,15 @@ class CastService {
   String? get deviceName => _device?.name;
 
  /// 发现局域网内的 Chromecast 设备。
-  Future<List<CastDevice>> discover() => CastDiscoveryService().search();
+ ///
+ /// 鸿蒙：bonsoir 无平台实现，改走原生 `@ohos.net.mdns` 通道；
+ /// 其它平台仍由 cast 包的 bonsoir 发现。
+  Future<List<CastDevice>> discover() {
+    if (PlatformService.instance.isOHOS) {
+      return OhosMdnsDiscovery.search();
+    }
+    return CastDiscoveryService().search();
+  }
 
  /// 连接设备并投屏播放指定视频地址。
  ///

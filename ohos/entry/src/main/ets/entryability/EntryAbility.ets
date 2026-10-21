@@ -6,6 +6,7 @@ import FileExportPlugin from '../plugins/FileExportPlugin';
 import MediaStorePlugin from '../plugins/MediaStorePlugin';
 import OhosStoragePlugin from '../plugins/OhosStoragePlugin';
 import OhosTtsPlugin from '../plugins/OhosTtsPlugin';
+import MdnsDiscoveryPlugin from '../plugins/MdnsDiscoveryPlugin';
 import VolumeKeyPlugin from '../plugins/VolumeKeyPlugin';
 import WallpaperColorPlugin from '../plugins/WallpaperColorPlugin';
 
@@ -23,6 +24,8 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new FileExportPlugin())
     // 应用级原生通道：系统下载目录授权与读写（见 OhosStoragePlugin 注释）。
     flutterEngine.getPlugins()?.add(new OhosStoragePlugin())
+    // 应用级原生通道：投屏设备发现（@ohos.net.mdns，见 MdnsDiscoveryPlugin 注释）。
+    flutterEngine.getPlugins()?.add(new MdnsDiscoveryPlugin())
     // 应用级原生通道：阅读器音量键翻页拦截（见 VolumeKeyPlugin 注释）。
     flutterEngine.getPlugins()?.add(new VolumeKeyPlugin())
     // 应用级原生通道：壁纸主色（莫奈 seed，见 WallpaperColorPlugin 注释）。

@@ -4526,15 +4526,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                 ),
               ),
             ),
-            // 投屏（鸿蒙无 cast/bonsoir 适配，入口隐藏，规格 §6）
-            if (!PlatformService.instance.isOHOS)
-              topBarBtn(
-                key: const Key('player_cast'),
-                icon: Icons.cast_rounded,
-                color: _isCasting ? Colors.amber : Colors.white,
-                tooltip: l10n.playerCast,
-                onPressed: () => _showCastSheet(l10n),
-              ),
+            // 投屏（鸿蒙经原生 @ohos.net.mdns 发现，见 cast_service.dart）
+            topBarBtn(
+              key: const Key('player_cast'),
+              icon: Icons.cast_rounded,
+              color: _isCasting ? Colors.amber : Colors.white,
+              tooltip: l10n.playerCast,
+              onPressed: () => _showCastSheet(l10n),
+            ),
             // 字幕
             topBarBtn(
               key: const Key('player_subtitle'),
