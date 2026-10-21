@@ -78,9 +78,10 @@ class _FlatSettingsSheetState extends State<_FlatSettingsSheet> {
     widget.onChanged?.call(next);
   }
 
-  /// 是否显示「音量键翻页」设置：仅 Android（原生拦截通道 Android 专有，
-  /// iOS / 桌面 / 鸿蒙没有该通道）。
-  bool get _showVolumeKey => PlatformService.instance.isAndroid;
+  /// 是否显示「音量键翻页」设置：Android / 鸿蒙（两端都有原生拦截通道，
+  /// iOS / 桌面没有）。
+  bool get _showVolumeKey =>
+      PlatformService.instance.isAndroid || PlatformService.instance.isOHOS;
 
   // ──────────────────── 构建辅助 ────────────────────
 
@@ -437,7 +438,7 @@ class _FlatSettingsSheetState extends State<_FlatSettingsSheet> {
     );
   }
 
-  /// 音量键翻页（仅 Android）：开关 + 条漫滚动距离滑块。
+  /// 音量键翻页（Android / 鸿蒙）：开关 + 条漫滚动距离滑块。
   Widget _buildVolumeKey() {
     final l10n = AppLocalizations.of(context);
     return Column(

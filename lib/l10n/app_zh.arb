@@ -2627,7 +2627,7 @@
   "readerScrollSpeed": "滚动速度",
   "readerScrollSpeedDesc": "鼠标滚轮在条漫模式下的滚动增量倍率（0.5x–3x）",
   "readerVolumeKeyPageTurn": "音量键翻页",
-  "readerVolumeKeyPageTurnDesc": "Android 拦截音量上/下翻页（翻页模式：翻页；条漫模式：按距离滚动）",
+  "readerVolumeKeyPageTurnDesc": "Android / 鸿蒙拦截音量上/下翻页（翻页模式：翻页；条漫模式：按距离滚动）",
   "readerVolumeKeyDistance": "音量键滚动距离",
   "readerVolumeKeyDistanceDesc": "条漫模式下音量键每次滚动的距离（占视口高度百分比）",
   "readerLongPressZoom": "长按缩放",

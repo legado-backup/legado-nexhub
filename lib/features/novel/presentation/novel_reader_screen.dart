@@ -3834,7 +3834,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   // ─────────────────────── 导航 ───────────────────────
 
-  /// 音量键翻页（仅 Android）：音量上 = 上一页、音量下 = 下一页，
+  /// 音量键翻页（Android / 鸿蒙）：音量上 = 上一页、音量下 = 下一页，
   /// 翻页/滚动模式均生效（复用 [_goNextPage]/[_goPrevPage] 的模式分派）。
   final VolumeKeyListener _volumeKeyListener = VolumeKeyListener();
 
@@ -3843,9 +3843,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// TTS 状态变化（朗读中不拦截，音量键恢复系统调音量）。
   Future<void> _syncVolumeKey() async {
     final bool ttsActive = _tts.state != NovelTtsState.stopped;
-    // 音量键拦截走 Android 原生通道（nexhub/volume_control），鸿蒙暂无实现。
-    final bool want =
-        _prefs.volumeKeyPageTurn && PlatformService.instance.isAndroid && !ttsActive;
+    // 音量键拦截走原生通道（Android dispatchKeyEvent / 鸿蒙 inputConsumer），
+    // 其它平台无实现。
+    final bool want = _prefs.volumeKeyPageTurn &&
+        (PlatformService.instance.isAndroid ||
+            PlatformService.instance.isOHOS) &&
+        !ttsActive;
     try {
       if (want) {
         await _volumeKeyListener.start(
@@ -9666,8 +9669,9 @@ class _NovelInlineSettings extends StatelessWidget {
                           onChanged(prefs.copyWith(scrollWheelInverted: v));
                         },
                       ),
-                      // 音量键翻页（仅 Android 有原生音量键拦截通道）。
-                      if (PlatformService.instance.isAndroid)
+                      // 音量键翻页（Android / 鸿蒙有原生音量键拦截通道）。
+                      if (PlatformService.instance.isAndroid ||
+                          PlatformService.instance.isOHOS)
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(l10n.readerVolumeKeyPageTurn),

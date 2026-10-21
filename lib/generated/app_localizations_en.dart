@@ -4806,7 +4806,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerVolumeKeyPageTurnDesc =>
-      'Intercept volume up/down to turn pages on Android (paged: turn page; webtoon: scroll by distance)';
+      'Intercept volume up/down to turn pages on Android and HarmonyOS (paged: turn page; webtoon: scroll by distance)';
 
   @override
   String get readerVolumeKeyDistance => 'Volume key scroll distance';

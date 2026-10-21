@@ -1589,7 +1589,7 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                             ),
                         ],
                       ),
-                      // 音量键翻页（仅 Android 生效）
+                      // 音量键翻页（Android / 鸿蒙生效）
                       SettingsSwitchTile(
                         key: const ValueKey<String>('comic.volumePageTurn'),
                         title: l10n.readerVolumeKeyPageTurn,

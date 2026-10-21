@@ -619,7 +619,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 同时配合在途任务取消，让渲染始终追着当前视野。
   static const int _motionFollowMs = 200;
 
-  // ── 音量键翻页（仅 Android）──────────────────────────────
+  // ── 音量键翻页（Android / 鸿蒙）────────────────────────────
 
   /// 原生音量键拦截器（Android onKeyDown 方案）：彻底消费按键事件，阻止系统音量条。
   final VolumeKeyListener _volumeKeyListener = VolumeKeyListener();
@@ -3695,14 +3695,14 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
 
   // ─────────────────────── 音量键翻页 ───────────────────────
 
-  /// 按当前偏好同步音量键监听：仅 Android 且开启 [ReaderPreferences.volumeKeyPageTurn]
-  /// 时通过 [VolumeKeyListener] 挂载原生 onKeyDown 拦截（彻底消费按键事件，阻止系统
+  /// 按当前偏好同步音量键监听：Android / 鸿蒙且开启 [ReaderPreferences.volumeKeyPageTurn]
+  /// 时通过 [VolumeKeyListener] 挂载原生拦截（彻底消费按键事件，阻止系统
   /// 音量条弹出），否则停止并恢复系统默认音量键行为。调用点：[_init]、
   /// [_applySettingsAuto]、[_onPrefsChanged]（偏好变化后即时生效）。
   Future<void> _syncVolumeKey() async {
-    // 音量键拦截走 Android 原生通道（nexhub/volume_control），鸿蒙暂无实现。
-    final bool want =
-        _prefs.volumeKeyPageTurn && PlatformService.instance.isAndroid;
+    // 音量键拦截走原生通道：Android dispatchKeyEvent / 鸿蒙 inputConsumer。
+    final bool want = _prefs.volumeKeyPageTurn &&
+        (PlatformService.instance.isAndroid || PlatformService.instance.isOHOS);
     if (want) {
       // Bug1 修复：async + try/catch，启动失败（原生通道未就绪/订阅异常）不再被
       // unawaited 静默吞掉，写日志便于实机排查。

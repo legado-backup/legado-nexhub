@@ -4719,7 +4719,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerVolumeKeyPageTurnDesc =>
-      'Android 拦截音量上/下翻页（翻页模式：翻页；条漫模式：按距离滚动）';
+      'Android / 鸿蒙拦截音量上/下翻页（翻页模式：翻页；条漫模式：按距离滚动）';
 
   @override
   String get readerVolumeKeyDistance => '音量键滚动距离';

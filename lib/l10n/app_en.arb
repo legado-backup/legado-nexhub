@@ -2649,7 +2649,7 @@
   "readerScrollSpeed": "Scroll speed",
   "readerScrollSpeedDesc": "Multiplier applied to the webtoon scroll amount from the mouse wheel (0.5x–3x)",
   "readerVolumeKeyPageTurn": "Volume key page turn",
-  "readerVolumeKeyPageTurnDesc": "Intercept volume up/down to turn pages on Android (paged: turn page; webtoon: scroll by distance)",
+  "readerVolumeKeyPageTurnDesc": "Intercept volume up/down to turn pages on Android and HarmonyOS (paged: turn page; webtoon: scroll by distance)",
   "readerVolumeKeyDistance": "Volume key scroll distance",
   "readerVolumeKeyDistanceDesc": "How far the volume key scrolls in webtoon mode (percent of viewport height)",
   "readerLongPressZoom": "Long-press to zoom",

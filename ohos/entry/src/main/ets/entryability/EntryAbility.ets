@@ -6,6 +6,7 @@ import FileExportPlugin from '../plugins/FileExportPlugin';
 import MediaStorePlugin from '../plugins/MediaStorePlugin';
 import OhosStoragePlugin from '../plugins/OhosStoragePlugin';
 import OhosTtsPlugin from '../plugins/OhosTtsPlugin';
+import VolumeKeyPlugin from '../plugins/VolumeKeyPlugin';
 
 export default class EntryAbility extends FlutterAbility {
   configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -21,5 +22,7 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new FileExportPlugin())
     // 应用级原生通道：系统下载目录授权与读写（见 OhosStoragePlugin 注释）。
     flutterEngine.getPlugins()?.add(new OhosStoragePlugin())
+    // 应用级原生通道：阅读器音量键翻页拦截（见 VolumeKeyPlugin 注释）。
+    flutterEngine.getPlugins()?.add(new VolumeKeyPlugin())
   }
 }

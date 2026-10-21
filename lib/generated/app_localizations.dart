@@ -9137,7 +9137,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerVolumeKeyPageTurnDesc.
   ///
   /// In en, this message translates to:
-  /// **'Intercept volume up/down to turn pages on Android (paged: turn page; webtoon: scroll by distance)'**
+  /// **'Intercept volume up/down to turn pages on Android and HarmonyOS (paged: turn page; webtoon: scroll by distance)'**
   String get readerVolumeKeyPageTurnDesc;
 
   /// No description provided for @readerVolumeKeyDistance.
