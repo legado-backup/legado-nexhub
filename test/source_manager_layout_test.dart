@@ -6,6 +6,7 @@ import 'package:nexhub/core/services/source_library_subscription.dart';
 import 'package:nexhub/core/services/source_repository.dart';
 import 'package:nexhub/core/theme/app_theme.dart';
 import 'package:nexhub/core/widgets/app_segmented_tabs.dart';
+import 'package:nexhub/core/widgets/unified_source_tile.dart';
 import 'package:nexhub/features/sources/presentation/source_manager_screen.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -43,6 +44,7 @@ void main() {
     WidgetTester tester,
     List<PluginConfig> sources, {
     SourceType? filterType,
+    double bottomInset = 0,
   }) async {
     await tester.pumpWidget(
       MultiProvider(
@@ -74,8 +76,18 @@ void main() {
           ],
           // 嵌入模式依赖外层外壳的 Scaffold 提供 Material 祖先（网络导入
           // 页的输入框需要），与真实使用场景（LibraryShell）一致。
-          home: Scaffold(
-            body: SourceManagerScreen(embedded: true, filterType: filterType),
+          home: Builder(
+            builder: (BuildContext ctx) => MediaQuery(
+              // 模拟主框架 extendBody + 玻璃底栏注入的底部避让量（鸿蒙等
+              // 移动端模块内页的真实环境）。
+              data: MediaQuery.of(ctx).copyWith(
+                padding: EdgeInsets.only(bottom: bottomInset),
+              ),
+              child: Scaffold(
+                body:
+                    SourceManagerScreen(embedded: true, filterType: filterType),
+              ),
+            ),
           ),
         ),
       ),
@@ -106,6 +118,20 @@ void main() {
     // 可用区底（> 400）。
     expect(tester.getSize(find.byWidget(lowSpecCard(tester))).height,
         lessThan(400));
+  });
+
+  testWidgets('低配整卡模式：底栏避让量不涂进卡片，卡底贴最后一行', (WidgetTester tester) async {
+    await pumpManager(
+      tester,
+      <PluginConfig>[novelSource('a'), novelSource('b')],
+      bottomInset: 80,
+    );
+    final Rect cardRect = tester.getRect(find.byWidget(lowSpecCard(tester)));
+    final Rect lastRowRect =
+        tester.getRect(find.byType(UnifiedSourceTile).last);
+    // 卡底只保留设计留白（spaceMd=12）；若把 80px 底栏避让也算进
+    // 列表内边距，这段无源区域会被涂成强调色（差值 ≈ 92）。
+    expect(cardRect.bottom - lastRowRect.bottom, lessThan(24));
   });
 
   testWidgets('第一行下划线页签：点击切换内容，分类分段随页签离开', (WidgetTester tester) async {

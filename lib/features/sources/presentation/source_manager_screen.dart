@@ -821,9 +821,12 @@ class _SourceManagerScreenState extends State<SourceManagerScreen>
     );
     // 视口处理：高配=透明圆角裁剪（滚动中边缘圆滑，卡底由行段自绘）；
     // 低配=整表一张静态强调色圆角卡（首次对话版式），左右 12px 与前置
-    // 区块对齐。Listener 记录指针位置驱动断口重算与边缘自动滚动
-    // （[_maybeAutoScroll]）；滚动通知覆盖框架内置自动滚动场景的断口同步。
-    // 开关即时生效：监听通用设置，切换后无需重进页面。
+    // 区块对齐。底栏/安全区避让量必须留在卡外：低配卡底由 Material 铺在
+    // 整张列表（含其内边距）之下，避让量若算进列表 padding，最后一行到
+    // 底栏之间的无源区域会被整体涂成强调色（鸿蒙等移动端 extendBody
+    // 注入的避让高度可达整条底栏）。Listener 记录指针位置驱动断口重算与
+    // 边缘自动滚动（[_maybeAutoScroll]）；滚动通知覆盖框架内置自动滚动
+    // 场景的断口同步。开关即时生效：监听通用设置，切换后无需重进页面。
     return ListenableBuilder(
       listenable: GeneralSettingsStore.instance,
       child: Listener(
@@ -851,13 +854,15 @@ class _SourceManagerScreenState extends State<SourceManagerScreen>
                   alignment: Alignment.topCenter,
                   child: Padding(
                     // 顶部留 8px 与媒体服务器等前置区块分开：卡内的顶部留白
-                    // 属于卡底色，不构成两张卡之间的间隔。
+                    // 属于卡底色，不构成两张卡之间的间隔。底部避让量加在卡
+                    // 外，卡底只包有源的行。
                     padding: const EdgeInsets.fromLTRB(
-                      AppTokens.spaceMd,
-                      AppTokens.spaceSm,
-                      AppTokens.spaceMd,
-                      0,
-                    ),
+                          AppTokens.spaceMd,
+                          AppTokens.spaceSm,
+                          AppTokens.spaceMd,
+                          0,
+                        ) +
+                        context.glassBarInset,
                     child: Material(
                       color: AppTheme.cardContainer(scheme),
                       shape: RoundedRectangleBorder(
@@ -906,16 +911,16 @@ class _SourceManagerScreenState extends State<SourceManagerScreen>
         : (gg < dd && gapSlot + 1 <= dd ? gapSlot : gapSlot + 1);
     return ReorderableListView(
       // 低配（默认）：整卡为一张静态强调色卡（首次对话版式），行内容平铺，
-      // 卡自身左右 12px 与媒体服务器等前置区块对齐；高配：分段底色在缩进区
-      // 内拼成整卡。
+      // 卡自身左右 12px 与媒体服务器等前置区块对齐；底栏避让由外层卡片
+      // Padding 承担（卡内只留设计留白，避免无源空白被涂成卡底色）。
+      // 高配：分段底色在缩进区内拼成整卡，避让量留在列表内供滚动穿透。
       padding: lowSpec
           ? const EdgeInsets.fromLTRB(
-                0,
-                AppTokens.spaceSm,
-                0,
-                AppTokens.spaceMd,
-              ) +
-              context.glassBarInset
+              0,
+              AppTokens.spaceSm,
+              0,
+              AppTokens.spaceMd,
+            )
           : const EdgeInsets.fromLTRB(
                 AppTokens.spaceMd,
                 AppTokens.spaceSm,
