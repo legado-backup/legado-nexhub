@@ -2944,6 +2944,7 @@
   "novelParagraphTranslate": "Paragraph translation",
   "novelTranslateAction": "Translate chapter",
   "novelTranslateRetranslate": "Re-translate",
+  "translationStaleNotice": "The source, glossary, or translation style has changed. The cached translation may be outdated.",
   "novelTranslateProgress": "{done} of {total} paragraphs",
   "@novelTranslateProgress": {
     "placeholders": {

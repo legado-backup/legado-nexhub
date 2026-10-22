@@ -97,6 +97,7 @@ import '../domain/novel_summary_service.dart';
 import '../domain/novel_summary_settings.dart';
 import '../domain/novel_polish_service.dart';
 import '../domain/novel_prescan_service.dart';
+import '../domain/novel_translation_fingerprint.dart';
 import '../domain/novel_translation_service.dart';
 import '../domain/novel_illustration_service.dart';
 import '../../../core/ai/glossary_manager.dart';
@@ -11201,6 +11202,10 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
   int _extractedTerms = 0;
   int _extractedConflicts = 0;
 
+  /// 当前缓存的输入指纹与过期状态（旧缓存无指纹时不做判断）。
+  String? _cachedFingerprint;
+  bool _stale = false;
+
   @override
   void initState() {
     super.initState();
@@ -11286,7 +11291,19 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
       lang: widget.targetLanguage,
     );
     if (cached != null) {
-      if (mounted) setState(() => _translations = cached.translations);
+      final stale = await NovelTranslationFingerprint.isStale(
+        cachedFingerprint: cached.fingerprint,
+        workId: widget.novelId,
+        lang: widget.targetLanguage,
+        sources: widget.paragraphs,
+      );
+      if (mounted) {
+        setState(() {
+          _translations = cached.translations;
+          _cachedFingerprint = cached.fingerprint;
+          _stale = stale;
+        });
+      }
       return;
     }
     // 无完整缓存时读取分块检查点，展示已完成段并提供「继续翻译」。
@@ -11428,6 +11445,11 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
           }
         },
       );
+      final fingerprint = await NovelTranslationFingerprint.computeForWork(
+        workId: widget.novelId,
+        lang: widget.targetLanguage,
+        sources: widget.paragraphs,
+      );
       await widget.manager.save(NovelChapterTranslation(
         novelId: widget.novelId,
         chapterId: widget.chapterId,
@@ -11435,6 +11457,7 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
         lang: widget.targetLanguage,
         translations: result,
         sources: widget.paragraphs,
+        fingerprint: fingerprint,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       ));
       // 完整译文已落盘，检查点使命完成；旧润色结果随重译失效。
@@ -11454,6 +11477,8 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
           _checkpoint = null;
           _polished = null;
           _showPolished = false;
+          _cachedFingerprint = fingerprint;
+          _stale = false;
         });
       }
     } on Object catch (e) {
@@ -11588,7 +11613,56 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
         builder: (_) => TranslationGlossaryScreen(workId: widget.novelId),
       ),
     );
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    await _refreshStale();
+  }
+
+  /// 术语页返回后重算：裁决策略可能改变本章实际命中的术语。
+  Future<void> _refreshStale() async {
+    final cached = _cachedFingerprint;
+    if (cached == null || cached.isEmpty || _translations == null) {
+      if (mounted) setState(() => _stale = false);
+      return;
+    }
+    final stale = await NovelTranslationFingerprint.isStale(
+      cachedFingerprint: cached,
+      workId: widget.novelId,
+      lang: widget.targetLanguage,
+      sources: widget.paragraphs,
+    );
+    if (mounted) setState(() => _stale = stale);
+  }
+
+  /// 缓存过期提示：输入已变化时建议重译，不自动删除旧译文。
+  Widget _staleRow(AppLocalizations l10n, ColorScheme scheme) {
+    if (!_stale || _translations == null || _translating) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(
+          left: AppTokens.spaceMd,
+          right: AppTokens.spaceMd,
+          bottom: AppTokens.spaceXs),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.update_rounded, size: 14, color: scheme.tertiary),
+          const SizedBox(width: AppTokens.spaceXs),
+          Expanded(
+            child: Text(
+              l10n.translationStaleNotice,
+              style: TextStyle(fontSize: 12, color: scheme.tertiary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _translate(),
+            child: Text(
+              l10n.novelTranslateRetranslate,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 自动提取结果行：收录/冲突计数 + 直达作品术语表裁决。
@@ -11686,6 +11760,7 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
                       TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ),
+            _staleRow(l10n, scheme),
             _prescanRow(l10n, scheme),
             _glossaryExtractRow(l10n, scheme),
             // 润色入口与初译/润色对照切换。

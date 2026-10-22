@@ -5552,6 +5552,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get novelTranslateRetranslate => '重新翻译';
 
   @override
+  String get translationStaleNotice => '原文、术语表或翻译风格已更新，当前缓存译文可能过期。';
+
+  @override
   String novelTranslateProgress(String done, String total) {
     return '已译 $done 段';
   }

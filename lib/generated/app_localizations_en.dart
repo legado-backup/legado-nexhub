@@ -5664,6 +5664,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get novelTranslateRetranslate => 'Re-translate';
 
   @override
+  String get translationStaleNotice =>
+      'The source, glossary, or translation style has changed. The cached translation may be outdated.';
+
+  @override
   String novelTranslateProgress(String done, String total) {
     return '$done of $total paragraphs';
   }

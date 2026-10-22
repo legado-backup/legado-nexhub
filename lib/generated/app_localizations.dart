@@ -10754,6 +10754,12 @@ abstract class AppLocalizations {
   /// **'Re-translate'**
   String get novelTranslateRetranslate;
 
+  /// No description provided for @translationStaleNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The source, glossary, or translation style has changed. The cached translation may be outdated.'**
+  String get translationStaleNotice;
+
   /// No description provided for @novelTranslateProgress.
   ///
   /// In en, this message translates to:

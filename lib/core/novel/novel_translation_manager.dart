@@ -26,6 +26,9 @@ class NovelChapterTranslation {
   /// 与 [translations] 对齐的原文列表（润色对照、审查证据、
   /// 双语导出用；旧缓存无此字段为 null，导出按「译文优先」降级）。
   final List<String>? sources;
+
+  /// 生成译文时的输入指纹；旧缓存为 null（不参与过期判断）。
+  final String? fingerprint;
   final int updatedAt;
 
   const NovelChapterTranslation({
@@ -35,6 +38,7 @@ class NovelChapterTranslation {
     required this.lang,
     required this.translations,
     this.sources,
+    this.fingerprint,
     required this.updatedAt,
   });
 
@@ -45,6 +49,7 @@ class NovelChapterTranslation {
         'lang': lang,
         'translations': translations,
         if (sources != null) 'sources': sources,
+        if (fingerprint != null) 'fingerprint': fingerprint,
         'updatedAt': updatedAt,
       };
 
@@ -60,6 +65,7 @@ class NovelChapterTranslation {
             t as String? ?? '',
         ],
         sources: (json['sources'] as List<dynamic>?)?.cast<String>(),
+        fingerprint: json['fingerprint'] as String?,
         updatedAt: (json['updatedAt'] as num?)?.toInt() ?? 0,
       );
 }
