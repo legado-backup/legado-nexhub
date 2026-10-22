@@ -8986,6 +8986,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewTypeLiteral => 'Literal';
 
   @override
+  String get reviewTypeAdded => 'Over-translation';
+
+  @override
+  String get reviewTypeMistranslation => 'Mistranslation';
+
+  @override
+  String get reviewTypeTerminology => 'Terminology';
+
+  @override
+  String get reviewTypePronoun => 'Pronoun';
+
+  @override
+  String get reviewAiAction => 'AI review';
+
+  @override
+  String reviewAiProgress(Object done, Object total) {
+    return 'AI reviewing $done/$total';
+  }
+
+  @override
+  String get reviewAiPartial =>
+      'Some chunks were skipped. The report may be incomplete.';
+
+  @override
+  String get reviewRevision => 'Revision';
+
+  @override
+  String get reviewAccept => 'Accept';
+
+  @override
+  String get reviewIgnore => 'Ignore';
+
+  @override
+  String get reviewApplyAll => 'Apply all';
+
+  @override
+  String reviewAppliedCount(Object count) {
+    return 'Applied $count revisions';
+  }
+
+  @override
   String get offlineTranslateTitle => 'Offline whole-video translation';
 
   @override

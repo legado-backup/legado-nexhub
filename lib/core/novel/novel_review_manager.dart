@@ -8,7 +8,6 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -19,6 +18,21 @@ class ReviewFindingType {
   static const String missing = 'missing';
   static const String literal = 'literal';
   static const String unsupported = 'unsupported';
+
+  // AI 审校新增类型（本地启发式不产出）。
+  static const String added = 'added';
+  static const String mistranslation = 'mistranslation';
+  static const String terminology = 'terminology';
+  static const String pronoun = 'pronoun';
+
+  /// AI 审校允许的类型全集（输出归一化用）。
+  static const Set<String> aiTypes = <String>{
+    missing,
+    added,
+    mistranslation,
+    terminology,
+    pronoun,
+  };
 }
 
 /// 单条审查发现（证据驱动：原文/译文/位置齐备）。
@@ -33,6 +47,15 @@ class TranslationReviewFinding {
   final String translation;
   final String detail;
 
+  /// 产出引擎：`local`（本地启发式，默认）/ `ai`（AI 审校）。
+  final String engine;
+
+  /// AI 修改建议（本地发现为空串）。
+  final String suggestion;
+
+  /// AI 影子修订：可直接替换原段的完整译文；仅用户采纳后才写回缓存。
+  final String revision;
+
   const TranslationReviewFinding({
     required this.type,
     required this.chapterId,
@@ -41,6 +64,9 @@ class TranslationReviewFinding {
     required this.source,
     required this.translation,
     required this.detail,
+    this.engine = 'local',
+    this.suggestion = '',
+    this.revision = '',
   });
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -51,6 +77,9 @@ class TranslationReviewFinding {
         'source': source,
         'translation': translation,
         'detail': detail,
+        'engine': engine,
+        if (suggestion.isNotEmpty) 'suggestion': suggestion,
+        if (revision.isNotEmpty) 'revision': revision,
       };
 
   factory TranslationReviewFinding.fromJson(Map<String, dynamic> json) =>
@@ -62,6 +91,9 @@ class TranslationReviewFinding {
         source: json['source'] as String? ?? '',
         translation: json['translation'] as String? ?? '',
         detail: json['detail'] as String? ?? '',
+        engine: json['engine'] as String? ?? 'local',
+        suggestion: json['suggestion'] as String? ?? '',
+        revision: json['revision'] as String? ?? '',
       );
 }
 
@@ -77,6 +109,12 @@ class TranslationReviewReport {
   /// true = 超出摘要版上限被截断（完整版见落盘 JSON）。
   final bool truncated;
 
+  /// 产出引擎：`local`（默认）/ `ai`。
+  final String engine;
+
+  /// true = AI 审校有块被跳过（重试后仍失败），报告可能不完整。
+  final bool partial;
+
   const TranslationReviewReport({
     required this.novelId,
     required this.lang,
@@ -85,6 +123,8 @@ class TranslationReviewReport {
     required this.chaptersReviewed,
     required this.findings,
     required this.truncated,
+    this.engine = 'local',
+    this.partial = false,
   });
 
   Map<String, int> get countsByType {
@@ -102,6 +142,8 @@ class TranslationReviewReport {
         'createdAt': createdAt,
         'chaptersReviewed': chaptersReviewed,
         'truncated': truncated,
+        'engine': engine,
+        'partial': partial,
         'findings': <Map<String, dynamic>>[
           for (final f in findings) f.toJson(),
         ],
@@ -120,6 +162,8 @@ class TranslationReviewReport {
             if (f is Map<String, dynamic>) TranslationReviewFinding.fromJson(f),
         ],
         truncated: json['truncated'] as bool? ?? false,
+        engine: json['engine'] as String? ?? 'local',
+        partial: json['partial'] as bool? ?? false,
       );
 }
 

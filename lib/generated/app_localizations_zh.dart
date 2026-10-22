@@ -8763,6 +8763,46 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reviewTypeLiteral => '直译腔';
 
   @override
+  String get reviewTypeAdded => '过度翻译';
+
+  @override
+  String get reviewTypeMistranslation => '误译';
+
+  @override
+  String get reviewTypeTerminology => '术语不一致';
+
+  @override
+  String get reviewTypePronoun => '指代';
+
+  @override
+  String get reviewAiAction => 'AI 审校';
+
+  @override
+  String reviewAiProgress(Object done, Object total) {
+    return 'AI 审校中 $done/$total';
+  }
+
+  @override
+  String get reviewAiPartial => '部分段落块被跳过，报告可能不完整。';
+
+  @override
+  String get reviewRevision => '修订';
+
+  @override
+  String get reviewAccept => '采纳';
+
+  @override
+  String get reviewIgnore => '忽略';
+
+  @override
+  String get reviewApplyAll => '全部应用';
+
+  @override
+  String reviewAppliedCount(Object count) {
+    return '已应用 $count 条修订';
+  }
+
+  @override
   String get offlineTranslateTitle => '整片翻译（离线）';
 
   @override

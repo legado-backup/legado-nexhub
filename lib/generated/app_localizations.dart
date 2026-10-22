@@ -16820,6 +16820,78 @@ abstract class AppLocalizations {
   /// **'Literal'**
   String get reviewTypeLiteral;
 
+  /// No description provided for @reviewTypeAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Over-translation'**
+  String get reviewTypeAdded;
+
+  /// No description provided for @reviewTypeMistranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Mistranslation'**
+  String get reviewTypeMistranslation;
+
+  /// No description provided for @reviewTypeTerminology.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminology'**
+  String get reviewTypeTerminology;
+
+  /// No description provided for @reviewTypePronoun.
+  ///
+  /// In en, this message translates to:
+  /// **'Pronoun'**
+  String get reviewTypePronoun;
+
+  /// No description provided for @reviewAiAction.
+  ///
+  /// In en, this message translates to:
+  /// **'AI review'**
+  String get reviewAiAction;
+
+  /// No description provided for @reviewAiProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'AI reviewing {done}/{total}'**
+  String reviewAiProgress(Object done, Object total);
+
+  /// No description provided for @reviewAiPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some chunks were skipped. The report may be incomplete.'**
+  String get reviewAiPartial;
+
+  /// No description provided for @reviewRevision.
+  ///
+  /// In en, this message translates to:
+  /// **'Revision'**
+  String get reviewRevision;
+
+  /// No description provided for @reviewAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get reviewAccept;
+
+  /// No description provided for @reviewIgnore.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore'**
+  String get reviewIgnore;
+
+  /// No description provided for @reviewApplyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply all'**
+  String get reviewApplyAll;
+
+  /// No description provided for @reviewAppliedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {count} revisions'**
+  String reviewAppliedCount(Object count);
+
   /// No description provided for @offlineTranslateTitle.
   ///
   /// In en, this message translates to:
