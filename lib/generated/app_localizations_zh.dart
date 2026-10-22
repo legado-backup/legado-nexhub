@@ -1997,6 +1997,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get folderImportOhosUnsupported => '鸿蒙版暂不支持文件夹导入，请改用「选择文件」导入';
 
   @override
+  String get folderImportCopyProgress => '正在导入目录';
+
+  @override
+  String get folderImportCopyProgressHint => '正在复制到应用空间，请勿关闭应用';
+
+  @override
+  String get folderImportCopyFailed => '目录复制失败，请重试';
+
+  @override
   String get downloadPathSet => '下载路径已更新';
 
   @override

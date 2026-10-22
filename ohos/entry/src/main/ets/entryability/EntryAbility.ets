@@ -9,6 +9,8 @@ import OhosTtsPlugin from '../plugins/OhosTtsPlugin';
 import MdnsDiscoveryPlugin from '../plugins/MdnsDiscoveryPlugin';
 import VolumeKeyPlugin from '../plugins/VolumeKeyPlugin';
 import WallpaperColorPlugin from '../plugins/WallpaperColorPlugin';
+import DeviceFormPlugin from '../plugins/DeviceFormPlugin';
+import WindowControlPlugin from '../plugins/WindowControlPlugin';
 
 export default class EntryAbility extends FlutterAbility {
   configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -30,5 +32,9 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new VolumeKeyPlugin())
     // 应用级原生通道：壁纸主色（莫奈 seed，见 WallpaperColorPlugin 注释）。
     flutterEngine.getPlugins()?.add(new WallpaperColorPlugin())
+    // 应用级原生通道：设备形态判定（手机 / 2in1 PC，见 DeviceFormPlugin 注释）。
+    flutterEngine.getPlugins()?.add(new DeviceFormPlugin())
+    // 应用级原生通道：窗口全屏控制（2in1 PC，见 WindowControlPlugin 注释）。
+    flutterEngine.getPlugins()?.add(new WindowControlPlugin())
   }
 }

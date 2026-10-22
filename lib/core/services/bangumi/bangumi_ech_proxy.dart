@@ -313,7 +313,7 @@ class BangumiEchProxy {
   static bool get platformSupported {
     if (kIsWeb) return false;
     try {
-      const PlatformService platform = PlatformService.instance;
+      final PlatformService platform = PlatformService.instance;
       return platform.isAndroid ||
           platform.isWindows ||
           platform.isLinux ||

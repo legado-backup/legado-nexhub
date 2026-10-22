@@ -190,9 +190,9 @@ class _SettingsComicReaderScreenState extends State<SettingsComicReaderScreen> {
     };
   }
 
-  /// 是否显示「音量键翻页」设置：Android / 鸿蒙（都有原生拦截通道）。
+  /// 是否显示「音量键翻页」设置：Android / 鸿蒙手机（都有原生拦截通道）。
   bool get _showVolumeKey =>
-      PlatformService.instance.isAndroid || PlatformService.instance.isOHOS;
+      PlatformService.instance.isAndroid || PlatformService.instance.isOHOSPhone;
 
   /// 阅读模式切换联动：切到竖排 / 长条时双页拆分不再生效，自动关闭。
   /// （与阅读器内联面板行为一致）

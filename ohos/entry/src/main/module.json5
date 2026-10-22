@@ -6,7 +6,8 @@
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
     "deviceTypes": [
-      "phone"
+      "phone",
+      "2in1"
     ],
     "deliveryWithInstall": true,
     "installationFree": false,
@@ -20,6 +21,13 @@
         "label": "$string:EntryAbility_label",
         "startWindowIcon": "$media:icon",
         "startWindowBackground": "$color:start_window_background",
+        "supportWindowMode": [
+          "fullscreen",
+          "split",
+          "floating"
+        ],
+        "minWindowWidth": 480,
+        "minWindowHeight": 600,
         "exported": true,
         "skills": [
           {

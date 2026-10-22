@@ -1251,7 +1251,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // 记录退出全屏后要恢复的方向（进入全屏临时强制横屏，退出回到此处）。
     _controller
         .setBaseOrientations(isPhone ? orients : const <DeviceOrientation>[]);
-    if (!isPhone) return;
+    if (!isPhone || !PlatformService.instance.isMobile) return;
     try {
       await SystemChrome.setPreferredOrientations(orients);
     } on Object {

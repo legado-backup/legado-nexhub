@@ -2033,6 +2033,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Folder import isn\'t supported on HarmonyOS yet. Use file import instead.';
 
   @override
+  String get folderImportCopyProgress => 'Importing folder';
+
+  @override
+  String get folderImportCopyProgressHint =>
+      'Copying into app storage. Keep the app open.';
+
+  @override
+  String get folderImportCopyFailed =>
+      'Couldn\'t copy the folder. Please try again.';
+
+  @override
   String get downloadPathSet => 'Download path updated';
 
   @override

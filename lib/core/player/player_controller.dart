@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../models/episode.dart';
+import '../platform/platform_service.dart';
 import '../settings/player_settings.dart' show UpscaleShaderMode;
 import 'anime4k_shaders.dart';
 import 'demuxer_cache_policy.dart';
@@ -179,19 +180,22 @@ class PlayerController extends ChangeNotifier {
   Future<void> toggleFullscreen() async {
     _isFullscreen = !_isFullscreen;
     try {
-      if (_isFullscreen) {
-        await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-        await SystemChrome.setEnabledSystemUIMode(
-          SystemUiMode.immersiveSticky,
-        );
-      } else {
-        await SystemChrome.setPreferredOrientations(_baseOrientations);
-        await SystemChrome.setEnabledSystemUIMode(
-          SystemUiMode.edgeToEdge,
-        );
+      // 方向锁定与系统 UI 模式仅对移动形态有意义；桌面 / 鸿蒙 PC 不产生系统调用。
+      if (PlatformService.instance.isMobile) {
+        if (_isFullscreen) {
+          await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+          await SystemChrome.setEnabledSystemUIMode(
+            SystemUiMode.immersiveSticky,
+          );
+        } else {
+          await SystemChrome.setPreferredOrientations(_baseOrientations);
+          await SystemChrome.setEnabledSystemUIMode(
+            SystemUiMode.edgeToEdge,
+          );
+        }
       }
     } on Object {
    // 测试环境或当前平台不支持，忽略。
@@ -1084,11 +1088,14 @@ class PlayerController extends ChangeNotifier {
   // 退出时始终还原方向与系统 UI。
   // 无论是否经过全屏切换，进入播放页时 _applyLockOrientation 可能已锁定方向
   // （默认 lockOrientation=landscape），必须在此无条件解除。
-    try {
-      SystemChrome.setPreferredOrientations(<DeviceOrientation>[]);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    } on Object {
-   // 测试环境忽略。
+  // 桌面 / 鸿蒙 PC 从未改动方向与系统 UI，无需复位。
+    if (PlatformService.instance.isMobile) {
+      try {
+        SystemChrome.setPreferredOrientations(<DeviceOrientation>[]);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } on Object {
+     // 测试环境忽略。
+      }
     }
     super.dispose();
     if (identical(_activeInstance, this)) _activeInstance = null;

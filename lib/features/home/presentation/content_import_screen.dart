@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/local/folder_import.dart';
 import '../../../core/local/folder_import_dialog.dart';
 import '../../../core/local/ohos_folder_import_hint.dart';
 import '../../../core/platform/platform_service.dart';
@@ -97,7 +98,8 @@ class _ContentImportScreenState extends State<ContentImportScreen> {
       );
       return;
     }
-    final dir = await pickFolderPath();
+    if (!mounted) return;
+    final dir = await FolderImport.pick(context);
     if (dir == null || !mounted) return;
     final saf = isAndroidSafUri(dir);
     final folderTitle = saf ? await safFolderName(dir) : p.basename(dir);
@@ -218,8 +220,8 @@ class _ContentImportScreenState extends State<ContentImportScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          // 鸿蒙目录选择不可用，隐藏文件夹入口（正文卡内有降级提示）。
-          if (!PlatformService.instance.isOHOS) ...<Widget>[
+          // 鸿蒙手机目录选择不可用，隐藏文件夹入口（正文卡内有降级提示）。
+          if (!PlatformService.instance.isOHOSPhone) ...<Widget>[
             FloatingActionButton.extended(
               onPressed: _picking ? null : _pickFolder,
               icon: const Icon(Icons.folder_rounded),
@@ -257,8 +259,8 @@ class _ContentImportScreenState extends State<ContentImportScreen> {
                   _formatRow(l10n.contentImportNovelFormats, Icons.menu_book_rounded),
                   _formatRow(l10n.contentImportComicFormats, Icons.auto_stories_rounded),
                   _formatRow(l10n.contentImportMediaFormats, Icons.movie_rounded),
-                  // 鸿蒙目录选择不可用，说明改由「选择文件」路径导入。
-                  if (PlatformService.instance.isOHOS) ...<Widget>[
+                  // 鸿蒙手机目录选择不可用，说明改由「选择文件」路径导入。
+                  if (PlatformService.instance.isOHOSPhone) ...<Widget>[
                     const SizedBox(height: AppTokens.spaceMd),
                     OhosFolderImportHint(l10n: l10n),
                   ],

@@ -78,10 +78,10 @@ class _FlatSettingsSheetState extends State<_FlatSettingsSheet> {
     widget.onChanged?.call(next);
   }
 
-  /// 是否显示「音量键翻页」设置：Android / 鸿蒙（两端都有原生拦截通道，
+  /// 是否显示「音量键翻页」设置：Android / 鸿蒙手机（两端都有原生拦截通道，
   /// iOS / 桌面没有）。
   bool get _showVolumeKey =>
-      PlatformService.instance.isAndroid || PlatformService.instance.isOHOS;
+      PlatformService.instance.isAndroid || PlatformService.instance.isOHOSPhone;
 
   // ──────────────────── 构建辅助 ────────────────────
 

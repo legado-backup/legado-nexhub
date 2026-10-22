@@ -3944,6 +3944,24 @@ abstract class AppLocalizations {
   /// **'Folder import isn\'t supported on HarmonyOS yet. Use file import instead.'**
   String get folderImportOhosUnsupported;
 
+  /// No description provided for @folderImportCopyProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing folder'**
+  String get folderImportCopyProgress;
+
+  /// No description provided for @folderImportCopyProgressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying into app storage. Keep the app open.'**
+  String get folderImportCopyProgressHint;
+
+  /// No description provided for @folderImportCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t copy the folder. Please try again.'**
+  String get folderImportCopyFailed;
+
   /// No description provided for @downloadPathSet.
   ///
   /// In en, this message translates to:

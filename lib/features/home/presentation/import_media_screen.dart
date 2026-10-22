@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../../../core/local/import_permission.dart';
 import '../../../core/local/local_content_manager.dart';
 import '../../../core/platform/platform_service.dart';
+import '../../../core/local/folder_import.dart';
 import '../../../core/local/folder_import_dialog.dart';
 import '../../../core/local/ohos_folder_import_hint.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -99,7 +100,8 @@ class _ImportMediaScreenState extends State<ImportMediaScreen> {
       );
       return;
     }
-    final dir = await pickFolderPath();
+    if (!mounted) return;
+    final dir = await FolderImport.pick(context);
     if (dir == null || !mounted) return;
     // 安卓走 saf.pickDirectory 拿 content:// tree URI（getDirectoryPath 在分区存储下
     // 返回真实路径，dart:io 列不出文件）；桌面/其它平台为真实路径，走 dart:io。
@@ -246,8 +248,8 @@ class _ImportMediaScreenState extends State<ImportMediaScreen> {
               ),
               const SizedBox(height: AppTokens.spaceMd),
 
-              // 选择目录按钮（Outlined）。鸿蒙目录选择不可用，降级为提示行。
-              if (PlatformService.instance.isOHOS)
+              // 选择目录按钮（Outlined）。鸿蒙手机目录选择不可用，降级为提示行。
+              if (PlatformService.instance.isOHOSPhone)
                 OhosFolderImportHint(l10n: l10n)
               else
                 SizedBox(

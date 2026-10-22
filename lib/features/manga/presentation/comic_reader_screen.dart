@@ -11,7 +11,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'package:window_manager/window_manager.dart';
 import 'package:comic_motion/comic_motion.dart'
     show MemoryPipelineResult, MotionCancelToken, processBytesInBackground;
 import 'package:nexhub/generated/app_localizations.dart';
@@ -20,6 +19,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../../../core/platform/brightness_compat.dart';
+import '../../../core/platform/window_service.dart';
 
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/scraper/http_fetcher.dart';
@@ -825,8 +825,8 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 整目录递归删除——此前解压产物平铺在系统临时目录、只靠 OS 兜底清理。
   final List<String> _archiveTempDirs = <String>[];
 
-  /// 桌面形态平台（Windows / Linux / macOS，非 Web）：启用 window_manager 真实
-  /// 全屏与键盘快捷键。移动端（含鸿蒙手机）走 SystemChrome。
+  /// 桌面形态平台（Windows / Linux / macOS / 鸿蒙 PC，非 Web）：启用真窗口全屏 /
+  /// 与键盘快捷键。移动端（含鸿蒙手机）走 SystemChrome。
   bool get _isDesktop => PlatformService.instance.isDesktopForm;
 
   /// 进入阅读器期间上调 Flutter 图片缓存预算（资源/内存）：按设备物理内存
@@ -1422,13 +1422,17 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
     _webtoonLastPageTimer?.cancel();
     _webtoonLastPageTimeout?.cancel();
     try {
-      SystemChrome.setPreferredOrientations(<DeviceOrientation>[]);
+      if (PlatformService.instance.isMobile) {
+        SystemChrome.setPreferredOrientations(<DeviceOrientation>[]);
+      }
     } on Object {
       // 测试环境忽略。
     }
     try {
       // 退出阅读器：恢复系统 UI 模式（沉浸全屏 → edgeToEdge）。
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      if (PlatformService.instance.isMobile) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
     } on Object {
       // 测试环境忽略。
     }
@@ -1441,7 +1445,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
         try {
           // 仅在确实处于 OS 全屏时才退出——否则 setFullScreen(false) 也会做无谓的
           // 窗口样式重建（SetWindowLongPtr + SetWindowPos），可能触发冻结。
-          if (await WindowManager.instance.isFullScreen()) {
+          if (await WindowService.instance.isFullScreen()) {
             await _requestOsFullscreen(false);
           }
         } on Object {
@@ -3695,14 +3699,15 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
 
   // ─────────────────────── 音量键翻页 ───────────────────────
 
-  /// 按当前偏好同步音量键监听：Android / 鸿蒙且开启 [ReaderPreferences.volumeKeyPageTurn]
+  /// 按当前偏好同步音量键监听：Android / 鸿蒙手机且开启 [ReaderPreferences.volumeKeyPageTurn]
   /// 时通过 [VolumeKeyListener] 挂载原生拦截（彻底消费按键事件，阻止系统
   /// 音量条弹出），否则停止并恢复系统默认音量键行为。调用点：[_init]、
   /// [_applySettingsAuto]、[_onPrefsChanged]（偏好变化后即时生效）。
   Future<void> _syncVolumeKey() async {
     // 音量键拦截走原生通道：Android dispatchKeyEvent / 鸿蒙 inputConsumer。
     final bool want = _prefs.volumeKeyPageTurn &&
-        (PlatformService.instance.isAndroid || PlatformService.instance.isOHOS);
+        (PlatformService.instance.isAndroid ||
+            PlatformService.instance.isOHOSPhone);
     if (want) {
       // Bug1 修复：async + try/catch，启动失败（原生通道未就绪/订阅异常）不再被
       // unawaited 静默吞掉，写日志便于实机排查。
@@ -4144,8 +4149,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
     final next = (cur + 1) % 4;
     setState(() {
       _pageRotations[idx] = next;
-      // 单页旋转 + rotateLandscape：强制横屏。
-      if (_prefs.rotateLandscape && next != 0) {
+      // 单页旋转 + rotateLandscape：强制横屏（仅移动形态）。
+      if (PlatformService.instance.isMobile &&
+          _prefs.rotateLandscape &&
+          next != 0) {
         // 与 _applyOrientation 协同：仅当 orientation 为 default/followSystem 时
         // 才临时切横屏，否则尊重用户锁定的方向。
         if (_prefs.orientation == ScreenOrientation.defaultMode ||
@@ -4282,7 +4289,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   Future<void> _requestOsFullscreen(bool on) async {
     await Future.delayed(Duration.zero);
     try {
-      await WindowManager.instance.setFullScreen(on);
+      await WindowService.instance.setFullScreen(on);
       _osFullscreenEntered = on;
     } on Object {
       // 测试 / headless 环境忽略。
@@ -4320,7 +4327,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// （避免 window_manager 0.3.9 无谓的窗口样式重建触发冻结）。
   Future<void> _applyDesktopFullscreen(bool want) async {
     try {
-      final bool isFs = await WindowManager.instance.isFullScreen();
+      final bool isFs = await WindowService.instance.isFullScreen();
       if (isFs != want) {
         await _requestOsFullscreen(want);
       }
@@ -4350,7 +4357,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
         // （A/D 验收「按 Esc 后画面冻住、只能 resize 恢复」的直接根因之一）。
         unawaited(() async {
           try {
-            if (await WindowManager.instance.isFullScreen()) {
+            if (await WindowService.instance.isFullScreen()) {
               await _requestOsFullscreen(false);
             }
           } on Object {
@@ -4505,7 +4512,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   Future<void> _toggleFullscreen() async {
     if (!_isDesktop) return;
     try {
-      final isFs = await WindowManager.instance.isFullScreen();
+      final isFs = await WindowService.instance.isFullScreen();
       final int savedPage = _currentPage;
       final bool wasRestoring = _restoringPage;
       _restoringPage = true;
@@ -4812,6 +4819,8 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   }
 
   void _applyOrientation() {
+    // 方向锁定只对移动形态有意义；鸿蒙 PC / 桌面不产生系统调用。
+    if (!PlatformService.instance.isMobile) return;
     List<DeviceOrientation>? orient;
     switch (_prefs.orientation) {
       case ScreenOrientation.portrait:

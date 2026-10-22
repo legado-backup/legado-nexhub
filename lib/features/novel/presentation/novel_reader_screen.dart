@@ -3847,7 +3847,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 其它平台无实现。
     final bool want = _prefs.volumeKeyPageTurn &&
         (PlatformService.instance.isAndroid ||
-            PlatformService.instance.isOHOS) &&
+            PlatformService.instance.isOHOSPhone) &&
         !ttsActive;
     try {
       if (want) {
@@ -9669,9 +9669,9 @@ class _NovelInlineSettings extends StatelessWidget {
                           onChanged(prefs.copyWith(scrollWheelInverted: v));
                         },
                       ),
-                      // 音量键翻页（Android / 鸿蒙有原生音量键拦截通道）。
+                      // 音量键翻页（Android / 鸿蒙手机有原生音量键拦截通道）。
                       if (PlatformService.instance.isAndroid ||
-                          PlatformService.instance.isOHOS)
+                          PlatformService.instance.isOHOSPhone)
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(l10n.readerVolumeKeyPageTurn),

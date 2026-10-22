@@ -6,7 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'core/player/player_runtime.dart';
 import 'core/platform/platform_service.dart';
-import 'package:window_manager/window_manager.dart';
+import 'core/platform/window_service.dart';
 import 'core/network/runtime/nexhub_http_overrides.dart';
 import 'core/debug/crash_log.dart';
 import 'core/utils/app_log.dart';
@@ -23,6 +23,9 @@ void main() {
   // 却无任何提示。渲染错误时不再是纯黑，而是给出可读的错误详情，便于定位根因。
   runZonedGuarded<void>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // 鸿蒙需要原生 deviceType 才能区分手机 / PC；非鸿蒙立即返回。
+    await PlatformService.instance.initializeFormFactor();
 
     // 内置开源字体许可（SIL OFL 1.1 要求随字体分发许可全文）。字体文件见
     // pubspec.yaml fonts 段，许可全文位于 assets/licenses/fonts/，注册进
@@ -65,7 +68,10 @@ void main() {
     // 全局统一 edge-to-edge（手势条区域透明）：与阅读器 / 播放器退出全屏后的
     // 还原状态保持一致，修复「退出全屏后底栏被系统手势条遮挡」。Android 15+
     // 强制 edge-to-edge，此处提前统一，避免进出全屏时系统 UI 模式跳变。
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // 仅移动形态调用：鸿蒙 PC / 传统桌面不触碰窗口与系统栏。
+    if (PlatformService.instance.isMobile) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
 
     // 全局网络覆盖：接管所有 dart:io HttpClient 派生流量（散落的独立
     // Dio/HttpClient、cached_network_image、下载器、云同步等）。此时用默认
@@ -124,13 +130,8 @@ void main() {
     // ensureInitialized，其原生侧会在已运行的消息循环中重挂窗口钩子，与 Flutter
     // 渲染管道相互等待，表现为「进入 / 退出阅读器画面完全冻结，只有手动 resize
     // 窗口才能恢复」，且此后 setFullScreen / isFullScreen 全部失效（F11、Esc 无反应）。
-    if (PlatformService.instance.isDesktopForm) {
-      try {
-        await windowManager.ensureInitialized();
-      } catch (e, st) {
-        debugPrint('windowManager.ensureInitialized failed: $e\n$st');
-      }
-    }
+    // 传统桌面由此初始化 window_manager；鸿蒙 PC 走自建窗口通道，无需初始化。
+    await WindowService.instance.initialize();
 
     // 后台播放 + 系统媒体通知（audio_service / audio_session）。
     // 幂等初始化：注册平台媒体会话与音频打断/拔耳机处理。失败不影响前台播放，

@@ -14,6 +14,7 @@ import 'core/download/download_manager.dart';
 import 'core/settings/general_settings.dart';
 import 'core/services/software_announcement_service.dart';
 import 'core/widgets/software_announcement_dialog.dart';
+import 'core/widgets/app_scroll_behavior.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
@@ -74,6 +75,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'nexhub',
           debugShowCheckedModeBanner: false,
+          scrollBehavior: const AppScrollBehavior(),
           // 桥接仍基于框架 flutter/material 的第三方包（flutter_js / inappwebview / media_kit）
           builder: (BuildContext context, Widget? child) {
             // 全局系统栏兜底：导航栏透明 + 图标亮度随主题（详见

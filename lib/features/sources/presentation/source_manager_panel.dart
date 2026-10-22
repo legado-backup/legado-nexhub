@@ -27,10 +27,11 @@ import 'source_login_screen.dart';
 import 'source_mirror_screen.dart';
 import 'package:nexhub/core/navigation/app_page_route.dart';
 import 'package:nexhub/core/widgets/app_alert_dialog.dart';
+import '../../../core/local/folder_import.dart';
 import '../../../core/local/local_content_manager.dart' show isAndroidSafUri;
 import '../../../core/platform/platform_service.dart';
 import '../../../core/local/saf_bridge.dart'
-    show listFolderSourceFilesSaf, pickFolderPath, readSourceText, safBaseName;
+    show listFolderSourceFilesSaf, readSourceText, safBaseName;
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/utils/app_log.dart';
 
@@ -129,9 +130,9 @@ class _SourceManagerPanelState extends State<SourceManagerPanel> {
               ),
             ),
             const SizedBox(width: AppTokens.spaceSm),
-            // 鸿蒙：目录选择接口不可用（已知缺陷 U2），隐藏文件夹导入入口，
-            // 源 JSON 走「选择文件」逐个导入。
-            if (!PlatformService.instance.isOHOS)
+            // 鸿蒙手机：目录选择接口不可用（已知缺陷 U2），隐藏文件夹导入入口，
+            // 源 JSON 走「选择文件」逐个导入；鸿蒙 PC 已支持目录导入。
+            if (!PlatformService.instance.isOHOSPhone)
               Expanded(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.folder_rounded),
@@ -196,9 +197,9 @@ class _SourceManagerPanelState extends State<SourceManagerPanel> {
   }
 
   Future<void> _pickLocalFolder() async {
-    // 安卓必须用 pickFolderPath()（内部走 saf.pickDirectory 拿 content:// tree URI）；
-    // 直接 getDirectoryPath 在分区存储下返回真实路径，dart:io 列不出文件 → 误报空。
-    final dirPath = await pickFolderPath();
+    // Android 必须用 FolderImport.pick（内部走 saf.pickDirectory 拿 content:// tree URI）；
+    // 鸿蒙 PC 走系统目录选择并复制进沙箱；其余平台为真实路径。
+    final dirPath = await FolderImport.pick(context);
     if (dirPath == null || dirPath.isEmpty) return;
     List<String> files;
     try {

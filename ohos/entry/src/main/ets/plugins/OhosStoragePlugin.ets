@@ -28,6 +28,12 @@ interface DownloadDirResult {
   path: string;
 }
 
+interface PickDirectoryResult {
+  uri: string;
+  path: string;
+  name: string;
+}
+
 /**
  * 应用级文件存储通道（鸿蒙专用）。
  *
@@ -109,6 +115,12 @@ export default class OhosStoragePlugin implements FlutterPlugin, AbilityAware, M
       case 'closeWrite':
         this.closeWrite(call, result);
         return;
+      case 'pickDirectory':
+        this.pickDirectory(result);
+        return;
+      case 'copyDirectoryToImport':
+        this.copyDirectoryToImport(call, result);
+        return;
       case 'copyToCache':
         this.copyToCache(call, result);
         return;
@@ -160,6 +172,93 @@ export default class OhosStoragePlugin implements FlutterPlugin, AbilityAware, M
       const err = e as BusinessError;
       hilog.error(0x0000, TAG, 'requestDownloadDir setup failure: %{public}s', err.message);
       result.error('picker_setup_failed', `${err.message}`, '');
+    }
+  }
+
+  private pickDirectory(result: MethodResult): void {
+    const context: common.UIAbilityContext | null = this.uiContext;
+    if (context == null) {
+      hilog.error(0x0000, TAG, 'pickDirectory no ui context');
+      result.error('no_context', 'UIAbility context is null', '');
+      return;
+    }
+    try {
+      const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
+      // FOLDER 模式仅 2in1 具备；插件不按机型拦截，由 Dart 侧只在 isOHOSPC 调用。
+      options.selectMode = picker.DocumentSelectMode.FOLDER;
+      options.maxSelectNumber = 1;
+      const documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
+      documentPicker.select(options).then((uris: Array<string>) => {
+        if (uris == null || uris.length === 0 || uris[0] == null || uris[0].length === 0) {
+          hilog.info(0x0000, TAG, 'pickDirectory canceled');
+          result.success(null);
+          return;
+        }
+        const dirUri: string = uris[0];
+        try {
+          const dirPath: string = new fileUri.FileUri(dirUri).path;
+          const payload: PickDirectoryResult = {
+            uri: dirUri,
+            path: dirPath,
+            name: baseName(dirPath)
+          };
+          hilog.info(0x0000, TAG, 'pickDirectory ok: %{public}s', dirPath);
+          result.success(payload);
+        } catch (e) {
+          const err = e as BusinessError;
+          hilog.error(0x0000, TAG, 'pickDirectory resolve failure: %{public}d %{public}s',
+            err.code, err.message);
+          result.error('dir_resolve_failed', `${err.code} ${err.message}`, '');
+        }
+      }).catch((e: BusinessError) => {
+        hilog.error(0x0000, TAG, 'pickDirectory rejected: %{public}d %{public}s', e.code, e.message);
+        result.error('picker_failed', `${e.code} ${e.message}`, '');
+      });
+    } catch (e) {
+      const err = e as BusinessError;
+      hilog.error(0x0000, TAG, 'pickDirectory setup failure: %{public}s', err.message);
+      result.error('picker_setup_failed', `${err.message}`, '');
+    }
+  }
+
+  private async copyDirectoryToImport(call: MethodCall, result: MethodResult): Promise<void> {
+    const context: common.UIAbilityContext | null = this.uiContext;
+    if (context == null) {
+      hilog.error(0x0000, TAG, 'copyDirectoryToImport no ui context');
+      result.error('no_context', 'UIAbility context is null', '');
+      return;
+    }
+    const srcPath: string = call.argument('srcPath');
+    const name: string = call.argument('name');
+    if (srcPath == null || srcPath.length === 0) {
+      result.error('bad_args', 'srcPath is empty', '');
+      return;
+    }
+    // 时间戳做成父目录、原目录名做最后一段：导入页用 p.basename(dest) 作为
+    // 书名 / 媒体名，不能带时间戳；父目录保证重复导入不覆盖。
+    const batchDir: string = `${context.filesDir}/imports/${Date.now()}`;
+    const dest: string = `${batchDir}/${sanitizeFolderName(name)}`;
+    try {
+      if (!fileIo.accessSync(srcPath)) {
+        result.error('src_missing', `cannot access ${srcPath}`, '');
+        return;
+      }
+      fileIo.mkdirSync(batchDir, true);
+      await fileIo.copyDir(srcPath, dest);
+      hilog.info(0x0000, TAG, 'copyDirectoryToImport ok: %{public}s -> %{public}s', srcPath, dest);
+      result.success(dest);
+    } catch (e) {
+      // 失败时递归删除本次批次目录，避免沙箱残留半成品。
+      try {
+        if (fileIo.accessSync(batchDir)) {
+          fileIo.rmdirSync(batchDir);
+        }
+      } catch (cleanupError) {
+        const err = cleanupError as BusinessError;
+        hilog.warn(0x0000, TAG, 'copy cleanup failed: %{public}d %{public}s',
+          err.code, err.message);
+      }
+      this.fail(result, 'copy_dir_failed', e);
     }
   }
 
@@ -469,4 +568,29 @@ export default class OhosStoragePlugin implements FlutterPlugin, AbilityAware, M
     hilog.error(0x0000, TAG, '%{public}s: %{public}d %{public}s', code, err.code, err.message);
     result.error(code, `${err.code} ${err.message}`, '');
   }
+}
+
+/** 取路径最后一段（忽略末尾分隔符）。 */
+function baseName(path: string): string {
+  let normalized: string = path;
+  while (normalized.length > 1 && normalized.endsWith('/')) {
+    normalized = normalized.substring(0, normalized.length - 1);
+  }
+  const idx: number = normalized.lastIndexOf('/');
+  return idx >= 0 ? normalized.substring(idx + 1) : normalized;
+}
+
+/** 保留 Unicode 字母 / 数字 / 中文 / - / _，其余替换为 _，最长 48 字符。 */
+function sanitizeFolderName(name: string): string {
+  const raw: string = name == null ? '' : name.trim();
+  let out: string = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch: string = raw.charAt(i);
+    out += /[\p{L}\p{N}_-]/u.test(ch) ? ch : '_';
+  }
+  out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  if (out.length === 0) {
+    return 'folder';
+  }
+  return out.length > 48 ? out.substring(0, 48) : out;
 }

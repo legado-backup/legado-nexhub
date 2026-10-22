@@ -7,10 +7,11 @@ part of 'video_player_screen.dart';
 const Size _kWindowMaxUnconstrained = Size(10000, 10000);
 
 extension _VideoCastPip on _VideoPlayerScreenState {
-  /// 是否桌面形态平台（Windows/macOS/Linux）。
+  /// 是否传统桌面平台（Windows/macOS/Linux）。鸿蒙 PC 不在此列：它走系统 PiP
+  /// （floating），窗口置顶 PiP 仅传统桌面可用。
   bool get _isDesktop {
     try {
-      return PlatformService.instance.isDesktopForm;
+      return PlatformService.instance.isDesktop;
     } on Object {
       return false;
     }
