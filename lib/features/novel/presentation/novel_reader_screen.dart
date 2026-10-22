@@ -104,6 +104,7 @@ import '../../../core/ai/translation_exception.dart';
 import '../../../core/ai/translation_options_store.dart';
 import '../../../core/novel/novel_prescan_manager.dart';
 import '../../settings/presentation/settings_ai_screen.dart';
+import '../../settings/presentation/translation_glossary_screen.dart';
 // 内容编辑：正文编辑持久化管理器（Hive `novel_content_edits`）。
 
 /// 小说阅读器（Phase 4 — Task 19/20）。
@@ -2298,8 +2299,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         novelId: widget.novelId,
         chapterId: chapter.id,
         chapterTitle: chapter.title,
+        chapterIndex: _chapterIndex,
         paragraphs: paragraphs,
         targetLanguage: targetLang,
+        previousChapterId:
+            _chapterIndex > 0 ? widget.chapters[_chapterIndex - 1].id : null,
         manager: NovelTranslationManager(),
         prescanManager: _prescanManager,
         prescanUi: _prescanUi,
@@ -11139,9 +11143,11 @@ class _NovelTranslationSheet extends StatefulWidget {
     required this.novelId,
     required this.chapterId,
     required this.chapterTitle,
+    this.chapterIndex,
     required this.paragraphs,
     required this.targetLanguage,
     required this.manager,
+    this.previousChapterId,
     this.prescanManager,
     this.prescanUi,
     this.onStartPrescan,
@@ -11150,11 +11156,17 @@ class _NovelTranslationSheet extends StatefulWidget {
   final String novelId;
   final String chapterId;
   final String chapterTitle;
+
+  /// 章节序号（术语首次出现章节标记用，可空）。
+  final int? chapterIndex;
   final List<String> paragraphs;
 
   /// 翻译目标语言（取自翻译配置页；兼作缓存 lang 标记）。
   final String targetLanguage;
   final NovelTranslationManager manager;
+
+  /// 前一章 id（缓存存在时取其尾部译文作为本章衔接上下文）。
+  final String? previousChapterId;
 
   /// 全书预扫描（null 时隐藏预扫描入口，如测试环境）。
   final NovelPrescanManager? prescanManager;
@@ -11184,6 +11196,10 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
   bool _polishing = false;
   String? _polishProgress;
   bool _polishEnabled = false;
+
+  /// 自动提取术语的累计结果（本次翻译会话；重译时清零）。
+  int _extractedTerms = 0;
+  int _extractedConflicts = 0;
 
   @override
   void initState() {
@@ -11329,6 +11345,8 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
       _translating = true;
       _error = null;
       _progress = null;
+      _extractedTerms = 0;
+      _extractedConflicts = 0;
     });
     final existing = resume && _checkpoint != null
         ? List<String>.of(_checkpoint!)
@@ -11343,6 +11361,31 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
     } on Object {
       bookContext = null; // 语境读取失败不影响翻译。
     }
+    // 前章已缓存译文 → 本章开头的指代与语气衔接上下文。
+    var previousContext = <({String source, String translation})>[];
+    final prevChapterId = widget.previousChapterId;
+    if (prevChapterId != null) {
+      try {
+        final prev = await widget.manager.load(
+          widget.novelId,
+          prevChapterId,
+          lang: widget.targetLanguage,
+        );
+        final sources = prev?.sources;
+        if (prev != null && sources != null) {
+          previousContext = <({String source, String translation})>[
+            for (var i = 0;
+                i < sources.length && i < prev.translations.length;
+                i++)
+              if (sources[i].trim().isNotEmpty &&
+                  prev.translations[i].trim().isNotEmpty)
+                (source: sources[i], translation: prev.translations[i]),
+          ];
+        }
+      } on Object {
+        // 前章未译或读取失败：按无跨章上下文翻译。
+      }
+    }
     try {
       final result = await NovelTranslationService(
         targetLanguage: widget.targetLanguage,
@@ -11351,6 +11394,18 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
         workId: widget.novelId,
         existing: existing,
         bookContext: bookContext,
+        previousChapterContext: previousContext,
+        chapterId: widget.chapterId,
+        chapterTitle: widget.chapterTitle,
+        chapterIndex: widget.chapterIndex,
+        // 术语提取逐块累计，完成后在面板内展示并可直接进入裁决。
+        onGlossaryExtracted: (summary) {
+          if (!mounted || seq != _runSeq || summary.isEmpty) return;
+          setState(() {
+            _extractedTerms += summary.changed;
+            _extractedConflicts += summary.conflicts;
+          });
+        },
         // 每个分块完成即落盘检查点，中断后可从断点续译。
         onChunkPersisted: (snapshot) {
           if (seq != _runSeq) return;
@@ -11527,6 +11582,46 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
     );
   }
 
+  Future<void> _openGlossary() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TranslationGlossaryScreen(workId: widget.novelId),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  /// 自动提取结果行：收录/冲突计数 + 直达作品术语表裁决。
+  Widget _glossaryExtractRow(AppLocalizations l10n, ColorScheme scheme) {
+    if (_extractedTerms == 0 && _extractedConflicts == 0) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(
+          left: AppTokens.spaceMd,
+          right: AppTokens.spaceMd,
+          bottom: AppTokens.spaceXs),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.menu_book_rounded, size: 14, color: scheme.primary),
+          const SizedBox(width: AppTokens.spaceXs),
+          Expanded(
+            child: Text(
+              l10n.glossaryExtractedNotice(
+                  _extractedTerms, _extractedConflicts),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            onPressed: _openGlossary,
+            child: Text(l10n.glossaryExtractedOpen,
+                style: const TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -11545,6 +11640,11 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
                       l10n.novelParagraphTranslate,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.glossaryTitle,
+                    onPressed: _openGlossary,
+                    icon: const Icon(Icons.menu_book_rounded, size: 20),
                   ),
                   FilledButton.icon(
                     onPressed: _translating || widget.paragraphs.isEmpty
@@ -11587,6 +11687,7 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
                 ),
               ),
             _prescanRow(l10n, scheme),
+            _glossaryExtractRow(l10n, scheme),
             // 润色入口与初译/润色对照切换。
             if (!_translating && _translations != null && _polishEnabled)
               _polishRow(l10n, scheme),

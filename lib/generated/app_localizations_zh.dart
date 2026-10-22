@@ -8561,6 +8561,78 @@ class AppLocalizationsZh extends AppLocalizations {
   String get glossaryOpen => '术语表编辑器';
 
   @override
+  String get glossaryWorkTitle => '作品术语表';
+
+  @override
+  String get glossaryScopeGlobal => '全局术语表 · 所有作品生效';
+
+  @override
+  String get glossaryScopeWork => '当前作品 + 全局术语';
+
+  @override
+  String glossaryConflictsTitle(int count) {
+    return '待裁决术语冲突（$count）';
+  }
+
+  @override
+  String get glossaryConflictExisting => '既有译名';
+
+  @override
+  String get glossaryConflictProposed => '本次译法';
+
+  @override
+  String glossaryConflictChapter(String chapter) {
+    return '出自：$chapter';
+  }
+
+  @override
+  String get glossaryConflictAdopt => '采用新译法';
+
+  @override
+  String get glossaryConflictKeep => '保留原译名';
+
+  @override
+  String get glossaryConflictResolved => '冲突已裁决';
+
+  @override
+  String get glossaryConflictBadge => '待裁决';
+
+  @override
+  String get glossaryGlobalEntryHint => '全局条目，请到全局术语表修改或删除';
+
+  @override
+  String get glossaryTypeTerm => '术语';
+
+  @override
+  String get glossaryTypePerson => '人名';
+
+  @override
+  String get glossaryTypePlace => '地名';
+
+  @override
+  String get glossaryTypeOrg => '组织';
+
+  @override
+  String get glossaryTypeAppellation => '称谓';
+
+  @override
+  String get glossaryTypeHonorific => '敬称';
+
+  @override
+  String get glossaryTypeSpeech => '口癖';
+
+  @override
+  String get glossaryTypeFixed => '固定表达';
+
+  @override
+  String glossaryExtractedNotice(int terms, int conflicts) {
+    return '已收录 $terms 个术语，$conflicts 个待裁决';
+  }
+
+  @override
+  String get glossaryExtractedOpen => '查看';
+
+  @override
   String get translationStyle => '翻译风格';
 
   @override
@@ -8587,6 +8659,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get translationSubtitleLightweightHint =>
       '字幕译文按行输出、不带编号以省 token；对位失败自动回退编号协议。';
+
+  @override
+  String get translationAutoExtract => '自动提取术语';
+
+  @override
+  String get translationAutoExtractHint =>
+      '每批翻译后自动收录人名、地名与固定译名；发现异译时进入待裁决冲突。关闭可减少请求。';
 
   @override
   String get translationExportLayout => '小说译文附录排版';

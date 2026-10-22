@@ -8778,6 +8778,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String get glossaryOpen => 'Glossary editor';
 
   @override
+  String get glossaryWorkTitle => 'Work glossary';
+
+  @override
+  String get glossaryScopeGlobal => 'Global glossary · applies to all works';
+
+  @override
+  String get glossaryScopeWork => 'This work + global glossary';
+
+  @override
+  String glossaryConflictsTitle(int count) {
+    return 'Glossary conflicts to resolve ($count)';
+  }
+
+  @override
+  String get glossaryConflictExisting => 'Current translation';
+
+  @override
+  String get glossaryConflictProposed => 'Translation seen this batch';
+
+  @override
+  String glossaryConflictChapter(String chapter) {
+    return 'From: $chapter';
+  }
+
+  @override
+  String get glossaryConflictAdopt => 'Use new translation';
+
+  @override
+  String get glossaryConflictKeep => 'Keep current translation';
+
+  @override
+  String get glossaryConflictResolved => 'Conflict resolved';
+
+  @override
+  String get glossaryConflictBadge => 'Needs review';
+
+  @override
+  String get glossaryGlobalEntryHint =>
+      'Global entry; edit or delete it in the global glossary';
+
+  @override
+  String get glossaryTypeTerm => 'Term';
+
+  @override
+  String get glossaryTypePerson => 'Person';
+
+  @override
+  String get glossaryTypePlace => 'Place';
+
+  @override
+  String get glossaryTypeOrg => 'Organization';
+
+  @override
+  String get glossaryTypeAppellation => 'Title';
+
+  @override
+  String get glossaryTypeHonorific => 'Honorific';
+
+  @override
+  String get glossaryTypeSpeech => 'Verbal tic';
+
+  @override
+  String get glossaryTypeFixed => 'Fixed expression';
+
+  @override
+  String glossaryExtractedNotice(int terms, int conflicts) {
+    return '$terms terms added, $conflicts conflicts to resolve';
+  }
+
+  @override
+  String get glossaryExtractedOpen => 'View';
+
+  @override
   String get translationStyle => 'Translation style';
 
   @override
@@ -8805,6 +8878,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get translationSubtitleLightweightHint =>
       'Subtitles are output line-by-line without numbering to save tokens; falls back to numbered protocol automatically when alignment fails.';
+
+  @override
+  String get translationAutoExtract => 'Auto-extract glossary';
+
+  @override
+  String get translationAutoExtractHint =>
+      'After each batch, collect character names, places and fixed renderings; differing renderings become conflicts to resolve. Turn off to reduce requests.';
 
   @override
   String get translationExportLayout => 'Novel translation appendix layout';

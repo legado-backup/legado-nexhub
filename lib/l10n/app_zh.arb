@@ -4688,6 +4688,52 @@
     }
   },
   "glossaryOpen": "术语表编辑器",
+  "glossaryWorkTitle": "作品术语表",
+  "glossaryScopeGlobal": "全局术语表 · 所有作品生效",
+  "glossaryScopeWork": "当前作品 + 全局术语",
+  "glossaryConflictsTitle": "待裁决术语冲突（{count}）",
+  "@glossaryConflictsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "glossaryConflictExisting": "既有译名",
+  "glossaryConflictProposed": "本次译法",
+  "glossaryConflictChapter": "出自：{chapter}",
+  "@glossaryConflictChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "String"
+      }
+    }
+  },
+  "glossaryConflictAdopt": "采用新译法",
+  "glossaryConflictKeep": "保留原译名",
+  "glossaryConflictResolved": "冲突已裁决",
+  "glossaryConflictBadge": "待裁决",
+  "glossaryGlobalEntryHint": "全局条目，请到全局术语表修改或删除",
+  "glossaryTypeTerm": "术语",
+  "glossaryTypePerson": "人名",
+  "glossaryTypePlace": "地名",
+  "glossaryTypeOrg": "组织",
+  "glossaryTypeAppellation": "称谓",
+  "glossaryTypeHonorific": "敬称",
+  "glossaryTypeSpeech": "口癖",
+  "glossaryTypeFixed": "固定表达",
+  "glossaryExtractedNotice": "已收录 {terms} 个术语，{conflicts} 个待裁决",
+  "@glossaryExtractedNotice": {
+    "placeholders": {
+      "terms": {
+        "type": "int"
+      },
+      "conflicts": {
+        "type": "int"
+      }
+    }
+  },
+  "glossaryExtractedOpen": "查看",
   "translationStyle": "翻译风格",
   "translationStyleStandard": "标准",
   "translationStyleColloquial": "口语化",
@@ -4697,6 +4743,8 @@
   "translationCotHint": "翻译前先让模型理解语境与术语，质量更高但更慢、更贵；适合短篇/低批量场景。",
   "translationSubtitleLightweight": "字幕轻量输出",
   "translationSubtitleLightweightHint": "字幕译文按行输出、不带编号以省 token；对位失败自动回退编号协议。",
+  "translationAutoExtract": "自动提取术语",
+  "translationAutoExtractHint": "每批翻译后自动收录人名、地名与固定译名；发现异译时进入待裁决冲突。关闭可减少请求。",
   "translationExportLayout": "小说译文附录排版",
   "translationLayoutTranslationFirst": "译文优先",
   "translationLayoutSourceFirst": "原文优先",

@@ -203,6 +203,62 @@ void main() {
         '',
       );
     });
+
+    test('术语段：按出现约束 + 未列出沿用前文；最多 80 条', () {
+      final section = PromptBuilder.glossarySection(const <GlossaryEntry>[
+        GlossaryEntry(id: '1', term: 'サクラ', preferred: '小樱'),
+      ]);
+      expect(section, contains('原文确实出现以下词条时'));
+      expect(section, contains('未列出的专名沿用前文译法'));
+
+      final many = <GlossaryEntry>[
+        for (var i = 1; i <= 85; i++)
+          GlossaryEntry(id: '$i', term: 'T$i', preferred: '译$i'),
+      ];
+      final capped = PromptBuilder.glossarySection(many);
+      expect(capped, contains('T80→译80'));
+      expect(capped, isNot(contains('T81→译81')));
+    });
+
+    test('小说提示词：前文译文 + 下一段原文 + 断句续译规则', () {
+      final p = PromptBuilder.novelSystemPrompt(
+        lang: '中文',
+        paragraphCount: 2,
+        recentTranslations: <({String source, String translation})>[
+          (source: '前段原文', translation: '前段译文'),
+        ],
+        nextSource: '下一段原文内容',
+      );
+      expect(p, contains('前文译文'));
+      expect(p, contains('原文：前段原文'));
+      expect(p, contains('译文：前段译文'));
+      expect(p, contains('下一段原文'));
+      expect(p, contains('下一段原文内容'));
+      expect(p, contains('不要翻译或输出它'));
+      expect(p, contains('不要擅自补全或收束'));
+    });
+
+    test('上下文渲染只取最近 12 段', () {
+      final pairs = <({String source, String translation})>[
+        for (var i = 1; i <= 20; i++)
+          (source: '原文$i', translation: '译文$i'),
+      ];
+      final section = PromptBuilder.recentTranslationsSection(pairs);
+      expect(section, isNot(contains('原文：原文8')));
+      expect(section, contains('原文：原文9'));
+      expect(section, contains('原文：原文20'));
+    });
+
+    test('润色提示词：断句续译规则 + 下一段原文', () {
+      final p = PromptBuilder.polishSystemPrompt(
+        lang: '中文',
+        paragraphCount: 2,
+        nextSource: '润色后的下一段',
+      );
+      expect(p, contains('不要擅自补全或收束'));
+      expect(p, contains('润色后的下一段'));
+      expect(p, contains('不要翻译或输出它'));
+    });
   });
 
   // ───────────────────：BatchProtocol.decodeLoose ───────────────────

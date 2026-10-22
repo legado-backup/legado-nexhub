@@ -4732,6 +4732,52 @@
     }
   },
   "glossaryOpen": "Glossary editor",
+  "glossaryWorkTitle": "Work glossary",
+  "glossaryScopeGlobal": "Global glossary · applies to all works",
+  "glossaryScopeWork": "This work + global glossary",
+  "glossaryConflictsTitle": "Glossary conflicts to resolve ({count})",
+  "@glossaryConflictsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "glossaryConflictExisting": "Current translation",
+  "glossaryConflictProposed": "Translation seen this batch",
+  "glossaryConflictChapter": "From: {chapter}",
+  "@glossaryConflictChapter": {
+    "placeholders": {
+      "chapter": {
+        "type": "String"
+      }
+    }
+  },
+  "glossaryConflictAdopt": "Use new translation",
+  "glossaryConflictKeep": "Keep current translation",
+  "glossaryConflictResolved": "Conflict resolved",
+  "glossaryConflictBadge": "Needs review",
+  "glossaryGlobalEntryHint": "Global entry; edit or delete it in the global glossary",
+  "glossaryTypeTerm": "Term",
+  "glossaryTypePerson": "Person",
+  "glossaryTypePlace": "Place",
+  "glossaryTypeOrg": "Organization",
+  "glossaryTypeAppellation": "Title",
+  "glossaryTypeHonorific": "Honorific",
+  "glossaryTypeSpeech": "Verbal tic",
+  "glossaryTypeFixed": "Fixed expression",
+  "glossaryExtractedNotice": "{terms} terms added, {conflicts} conflicts to resolve",
+  "@glossaryExtractedNotice": {
+    "placeholders": {
+      "terms": {
+        "type": "int"
+      },
+      "conflicts": {
+        "type": "int"
+      }
+    }
+  },
+  "glossaryExtractedOpen": "View",
   "translationStyle": "Translation style",
   "translationStyleStandard": "Standard",
   "translationStyleColloquial": "Colloquial",
@@ -4741,6 +4787,8 @@
   "translationCotHint": "Let the model reason about context and terminology before translating. Higher quality but slower and more costly; best for short passages.",
   "translationSubtitleLightweight": "Lightweight subtitle output",
   "translationSubtitleLightweightHint": "Subtitles are output line-by-line without numbering to save tokens; falls back to numbered protocol automatically when alignment fails.",
+  "translationAutoExtract": "Auto-extract glossary",
+  "translationAutoExtractHint": "After each batch, collect character names, places and fixed renderings; differing renderings become conflicts to resolve. Turn off to reduce requests.",
   "translationExportLayout": "Novel translation appendix layout",
   "translationLayoutTranslationFirst": "Translation first",
   "translationLayoutSourceFirst": "Source first",

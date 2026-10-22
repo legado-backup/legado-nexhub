@@ -20,6 +20,7 @@ class TranslationOptionsStore {
   static const String _kExportLayout = 'novel_translation_export_layout_v1';
   static const String _kSubtitleLightweight = 'subtitle_translation_lightweight_v1';
   static const String _kPolish = 'translation_polish_v1';
+  static const String _kAutoExtract = 'translation_auto_extract_v1';
 
   static const String _styleBoxName = 'translation_style_overrides';
 
@@ -111,6 +112,19 @@ class TranslationOptionsStore {
   Future<void> setPolishEnabled(bool v) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kPolish, v ? '1' : '0');
+  }
+
+  // ─────────────────── 自动提取术语───────────────────
+
+  /// 翻译后自动提取术语（默认开启；每批产生一次小请求，失败静默跳过）。
+  Future<bool> getAutoExtractEnabled() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kAutoExtract) != '0';
+  }
+
+  Future<void> setAutoExtractEnabled(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kAutoExtract, v ? '1' : '0');
   }
 
   // ─────────────────── 小说导出排版───────────────────

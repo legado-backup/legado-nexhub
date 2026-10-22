@@ -85,6 +85,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
   bool _trCot = false;
   bool _trSubtitleLightweight = true;
   bool _trPolish = false;
+  bool _trAutoExtract = true;
   String _trExportLayout = 'translationFirst';
 
   final TranslationOptionsStore _trOptions = TranslationOptionsStore();
@@ -256,6 +257,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
     final trCot = await _trOptions.getCotEnabled();
     final trLightweight = await _trOptions.getSubtitleLightweight();
     final trPolish = await _trOptions.getPolishEnabled();
+    final trAutoExtract = await _trOptions.getAutoExtractEnabled();
     final trExportLayout = await _trOptions.getNovelExportLayout();
     // 漫画翻译 / 视频翻译：同样只回显功能级填写内容（与通用一致时留空）。
     final comicCfg = await _settings.getComicTranslationConfig();
@@ -309,6 +311,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
       _trCot = trCot;
       _trSubtitleLightweight = trLightweight;
       _trPolish = trPolish;
+      _trAutoExtract = trAutoExtract;
       _trExportLayout = trExportLayout;
 
       _comicBaseCtrl.text = cBase;
@@ -415,6 +418,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
       await _trOptions.setCotEnabled(_trCot);
       await _trOptions.setSubtitleLightweight(_trSubtitleLightweight);
       await _trOptions.setPolishEnabled(_trPolish);
+      await _trOptions.setAutoExtractEnabled(_trAutoExtract);
       await _trOptions.setNovelExportLayout(_trExportLayout);
       await _settings.saveComicTranslationConfig(NovelSummaryConfig(
         baseUrl: _comicBaseCtrl.text.trim(),
@@ -745,6 +749,13 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                   subtitle: l10n.translationSubtitleLightweightHint,
                   value: _trSubtitleLightweight,
                   onChanged: (v) => setState(() => _trSubtitleLightweight = v),
+                ),
+                // 翻译后自动提取术语（默认开启；异译进冲突待裁决）。
+                SettingsSwitchTile(
+                  title: l10n.translationAutoExtract,
+                  subtitle: l10n.translationAutoExtractHint,
+                  value: _trAutoExtract,
+                  onChanged: (v) => setState(() => _trAutoExtract = v),
                 ),
                 const SizedBox(height: AppTokens.spaceMd),
                 // 术语表编辑器入口。

@@ -11,6 +11,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/ai/batch_protocol.dart';
 import '../../../core/ai/glossary_manager.dart';
+import '../../../core/ai/glossary_matcher.dart';
 import '../../../core/ai/prompt_builder.dart';
 import '../../../core/ai/translation_exception.dart';
 import '../../../core/utils/app_log.dart';
@@ -55,7 +56,8 @@ class NovelPolishService {
         lang,
         user.toString(),
         trChunk.length,
-        glossary: glossary,
+        glossary: GlossaryMatcher.entriesInTexts(glossary, srcChunk),
+        nextSource: _nextNonEmpty(sources, end),
       );
       final parsed = BatchProtocol.decode(raw, trChunk.length);
       if (parsed == null) {
@@ -69,12 +71,21 @@ class NovelPolishService {
     return result;
   }
 
+  static String? _nextNonEmpty(List<String> sources, int from) {
+    for (var i = from; i < sources.length; i++) {
+      final text = sources[i].trim();
+      if (text.isNotEmpty) return text;
+    }
+    return null;
+  }
+
   Future<String> _requestBatch(
     NovelSummaryConfig cfg,
     String lang,
     String user,
     int count, {
     List<GlossaryEntry> glossary = const <GlossaryEntry>[],
+    String? nextSource,
   }) async {
     final trimmedBase = cfg.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     try {
@@ -100,6 +111,7 @@ class NovelPolishService {
                 lang: lang,
                 paragraphCount: count,
                 glossary: glossary,
+                nextSource: nextSource,
               ),
             },
             <String, dynamic>{'role': 'user', 'content': user},

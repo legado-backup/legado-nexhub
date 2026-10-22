@@ -10,9 +10,10 @@
 /// 先试再败只会白付一次大请求的 token/延迟；
 /// - **分块回退**：批量解析段数不齐 / 请求失败时按 [batchSize] 分块重试；
 /// - **术语表与提示词**：system prompt 由 [PromptBuilder] 组装
-/// （术语表 + 风格预设 + CoT + 作品语境），术语冲突在响应侧检测入日志；
-/// - **块间衔接**：每块请求携带上一块最后 2 段的原文+译文，
-/// 缓解代词指代与语气断裂；
+/// （按本批出现过滤的术语表 + 风格预设 + CoT + 作品语境），
+/// 术语冲突在响应侧检测入日志；
+/// - **衔接上下文**：块间携带 [RollingContext] 的尾部原文+译文，
+/// 并预读下一段原文帮助判断段末断句；跨章可由调用方传入前章尾部；
 /// - **断点续译**：[existing] 传入已完成的部分译文（空串 = 待译），
 /// 已完成块直接复用不发请求；[onChunkPersisted] 供调用方逐块落盘检查点；
 /// - 译文由调用方经 [NovelTranslationManager] 持久化（导出附带同源）。
@@ -24,8 +25,11 @@ import '../../../core/ai/batch_protocol.dart';
 import '../../../core/ai/bing_translation_client.dart';
 import '../../../core/ai/endpoint_router.dart';
 import '../../../core/ai/vision_translation_client.dart' show AiEndpointConfig;
+import '../../../core/ai/glossary_extractor.dart';
 import '../../../core/ai/glossary_manager.dart';
+import '../../../core/ai/glossary_matcher.dart';
 import '../../../core/ai/prompt_builder.dart';
+import '../../../core/ai/rolling_context.dart';
 import '../../../core/ai/translation_engine_policy.dart';
 import '../../../core/ai/translation_exception.dart';
 import '../../../core/ai/translation_feature_flags.dart';
@@ -35,7 +39,6 @@ import '../../../core/ai/vision_translation_client.dart' show TranslationContext
 import '../../../core/utils/app_log.dart';
 import '../../../../core/novel/novel_translation_manager.dart';
 import 'novel_summary_settings.dart';
-import 'novel_summary_service.dart' show NovelSummaryConfig;
 
 /// 段落翻译服务。
 class NovelTranslationService {
@@ -46,12 +49,14 @@ class NovelTranslationService {
     GlossaryManager? glossary,
     TranslationOptionsStore? options,
     BingTranslationClient? bingClient,
+    GlossaryExtractor? extractor,
   })  : _dio = dio ?? Dio(),
         _settings = settings ?? NovelSummarySettings.instance,
         _targetLanguage = targetLanguage,
         _glossary = glossary ?? GlossaryManager(),
         _options = options ?? TranslationOptionsStore(),
-        _bing = bingClient ?? BingTranslationClient();
+        _bing = bingClient ?? BingTranslationClient(),
+        _extractor = extractor;
 
   final Dio _dio;
   final NovelSummarySettings _settings;
@@ -59,14 +64,17 @@ class NovelTranslationService {
   final TranslationOptionsStore _options;
   final BingTranslationClient _bing;
 
+  /// 术语提取器（null 时按需创建，复用本服务的 Dio 配置）。
+  GlossaryExtractor? _extractor;
+
+  GlossaryExtractor get _glossaryExtractor =>
+      _extractor ??= GlossaryExtractor(dio: _dio);
+
   /// 翻译目标语言（提示词用，默认中文）；null 时运行时读翻译配置页设置。
   final String? _targetLanguage;
 
   /// 单次请求的段落数上限：超过直接分块，避免必然截断的超大请求。
   static const int _kOneShotMaxParagraphs = 40;
-
-  /// 块间衔接段数：每块请求携带上一块最后 2 段的原文+译文。
-  static const int _kChunkContextPairs = 2;
 
   /// 批量协议编码（兼容旧入口；实现收敛于 [BatchProtocol]）。
   static String encodeBatch(List<String> paragraphs) =>
@@ -82,7 +90,13 @@ class NovelTranslationService {
   /// [workId] 用于术语表 / 风格的作品级配置（null 时用全局）；
   /// [existing] 为断点续译的已完成译文（与 [paragraphs] 等长，
   /// 空串表示待译）；[onChunkPersisted] 在每个分块完成后回调当前完整
-  /// 译文快照，供调用方落盘检查点；[bookContext] 为 全书概述注入。
+  /// 译文快照，供调用方落盘检查点；[bookContext] 为 全书概述注入；
+  /// [previousChapterContext] 为前一章尾部原文+译文（跨章衔接，可空）。
+  ///
+  /// 自动术语提取仅在 [workId] 非空且设置开启时运行：每块翻译完成后
+  /// 追加一次小请求，新词/别名落库、异译记冲突；失败静默跳过。
+  /// [chapterId]/[chapterTitle]/[chapterIndex] 仅用于冲突出处展示；
+  /// [onGlossaryExtracted] 逐块回调收录统计，供面板展示状态。
   Future<List<String>> translateParagraphs(
     List<String> paragraphs, {
     int? batchSize,
@@ -91,6 +105,12 @@ class NovelTranslationService {
     List<String> existing = const <String>[],
     void Function(List<String> translatedSoFar)? onChunkPersisted,
     String? bookContext,
+    List<TranslationContextPair> previousChapterContext =
+        const <TranslationContextPair>[],
+    String? chapterId,
+    String? chapterTitle,
+    int? chapterIndex,
+    void Function(GlossaryUpsertSummary summary)? onGlossaryExtracted,
   }) async {
     if (paragraphs.isEmpty) return const <String>[];
     final lang =
@@ -103,10 +123,15 @@ class NovelTranslationService {
     var glossary = const <GlossaryEntry>[];
     var style = TranslationStyle.standard;
     var cot = false;
+    var autoExtract = false;
+    final extractScope = workId?.trim() ?? '';
     try {
       glossary = await _glossary.effectiveEntries(workId, lang);
       style = await _options.effectiveStyle(workId);
       cot = await _options.getCotEnabled();
+      if (extractScope.isNotEmpty) {
+        autoExtract = await _options.getAutoExtractEnabled();
+      }
     } on Object {
       AppLog.instance.w('[小说翻译] 术语表/风格读取失败，按默认注入');
     }
@@ -114,7 +139,7 @@ class NovelTranslationService {
     // 已完成的段落（existing 非空段）直接复用。
     final result = List<String>.generate(
       paragraphs.length,
-      (i) => (i < existing.length ? existing[i] : '') ?? '',
+      (i) => i < existing.length ? existing[i] : '',
     );
     var done = result.where((t) => t.isNotEmpty).length;
     final hasPartial = done > 0;
@@ -171,6 +196,13 @@ class NovelTranslationService {
           style: style,
           cot: cot,
           bookContext: bookContext,
+          previousChapterContext: previousChapterContext,
+          workId: extractScope,
+          autoExtract: autoExtract,
+          chapterId: chapterId,
+          chapterTitle: chapterTitle,
+          chapterIndex: chapterIndex,
+          onGlossaryExtracted: onGlossaryExtracted,
           onProgress: onProgress,
           onChunkPersisted: onChunkPersisted,
         );
@@ -295,9 +327,18 @@ class NovelTranslationService {
     required TranslationStyle style,
     required bool cot,
     required String? bookContext,
+    List<TranslationContextPair> previousChapterContext =
+        const <TranslationContextPair>[],
+    String? workId,
+    bool autoExtract = false,
+    String? chapterId,
+    String? chapterTitle,
+    int? chapterIndex,
+    void Function(GlossaryUpsertSummary summary)? onGlossaryExtracted,
     void Function(int done, int total)? onProgress,
     void Function(List<String> translatedSoFar)? onChunkPersisted,
   }) async {
+    var currentGlossary = glossary;
     // 1) 整章一次批量（最省 token）；超大章或已有断点直接跳过，
     //    必然截断的请求不值得先付一次 token/延迟；失败/解析不齐 → 分块回退。
     final bool tryOneShot = allowOneShot &&
@@ -310,16 +351,39 @@ class NovelTranslationService {
           paragraphs,
           endpoints,
           lang,
-          glossary: glossary,
+          glossary: currentGlossary,
           style: style,
           cot: cot,
           bookContext: bookContext,
+          recentTranslations: previousChapterContext,
         );
         final parsed = parseBatched(oneShot, paragraphs.length);
         if (parsed != null) {
-          _detectGlossaryConflicts(glossary, paragraphs, parsed);
+          _detectGlossaryConflicts(currentGlossary, paragraphs, parsed);
           for (var i = 0; i < result.length; i++) {
             if (!_isDone(paragraphs, result, i)) result[i] = parsed[i];
+          }
+          final summary = await _maybeExtract(
+            endpoints: endpoints,
+            lang: lang,
+            workId: workId,
+            autoExtract: autoExtract,
+            sources: paragraphs,
+            translations: parsed,
+            glossary: currentGlossary,
+            chapterId: chapterId,
+            chapterTitle: chapterTitle,
+            chapterIndex: chapterIndex,
+          );
+          if (summary != null) {
+            onGlossaryExtracted?.call(summary);
+            if (summary.changed > 0) {
+              currentGlossary = await _reloadGlossary(
+                workId,
+                lang,
+                fallback: currentGlossary,
+              );
+            }
           }
           onProgress?.call(paragraphs.length, paragraphs.length);
           onChunkPersisted?.call(List<String>.of(result));
@@ -331,10 +395,14 @@ class NovelTranslationService {
     }
 
     // 2) 分块翻译（每块 chunkSize 段，块内仍走批量协议）。
-    // 整块已完成直接跳过，不重复请求；携带上一块最后 2 段原文+译文衔接。
-    List<TranslationContextPair> chunkContext = const <TranslationContextPair>[];
+    // 整块已完成直接跳过，不重复请求；滚动上下文含前章尾部与本章已译段。
+    final rolling = RollingContext(seed: previousChapterContext);
+    var contextCursor = 0;
     for (var start = 0; start < paragraphs.length; start += chunkSize) {
       final end = (start + chunkSize).clamp(0, paragraphs.length);
+      for (; contextCursor < start; contextCursor++) {
+        rolling.add(paragraphs[contextCursor], result[contextCursor]);
+      }
       final fullyDone = <bool>[
         for (var i = start; i < end; i++) _isDone(paragraphs, result, i),
       ].every((done) => done);
@@ -351,46 +419,123 @@ class NovelTranslationService {
             pendingTexts,
             endpoints,
             lang,
-            glossary: glossary,
+            glossary: currentGlossary,
             style: style,
             cot: cot,
             bookContext: bookContext,
-            priorContext: chunkContext,
+            recentTranslations: rolling.render(),
+            nextSource: _nextNonEmpty(paragraphs, end),
           );
           final parsed = parseBatched(raw, pendingTexts.length) ??
               (throw const TranslationException('翻译返回格式异常'));
-          _detectGlossaryConflicts(glossary, pendingTexts, parsed);
+          _detectGlossaryConflicts(currentGlossary, pendingTexts, parsed);
           for (var i = 0; i < pendingTexts.length; i++) {
             result[pendingIndexes[i]] = parsed[i];
           }
-          chunkContext = <TranslationContextPair>[
-            for (var i = (pendingTexts.length - _kChunkContextPairs)
-                .clamp(0, pendingTexts.length);
-                i < pendingTexts.length;
-                i++)
-              (source: pendingTexts[i], translation: parsed[i]),
-          ];
+          // 术语提取在本块落盘前完成：后续块立即使用新词，冲突进待裁决。
+          final summary = await _maybeExtract(
+            endpoints: endpoints,
+            lang: lang,
+            workId: workId,
+            autoExtract: autoExtract,
+            sources: pendingTexts,
+            translations: parsed,
+            glossary: currentGlossary,
+            chapterId: chapterId,
+            chapterTitle: chapterTitle,
+            chapterIndex: chapterIndex,
+          );
+          if (summary != null) {
+            onGlossaryExtracted?.call(summary);
+            if (summary.changed > 0) {
+              currentGlossary = await _reloadGlossary(
+                workId,
+                lang,
+                fallback: currentGlossary,
+              );
+            }
+          }
         }
-      } else {
-        // 已完成块同样维护上下文，保证下一块衔接自然。
-        final realIndexes = <int>[
-          for (var i = start; i < end; i++)
-            if (paragraphs[i].trim().isNotEmpty) i,
-        ];
-        chunkContext = <TranslationContextPair>[
-          for (var i = (realIndexes.length - _kChunkContextPairs)
-              .clamp(0, realIndexes.length);
-              i < realIndexes.length;
-              i++)
-            (
-              source: paragraphs[realIndexes[i]],
-              translation: result[realIndexes[i]],
-            ),
-        ];
       }
       onProgress?.call(_doneCount(paragraphs, result), paragraphs.length);
       onChunkPersisted?.call(List<String>.of(result));
     }
+  }
+
+  /// 自动术语提取：仅作品级翻译、设置开启且本批有效段 ≥ 2 时运行。
+  /// 失败静默返回 null，绝不打断翻译主流程。
+  Future<GlossaryUpsertSummary?> _maybeExtract({
+    required List<AiEndpointConfig> endpoints,
+    required String lang,
+    required String? workId,
+    required bool autoExtract,
+    required List<String> sources,
+    required List<String> translations,
+    required List<GlossaryEntry> glossary,
+    String? chapterId,
+    String? chapterTitle,
+    int? chapterIndex,
+  }) async {
+    final scope = workId?.trim() ?? '';
+    if (!autoExtract ||
+        scope.isEmpty ||
+        sources.length != translations.length) {
+      return null;
+    }
+    final src = <String>[];
+    final dst = <String>[];
+    for (var i = 0; i < sources.length; i++) {
+      if (sources[i].trim().isEmpty || translations[i].trim().isEmpty) continue;
+      src.add(sources[i]);
+      dst.add(translations[i]);
+    }
+    if (src.length < 2) return null;
+    try {
+      final candidates = await _glossaryExtractor.extract(
+        endpoints: endpoints,
+        lang: lang,
+        sources: src,
+        translations: dst,
+        existing: glossary,
+      );
+      if (candidates.isEmpty) return null;
+      final summary = await _glossary.upsertExtracted(
+        scope,
+        lang,
+        candidates,
+        chapterId: chapterId ?? '',
+        chapterTitle: chapterTitle ?? '',
+        chapterIndex: chapterIndex,
+      );
+      if (summary.isEmpty) return null;
+      AppLog.instance.w('[小说翻译][术语] 本批新增 ${summary.inserted}、'
+          '合并 ${summary.merged}、冲突 ${summary.conflicts}');
+      return summary;
+    } on Object catch (e) {
+      AppLog.instance.w('[小说翻译][术语] 自动提取失败，跳过: $e');
+      return null;
+    }
+  }
+
+  Future<List<GlossaryEntry>> _reloadGlossary(
+    String? workId,
+    String lang, {
+    required List<GlossaryEntry> fallback,
+  }) async {
+    try {
+      return await _glossary.effectiveEntries(workId, lang);
+    } on Object {
+      return fallback;
+    }
+  }
+
+  /// [from] 之后第一段非空原文（lookahead 断句参考）。
+  static String? _nextNonEmpty(List<String> paragraphs, int from) {
+    for (var i = from; i < paragraphs.length; i++) {
+      final text = paragraphs[i].trim();
+      if (text.isNotEmpty) return text;
+    }
+    return null;
   }
 
   /// 术语冲突检测：命中告警仅写日志（修正通道后续迭代）。
@@ -419,15 +564,21 @@ class NovelTranslationService {
     TranslationStyle style = TranslationStyle.standard,
     bool cot = false,
     String? bookContext,
-    List<TranslationContextPair> priorContext = const <TranslationContextPair>[],
+    List<TranslationContextPair> recentTranslations =
+        const <TranslationContextPair>[],
+    String? nextSource,
   }) async {
+    // 只注入本批原文确实出现的词条，避免长术语表挤占提示词预算。
+    final scopedGlossary = GlossaryMatcher.entriesInTexts(glossary, paragraphs);
     final system = PromptBuilder.novelSystemPrompt(
       lang: lang,
       paragraphCount: paragraphs.length,
-      glossary: glossary,
+      glossary: scopedGlossary,
       style: style,
       cot: cot,
       bookContext: bookContext,
+      recentTranslations: recentTranslations,
+      nextSource: nextSource,
     );
     try {
       // 主 → 备 失败路由（仅连接/超时/429 可切换；健康度熔断见路由器）。
@@ -453,17 +604,6 @@ class NovelTranslationService {
                   : 'gpt-3.5-turbo',
               'messages': <Map<String, dynamic>>[
                 <String, dynamic>{'role': 'system', 'content': system},
-                // 上一块末尾若干段的原文+译文，作为衔接语境。
-                for (final h in priorContext) ...<Map<String, dynamic>>[
-                  <String, dynamic>{
-                    'role': 'user',
-                    'content': encodeBatch(<String>[h.source]),
-                  },
-                  <String, dynamic>{
-                    'role': 'assistant',
-                    'content': h.translation
-                  },
-                ],
                 <String, dynamic>{
                   'role': 'user',
                   'content': encodeBatch(paragraphs)

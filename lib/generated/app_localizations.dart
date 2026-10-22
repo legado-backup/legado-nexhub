@@ -16454,6 +16454,138 @@ abstract class AppLocalizations {
   /// **'Glossary editor'**
   String get glossaryOpen;
 
+  /// No description provided for @glossaryWorkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work glossary'**
+  String get glossaryWorkTitle;
+
+  /// No description provided for @glossaryScopeGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Global glossary · applies to all works'**
+  String get glossaryScopeGlobal;
+
+  /// No description provided for @glossaryScopeWork.
+  ///
+  /// In en, this message translates to:
+  /// **'This work + global glossary'**
+  String get glossaryScopeWork;
+
+  /// No description provided for @glossaryConflictsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Glossary conflicts to resolve ({count})'**
+  String glossaryConflictsTitle(int count);
+
+  /// No description provided for @glossaryConflictExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Current translation'**
+  String get glossaryConflictExisting;
+
+  /// No description provided for @glossaryConflictProposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation seen this batch'**
+  String get glossaryConflictProposed;
+
+  /// No description provided for @glossaryConflictChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'From: {chapter}'**
+  String glossaryConflictChapter(String chapter);
+
+  /// No description provided for @glossaryConflictAdopt.
+  ///
+  /// In en, this message translates to:
+  /// **'Use new translation'**
+  String get glossaryConflictAdopt;
+
+  /// No description provided for @glossaryConflictKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current translation'**
+  String get glossaryConflictKeep;
+
+  /// No description provided for @glossaryConflictResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflict resolved'**
+  String get glossaryConflictResolved;
+
+  /// No description provided for @glossaryConflictBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs review'**
+  String get glossaryConflictBadge;
+
+  /// No description provided for @glossaryGlobalEntryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Global entry; edit or delete it in the global glossary'**
+  String get glossaryGlobalEntryHint;
+
+  /// No description provided for @glossaryTypeTerm.
+  ///
+  /// In en, this message translates to:
+  /// **'Term'**
+  String get glossaryTypeTerm;
+
+  /// No description provided for @glossaryTypePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get glossaryTypePerson;
+
+  /// No description provided for @glossaryTypePlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get glossaryTypePlace;
+
+  /// No description provided for @glossaryTypeOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get glossaryTypeOrg;
+
+  /// No description provided for @glossaryTypeAppellation.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get glossaryTypeAppellation;
+
+  /// No description provided for @glossaryTypeHonorific.
+  ///
+  /// In en, this message translates to:
+  /// **'Honorific'**
+  String get glossaryTypeHonorific;
+
+  /// No description provided for @glossaryTypeSpeech.
+  ///
+  /// In en, this message translates to:
+  /// **'Verbal tic'**
+  String get glossaryTypeSpeech;
+
+  /// No description provided for @glossaryTypeFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed expression'**
+  String get glossaryTypeFixed;
+
+  /// No description provided for @glossaryExtractedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{terms} terms added, {conflicts} conflicts to resolve'**
+  String glossaryExtractedNotice(int terms, int conflicts);
+
+  /// No description provided for @glossaryExtractedOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get glossaryExtractedOpen;
+
   /// No description provided for @translationStyle.
   ///
   /// In en, this message translates to:
@@ -16507,6 +16639,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subtitles are output line-by-line without numbering to save tokens; falls back to numbered protocol automatically when alignment fails.'**
   String get translationSubtitleLightweightHint;
+
+  /// No description provided for @translationAutoExtract.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-extract glossary'**
+  String get translationAutoExtract;
+
+  /// No description provided for @translationAutoExtractHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After each batch, collect character names, places and fixed renderings; differing renderings become conflicts to resolve. Turn off to reduce requests.'**
+  String get translationAutoExtractHint;
 
   /// No description provided for @translationExportLayout.
   ///
