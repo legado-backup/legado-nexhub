@@ -38,16 +38,21 @@ class _FakeOptions extends TranslationOptionsStore {
   _FakeOptions({
     this.style = TranslationStyle.standard,
     this.cot = false,
+    this.refined = false,
   });
 
   final TranslationStyle style;
   final bool cot;
+  final bool refined;
 
   @override
   Future<TranslationStyle> effectiveStyle(String? workId) async => style;
 
   @override
   Future<bool> getCotEnabled() async => cot;
+
+  @override
+  Future<bool> getRefinedEnabled() async => refined;
 }
 
 String _compute({
@@ -206,5 +211,49 @@ void main() {
       'updatedAt': 1,
     });
     expect(legacy.fingerprint, isNull);
+  });
+
+  test('精译开关参与指纹：开启与关闭产生不同指纹', () {
+    expect(
+      NovelTranslationFingerprint.compute(
+        sources: _sources,
+        lang: '中文',
+        refined: true,
+      ),
+      isNot(NovelTranslationFingerprint.compute(
+        sources: _sources,
+        lang: '中文',
+      )),
+    );
+  });
+
+  test('开启精译使旧缓存过期，关闭不影响旧缓存', () async {
+    final cached = NovelTranslationFingerprint.compute(
+      sources: _sources,
+      lang: '中文',
+      glossary: _glossary,
+    );
+    expect(
+      await NovelTranslationFingerprint.isStale(
+        cachedFingerprint: cached,
+        workId: 'w1',
+        lang: '中文',
+        sources: _sources,
+        glossaryManager: _FakeGlossary(_glossary),
+        options: _FakeOptions(),
+      ),
+      isFalse,
+    );
+    expect(
+      await NovelTranslationFingerprint.isStale(
+        cachedFingerprint: cached,
+        workId: 'w1',
+        lang: '中文',
+        sources: _sources,
+        glossaryManager: _FakeGlossary(_glossary),
+        options: _FakeOptions(refined: true),
+      ),
+      isTrue,
+    );
   });
 }

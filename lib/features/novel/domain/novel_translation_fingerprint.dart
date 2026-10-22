@@ -1,7 +1,7 @@
 /// 小说译文缓存指纹：判断缓存译文是否仍对应当前原文、术语与风格。
 ///
 /// 只纳入真正影响译文的输入：原文、目标语言、原文中实际命中的术语
-/// （术语表按出现过滤，未出现的术语增删不误报过期）、风格与 CoT。
+/// （术语表按出现过滤，未出现的术语增删不误报过期）、风格、CoT 与精译开关。
 /// 指纹不匹配时由阅读器提示重译，不自动删除缓存。
 library;
 
@@ -24,6 +24,7 @@ abstract final class NovelTranslationFingerprint {
     List<GlossaryEntry> glossary = const <GlossaryEntry>[],
     TranslationStyle style = TranslationStyle.standard,
     bool cot = false,
+    bool refined = false,
   }) {
     final applicable = GlossaryMatcher.entriesInTexts(glossary, sources);
     final glossaryPart = <String>[
@@ -38,6 +39,8 @@ abstract final class NovelTranslationFingerprint {
       'v': version,
       'lang': lang,
       'style': style.storageValue,
+      // 精译关=缺省键：与该功能引入前的旧指纹字节一致，不误报。
+      if (refined) 'refined': true,
       'cot': cot,
       'sources': <String>[
         for (final source in sources) _normalizeSource(source),
@@ -64,12 +67,14 @@ abstract final class NovelTranslationFingerprint {
           await (glossaryManager ?? GlossaryManager()).effectiveEntries(workId, lang);
       final style = await store.effectiveStyle(workId);
       final cot = await store.getCotEnabled();
+      final refined = await store.getRefinedEnabled();
       return compute(
         sources: sources,
         lang: lang,
         glossary: glossary,
         style: style,
         cot: cot,
+        refined: refined,
       );
     } on Object {
       return null;

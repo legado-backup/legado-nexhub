@@ -11206,6 +11206,9 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
   String? _cachedFingerprint;
   bool _stale = false;
 
+  /// 精译模式开关（全局持久化，默认关）。
+  bool _refined = false;
+
   @override
   void initState() {
     super.initState();
@@ -11285,6 +11288,13 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
       _checkpoint != null && _checkpoint!.any((t) => t.isEmpty);
 
   Future<void> _loadCache() async {
+    // 精译开关（读取失败按默认关闭）。
+    try {
+      final refined = await TranslationOptionsStore().getRefinedEnabled();
+      if (mounted) setState(() => _refined = refined);
+    } on Object {
+      // 保持默认。
+    }
     final cached = await widget.manager.load(
       widget.novelId,
       widget.chapterId,
@@ -11633,6 +11643,46 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
     if (mounted) setState(() => _stale = stale);
   }
 
+  /// 切换精译开关：持久化并重算缓存过期状态（开关改变指纹输入）。
+  Future<void> _toggleRefined(bool v) async {
+    setState(() => _refined = v);
+    try {
+      await TranslationOptionsStore().setRefinedEnabled(v);
+    } on Object {
+      // 持久化失败不影响本次会话内的开关状态。
+    }
+    await _refreshStale();
+  }
+
+  /// 精译开关行：三稿合成，标注成本（默认关）。
+  Widget _refinedRow(AppLocalizations l10n, ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.only(
+          left: AppTokens.spaceMd,
+          right: AppTokens.spaceMd,
+          bottom: AppTokens.spaceXs),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.auto_awesome_rounded, size: 14, color: scheme.primary),
+          const SizedBox(width: AppTokens.spaceXs),
+          Expanded(
+            child: Text(
+              l10n.translationRefinedMode,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ),
+          SizedBox(
+            height: 32,
+            child: Switch(
+              value: _refined,
+              onChanged: _translating ? null : (v) => _toggleRefined(v),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 缓存过期提示：输入已变化时建议重译，不自动删除旧译文。
   Widget _staleRow(AppLocalizations l10n, ColorScheme scheme) {
     if (!_stale || _translations == null || _translating) {
@@ -11760,6 +11810,7 @@ class _NovelTranslationSheetState extends State<_NovelTranslationSheet> {
                       TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ),
+            _refinedRow(l10n, scheme),
             _staleRow(l10n, scheme),
             _prescanRow(l10n, scheme),
             _glossaryExtractRow(l10n, scheme),

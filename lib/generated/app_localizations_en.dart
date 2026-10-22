@@ -5668,6 +5668,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The source, glossary, or translation style has changed. The cached translation may be outdated.';
 
   @override
+  String get translationRefinedMode =>
+      'Refined mode (3-draft synthesis, ≈4× tokens)';
+
+  @override
   String novelTranslateProgress(String done, String total) {
     return '$done of $total paragraphs';
   }

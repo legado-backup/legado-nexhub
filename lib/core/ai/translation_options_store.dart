@@ -21,6 +21,7 @@ class TranslationOptionsStore {
   static const String _kSubtitleLightweight = 'subtitle_translation_lightweight_v1';
   static const String _kPolish = 'translation_polish_v1';
   static const String _kAutoExtract = 'translation_auto_extract_v1';
+  static const String _kRefined = 'translation_refined_v1';
 
   static const String _styleBoxName = 'translation_style_overrides';
 
@@ -125,6 +126,19 @@ class TranslationOptionsStore {
   Future<void> setAutoExtractEnabled(bool v) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kAutoExtract, v ? '1' : '0');
+  }
+
+  // ─────────────────── 精译模式───────────────────
+
+  /// 精译模式（三稿并发 + 综合合成，默认关闭：约 4× token 消耗）。
+  Future<bool> getRefinedEnabled() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kRefined) == '1';
+  }
+
+  Future<void> setRefinedEnabled(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kRefined, v ? '1' : '0');
   }
 
   // ─────────────────── 小说导出排版───────────────────

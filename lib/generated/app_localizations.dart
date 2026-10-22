@@ -10760,6 +10760,12 @@ abstract class AppLocalizations {
   /// **'The source, glossary, or translation style has changed. The cached translation may be outdated.'**
   String get translationStaleNotice;
 
+  /// No description provided for @translationRefinedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Refined mode (3-draft synthesis, ≈4× tokens)'**
+  String get translationRefinedMode;
+
   /// No description provided for @novelTranslateProgress.
   ///
   /// In en, this message translates to:

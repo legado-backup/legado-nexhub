@@ -2945,6 +2945,7 @@
   "novelTranslateAction": "Translate chapter",
   "novelTranslateRetranslate": "Re-translate",
   "translationStaleNotice": "The source, glossary, or translation style has changed. The cached translation may be outdated.",
+  "translationRefinedMode": "Refined mode (3-draft synthesis, ≈4× tokens)",
   "novelTranslateProgress": "{done} of {total} paragraphs",
   "@novelTranslateProgress": {
     "placeholders": {

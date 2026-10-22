@@ -5555,6 +5555,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get translationStaleNotice => '原文、术语表或翻译风格已更新，当前缓存译文可能过期。';
 
   @override
+  String get translationRefinedMode => '精译模式（三稿合成，约 4× token）';
+
+  @override
   String novelTranslateProgress(String done, String total) {
     return '已译 $done 段';
   }

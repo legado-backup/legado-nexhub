@@ -266,4 +266,31 @@ abstract final class PromptBuilder {
     if (next.isNotEmpty) buf.write('\n$next');
     return buf.toString();
   }
+
+  /// 精译合成 system prompt（三稿择优合成）。
+  ///
+  /// 输入为「编号原文 + 若干候选草稿」，输出仅合成后的编号译文；
+  /// 滚动上下文已体现在各草稿中，不再重复注入。
+  static String refineSynthesisSystemPrompt({
+    required String lang,
+    required int paragraphCount,
+    required int draftCount,
+    List<GlossaryEntry> glossary = const <GlossaryEntry>[],
+    TranslationStyle style = TranslationStyle.standard,
+  }) {
+    const labels = <String>['一', '二', '三'];
+    final buf = StringBuffer()
+      ..write('你是专业的文学译者。用户会给出若干编号段落的原文，'
+          '以及 $draftCount 份候选译文（【候选译文${labels.take(draftCount).join('】与【候选译文')}】）。'
+          '请逐段比对候选译文，合成一份最终译文：'
+          '采纳各稿中最准确、最自然的表达，修正误译、漏译与生硬之处，'
+          '保持人名与术语译名一致，不要逐字拼接候选，不要增删情节信息。'
+          '本次共 $paragraphCount 段，请完整输出 $paragraphCount 段。'
+          '输出必须严格保持编号格式：每段译文前单独一行 <<<序号>>>，'
+          '只输出合成后的译文，不要添加任何解释。'
+          '若某个段落在句中被截断（句子、引号或对话未闭合），'
+          '顺承原意译到断点为止，不要擅自补全或收束。');
+    _appendCommon(buf, style: style, glossary: glossary);
+    return buf.toString();
+  }
 }

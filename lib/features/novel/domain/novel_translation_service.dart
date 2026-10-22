@@ -76,6 +76,12 @@ class NovelTranslationService {
   /// 单次请求的段落数上限：超过直接分块，避免必然截断的超大请求。
   static const int _kOneShotMaxParagraphs = 40;
 
+  /// 精译单块段落数上限：三稿并发成本随块大小线性放大，块不宜过大。
+  static const int _kRefinedMaxChunk = 8;
+
+  /// 精译三稿的采样温度：低温求稳、中温均衡、高温求表达多样。
+  static const List<double> _kRefinedTemperatures = <double>[0.2, 0.5, 0.8];
+
   /// 批量协议编码（兼容旧入口；实现收敛于 [BatchProtocol]）。
   static String encodeBatch(List<String> paragraphs) =>
       BatchProtocol.encode(paragraphs);
@@ -124,11 +130,13 @@ class NovelTranslationService {
     var style = TranslationStyle.standard;
     var cot = false;
     var autoExtract = false;
+    var refined = false;
     final extractScope = workId?.trim() ?? '';
     try {
       glossary = await _glossary.effectiveEntries(workId, lang);
       style = await _options.effectiveStyle(workId);
       cot = await _options.getCotEnabled();
+      refined = await _options.getRefinedEnabled();
       if (extractScope.isNotEmpty) {
         autoExtract = await _options.getAutoExtractEnabled();
       }
@@ -195,6 +203,7 @@ class NovelTranslationService {
           glossary: glossary,
           style: style,
           cot: cot,
+          refined: refined,
           bookContext: bookContext,
           previousChapterContext: previousChapterContext,
           workId: extractScope,
@@ -314,7 +323,7 @@ class NovelTranslationService {
   }
 
   /// AI pass：保留原有 one-shot / 分块回退 / 术语与语境注入逻辑，
-  /// 只对未完成段落发请求。
+  /// 只对未完成段落发请求；精译开启时逐块走三稿合成。
   Future<void> _aiPass({
     required List<String> paragraphs,
     required List<String> result,
@@ -326,6 +335,7 @@ class NovelTranslationService {
     required List<GlossaryEntry> glossary,
     required TranslationStyle style,
     required bool cot,
+    required bool refined,
     required String? bookContext,
     List<TranslationContextPair> previousChapterContext =
         const <TranslationContextPair>[],
@@ -339,9 +349,13 @@ class NovelTranslationService {
     void Function(List<String> translatedSoFar)? onChunkPersisted,
   }) async {
     var currentGlossary = glossary;
+    // 精译按固定小块发三稿并发，块上限收紧；整章 one-shot 跳过。
+    final effectiveChunk =
+        refined && chunkSize > _kRefinedMaxChunk ? _kRefinedMaxChunk : chunkSize;
     // 1) 整章一次批量（最省 token）；超大章或已有断点直接跳过，
     //    必然截断的请求不值得先付一次 token/延迟；失败/解析不齐 → 分块回退。
-    final bool tryOneShot = allowOneShot &&
+    final bool tryOneShot = !refined &&
+        allowOneShot &&
         paragraphs.length <= _kOneShotMaxParagraphs &&
         !hasPartial &&
         !_allDone(paragraphs, result);
@@ -394,12 +408,14 @@ class NovelTranslationService {
       }
     }
 
-    // 2) 分块翻译（每块 chunkSize 段，块内仍走批量协议）。
+    // 2) 分块翻译（每块 effectiveChunk 段，块内仍走批量协议）。
     // 整块已完成直接跳过，不重复请求；滚动上下文含前章尾部与本章已译段。
     final rolling = RollingContext(seed: previousChapterContext);
     var contextCursor = 0;
-    for (var start = 0; start < paragraphs.length; start += chunkSize) {
-      final end = (start + chunkSize).clamp(0, paragraphs.length);
+    for (var start = 0;
+        start < paragraphs.length;
+        start += effectiveChunk) {
+      final end = (start + effectiveChunk).clamp(0, paragraphs.length);
       for (; contextCursor < start; contextCursor++) {
         rolling.add(paragraphs[contextCursor], result[contextCursor]);
       }
@@ -415,7 +431,23 @@ class NovelTranslationService {
           pendingTexts.add(paragraphs[i]);
         }
         if (pendingTexts.isNotEmpty) {
-          final raw = await _requestBatch(
+          final recent = rolling.render();
+          final nextSource = _nextNonEmpty(paragraphs, end);
+          // 精译：三稿并发 + 合成；草稿全败返回 null 走普通单译。
+          List<String>? parsed = refined
+              ? await _refinedChunk(
+                  texts: pendingTexts,
+                  endpoints: endpoints,
+                  lang: lang,
+                  glossary: currentGlossary,
+                  style: style,
+                  cot: cot,
+                  bookContext: bookContext,
+                  recentTranslations: recent,
+                  nextSource: nextSource,
+                )
+              : null;
+          parsed ??= await _plainChunk(
             pendingTexts,
             endpoints,
             lang,
@@ -423,11 +455,9 @@ class NovelTranslationService {
             style: style,
             cot: cot,
             bookContext: bookContext,
-            recentTranslations: rolling.render(),
-            nextSource: _nextNonEmpty(paragraphs, end),
+            recentTranslations: recent,
+            nextSource: nextSource,
           );
-          final parsed = parseBatched(raw, pendingTexts.length) ??
-              (throw const TranslationException('翻译返回格式异常'));
           _detectGlossaryConflicts(currentGlossary, pendingTexts, parsed);
           for (var i = 0; i < pendingTexts.length; i++) {
             result[pendingIndexes[i]] = parsed[i];
@@ -460,6 +490,156 @@ class NovelTranslationService {
       onProgress?.call(_doneCount(paragraphs, result), paragraphs.length);
       onChunkPersisted?.call(List<String>.of(result));
     }
+  }
+
+  /// 普通单译块：批量协议请求 + 解析（解析失败抛异常走外层回退）。
+  Future<List<String>> _plainChunk(
+    List<String> texts,
+    List<AiEndpointConfig> endpoints,
+    String lang, {
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+    required bool cot,
+    required String? bookContext,
+    required List<TranslationContextPair> recentTranslations,
+    required String? nextSource,
+  }) async {
+    final raw = await _requestBatch(
+      texts,
+      endpoints,
+      lang,
+      glossary: glossary,
+      style: style,
+      cot: cot,
+      bookContext: bookContext,
+      recentTranslations: recentTranslations,
+      nextSource: nextSource,
+    );
+    return parseBatched(raw, texts.length) ??
+        (throw const TranslationException('翻译返回格式异常'));
+  }
+
+  /// 精译单块：三路草稿并发（不同温度）→ 综合合成。
+  ///
+  /// 降级链：部分草稿失败 → 用剩余草稿合成；仅剩一稿 → 直接采用不合成；
+  /// 草稿全败 → 返回 null 由调用方走普通单译；合成失败/不可解析 → 取第一稿。
+  Future<List<String>?> _refinedChunk({
+    required List<String> texts,
+    required List<AiEndpointConfig> endpoints,
+    required String lang,
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+    required bool cot,
+    required String? bookContext,
+    required List<TranslationContextPair> recentTranslations,
+    required String? nextSource,
+  }) async {
+    final drafts = await Future.wait<List<String>?>(<Future<List<String>?>>[
+      for (final temp in _kRefinedTemperatures)
+        _draftChunk(
+          texts,
+          endpoints,
+          lang,
+          temperature: temp,
+          glossary: glossary,
+          style: style,
+          cot: cot,
+          bookContext: bookContext,
+          recentTranslations: recentTranslations,
+          nextSource: nextSource,
+        ),
+    ]);
+    final ok = <List<String>>[
+      for (final d in drafts)
+        if (d != null) d,
+    ];
+    if (ok.isEmpty) return null;
+    if (ok.length == 1) return ok.first;
+    try {
+      final raw = await _requestSynthesis(
+        texts: texts,
+        drafts: ok,
+        endpoints: endpoints,
+        lang: lang,
+        glossary: glossary,
+        style: style,
+      );
+      final parsed = parseBatched(raw, texts.length);
+      if (parsed != null) return parsed;
+      AppLog.instance.w('[小说翻译][精译] 合成输出格式异常，取第一稿');
+    } on Object {
+      AppLog.instance.w('[小说翻译][精译] 合成失败，取第一稿');
+    }
+    return ok.first;
+  }
+
+  /// 单路草稿：请求 + 解析；任一环节失败返回 null（不中断其他草稿）。
+  Future<List<String>?> _draftChunk(
+    List<String> texts,
+    List<AiEndpointConfig> endpoints,
+    String lang, {
+    required double temperature,
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+    required bool cot,
+    required String? bookContext,
+    required List<TranslationContextPair> recentTranslations,
+    required String? nextSource,
+  }) async {
+    try {
+      final raw = await _requestBatch(
+        texts,
+        endpoints,
+        lang,
+        glossary: glossary,
+        style: style,
+        cot: cot,
+        bookContext: bookContext,
+        recentTranslations: recentTranslations,
+        nextSource: nextSource,
+        temperature: temperature,
+      );
+      return parseBatched(raw, texts.length);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// 精译合成请求：原文 + 各候选草稿，按批量协议回合成结果。
+  Future<String> _requestSynthesis({
+    required List<String> texts,
+    required List<List<String>> drafts,
+    required List<AiEndpointConfig> endpoints,
+    required String lang,
+    required List<GlossaryEntry> glossary,
+    required TranslationStyle style,
+  }) async {
+    final scopedGlossary = GlossaryMatcher.entriesInTexts(glossary, texts);
+    final system = PromptBuilder.refineSynthesisSystemPrompt(
+      lang: lang,
+      paragraphCount: texts.length,
+      draftCount: drafts.length,
+      glossary: scopedGlossary,
+      style: style,
+    );
+    const labels = <String>['一', '二', '三'];
+    final user = StringBuffer()..writeln('【原文】');
+    for (var i = 0; i < texts.length; i++) {
+      user
+        ..writeln('<<<${i + 1}>>>')
+        ..writeln(texts[i]);
+    }
+    for (var d = 0; d < drafts.length; d++) {
+      user
+        ..writeln()
+        ..writeln('【候选译文${labels[d]}】');
+      for (var i = 0; i < drafts[d].length; i++) {
+        user
+          ..writeln('<<<${i + 1}>>>')
+          ..writeln(drafts[d][i]);
+      }
+    }
+    return _postChat(endpoints, system, user.toString());
   }
 
   /// 自动术语提取：仅作品级翻译、设置开启且本批有效段 ≥ 2 时运行。
@@ -567,6 +747,7 @@ class NovelTranslationService {
     List<TranslationContextPair> recentTranslations =
         const <TranslationContextPair>[],
     String? nextSource,
+    double temperature = 0.2,
   }) async {
     // 只注入本批原文确实出现的词条，避免长术语表挤占提示词预算。
     final scopedGlossary = GlossaryMatcher.entriesInTexts(glossary, paragraphs);
@@ -580,8 +761,19 @@ class NovelTranslationService {
       recentTranslations: recentTranslations,
       nextSource: nextSource,
     );
+    return _postChat(endpoints, system, encodeBatch(paragraphs),
+        temperature: temperature);
+  }
+
+  /// 主 → 备 失败路由的 chat/completions 请求（仅连接/超时/429 可切换；
+  /// 健康度熔断见路由器），底层异常归一化后上抛。
+  Future<String> _postChat(
+    List<AiEndpointConfig> endpoints,
+    String system,
+    String user, {
+    double temperature = 0.2,
+  }) async {
     try {
-      // 主 → 备 失败路由（仅连接/超时/429 可切换；健康度熔断见路由器）。
       final content = await AiEndpointRouter.execute<String>(
         endpoints,
         (cfg) async {
@@ -604,12 +796,9 @@ class NovelTranslationService {
                   : 'gpt-3.5-turbo',
               'messages': <Map<String, dynamic>>[
                 <String, dynamic>{'role': 'system', 'content': system},
-                <String, dynamic>{
-                  'role': 'user',
-                  'content': encodeBatch(paragraphs)
-                },
+                <String, dynamic>{'role': 'user', 'content': user},
               ],
-              'temperature': 0.2,
+              'temperature': temperature,
             },
           );
           final choices = resp.data?['choices'] as List?;
