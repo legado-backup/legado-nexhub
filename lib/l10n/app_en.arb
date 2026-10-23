@@ -1537,6 +1537,7 @@
   "acknowledgementsLegado": "NexHub's novel paginator re-implements its ChapterProvider pagination algorithm as an independent Dart implementation (no source copied). The upstream repo ships no explicit open-source license; this credit is inspiration attribution only.",
   "acknowledgementsMihon": "Its extension-source architecture and comic-reader interaction informed NexHub's manga parsing and reading experience. Licensed under Apache License 2.0 (© Mihon contributors).",
   "acknowledgementsRssHub": "Powers the RSS aggregation behind NexHub's subscription feature. Licensed under AGPL-3.0 (© DIYgod); NexHub only calls it as a client and does not modify or redistribute its source.",
+  "acknowledgementsWenyi": "Its novel AI-translation pipeline design (context enrichment, terminology loop, review and refined drafting) informed the deep optimization of NexHub's built-in novel translation. Licensed under the MIT License (© BigDawnGhost); NexHub copied no source code and implemented independently.",
   "acknowledgementsAnime4K": "The player's \"Super resolution\" ships its GLSL shader presets (Mode A Fast/Quality). Licensed under the MIT License (© 2019-2021 bloc97).",
   "acknowledgementsViewProject": "View project",
   "acknowledgementsMoreLibs": "Other third-party libraries are listed under \"Open source licenses\".",

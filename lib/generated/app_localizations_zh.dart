@@ -2871,6 +2871,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '为 NexHub 的订阅功能提供 RSS 聚合服务。以 AGPL-3.0 发布（© DIYgod），NexHub 仅作客户端调用，未修改或再分发其源码。';
 
   @override
+  String get acknowledgementsWenyi =>
+      '其小说 AI 翻译管线设计（上下文增强、术语闭环、审查与精译）为 NexHub 内置小说翻译的深度优化提供了重要参考。以 MIT License 发布（© BigDawnGhost），NexHub 未复制其源码，仅借鉴设计思想独立实现。';
+
+  @override
   String get acknowledgementsAnime4K =>
       '播放器「超分辨率」内置其 GLSL shader 预设（Mode A 效率/质量档），随应用分发。以 MIT License 发布（© 2019-2021 bloc97）。';
 

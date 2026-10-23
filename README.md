@@ -141,6 +141,7 @@ NexHub 的生命力来自社区共同维护的「源」。我们欢迎任何人�
 - [Legado](https://github.com/gedoor/legado)（及其各类改版）的「书源」规则系统，为 NexHub「源即插件」的解析与共创理念提供了核心启发（尤其小说源的声明式 / 脚本式写法）。NexHub 小说分页器以独立 Dart 实现借鉴了 Legado `ChapterProvider` 的分页算法，未复制其源码；Legado 上游仓库未附带明确的开源许可证，本致谢仅作启发署名，不暗示任何许可授权。
 - [Mihon](https://github.com/mihonapp/mihon)（Tachiyomi 衍生版，及其各类改版）的扩展源架构与漫画阅读器交互，为 NexHub 的漫画解析与阅读体验提供了重要参考。Mihon 以 Apache License 2.0 发布（© Mihon contributors）。
 - [RSSHub](https://github.com/DIYgod/RSSHub) 的 RSS 聚合能力为 NexHub 的订阅功能提供了服务基础。RSSHub 以 AGPL-3.0 发布（© DIYgod），NexHub 仅作为客户端调用其实例，未修改或再分发其源码。
+- [wenyi](https://github.com/BigDawnGhost/wenyi) 的小说 AI 翻译管线设计（上下文增强、术语闭环、证据驱动审查与精译合成），为 NexHub 内置小说翻译的深度优化提供了重要参考。wenyi 以 MIT License 发布（© BigDawnGhost），NexHub 未复制其源码，仅借鉴设计思想独立实现。
 - **Flutter 鸿蒙社区（Flutter SIG / OpenHarmony 适配项目）**：为 Flutter 生态带来鸿蒙平台支持，NexHub 鸿蒙版基于社区维护的 Flutter 鸿蒙版 SDK 与三方库适配成果构建；
 - [Flutter](https://flutter.dev) 与 Dart 团队，提供优秀的跨平台框架；
 - [flutter_js](https://pub.dev/packages/flutter_js)（quickjs 内核），为源内嵌脚本提供安全的 JS 沙箱；

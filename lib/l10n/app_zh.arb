@@ -1516,6 +1516,7 @@
   "acknowledgementsLegado": "NexHub 小说分页器以独立 Dart 实现借鉴了其 ChapterProvider 分页算法（未复制源码）。上游仓库未附带明确开源许可证，本致谢仅作启发署名。",
   "acknowledgementsMihon": "扩展源架构与漫画阅读器交互为 NexHub 的漫画解析与阅读体验提供了重要参考。以 Apache License 2.0 发布（© Mihon contributors）。",
   "acknowledgementsRssHub": "为 NexHub 的订阅功能提供 RSS 聚合服务。以 AGPL-3.0 发布（© DIYgod），NexHub 仅作客户端调用，未修改或再分发其源码。",
+  "acknowledgementsWenyi": "其小说 AI 翻译管线设计（上下文增强、术语闭环、审查与精译）为 NexHub 内置小说翻译的深度优化提供了重要参考。以 MIT License 发布（© BigDawnGhost），NexHub 未复制其源码，仅借鉴设计思想独立实现。",
   "acknowledgementsAnime4K": "播放器「超分辨率」内置其 GLSL shader 预设（Mode A 效率/质量档），随应用分发。以 MIT License 发布（© 2019-2021 bloc97）。",
   "acknowledgementsViewProject": "查看项目",
   "acknowledgementsMoreLibs": "其余第三方库见「开源许可」列表。",

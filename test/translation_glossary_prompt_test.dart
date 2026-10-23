@@ -8,7 +8,6 @@ library;
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -272,7 +271,7 @@ void main() {
     });
 
     test('剥围栏与编号标记行、空行与列表符', () {
-      final raw = '```text\n<<<1>>>\n- 甲\n\n<<<2>>>\n* 乙\n```';
+      const raw = '```text\n<<<1>>>\n- 甲\n\n<<<2>>>\n* 乙\n```';
       expect(BatchProtocol.decodeLoose(raw, 2), <String>['甲', '乙']);
     });
 

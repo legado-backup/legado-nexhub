@@ -5636,6 +5636,12 @@ abstract class AppLocalizations {
   /// **'Powers the RSS aggregation behind NexHub\'s subscription feature. Licensed under AGPL-3.0 (© DIYgod); NexHub only calls it as a client and does not modify or redistribute its source.'**
   String get acknowledgementsRssHub;
 
+  /// No description provided for @acknowledgementsWenyi.
+  ///
+  /// In en, this message translates to:
+  /// **'Its novel AI-translation pipeline design (context enrichment, terminology loop, review and refined drafting) informed the deep optimization of NexHub\'s built-in novel translation. Licensed under the MIT License (© BigDawnGhost); NexHub copied no source code and implemented independently.'**
+  String get acknowledgementsWenyi;
+
   /// No description provided for @acknowledgementsAnime4K.
   ///
   /// In en, this message translates to:

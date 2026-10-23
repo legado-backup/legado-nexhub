@@ -274,6 +274,11 @@ class _AboutScreenState extends State<AboutScreen> {
         url: 'https://github.com/DIYgod/RSSHub',
       ),
       _AcknowledgementCredit(
+        name: 'wenyi',
+        desc: l10n.acknowledgementsWenyi,
+        url: 'https://github.com/BigDawnGhost/wenyi',
+      ),
+      _AcknowledgementCredit(
         name: 'Anime4K',
         desc: l10n.acknowledgementsAnime4K,
         url: 'https://github.com/bloc97/Anime4K',

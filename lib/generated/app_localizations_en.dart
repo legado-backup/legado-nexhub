@@ -2923,6 +2923,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Powers the RSS aggregation behind NexHub\'s subscription feature. Licensed under AGPL-3.0 (© DIYgod); NexHub only calls it as a client and does not modify or redistribute its source.';
 
   @override
+  String get acknowledgementsWenyi =>
+      'Its novel AI-translation pipeline design (context enrichment, terminology loop, review and refined drafting) informed the deep optimization of NexHub\'s built-in novel translation. Licensed under the MIT License (© BigDawnGhost); NexHub copied no source code and implemented independently.';
+
+  @override
   String get acknowledgementsAnime4K =>
       'The player\'s \"Super resolution\" ships its GLSL shader presets (Mode A Fast/Quality). Licensed under the MIT License (© 2019-2021 bloc97).';
 

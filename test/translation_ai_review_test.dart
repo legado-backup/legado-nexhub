@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
-import 'package:nexhub/core/ai/glossary_manager.dart';
 import 'package:nexhub/core/ai/translation_exception.dart';
 import 'package:nexhub/core/ai/vision_translation_client.dart'
     show AiEndpointConfig;
