@@ -4920,6 +4920,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'About a second after you stop on a page (page turn or scroll settle) it is rendered in the background; toggle and tune each effect below';
 
   @override
+  String get motionInteractiveTitle => 'Interactive reading';
+
+  @override
+  String get motionInteractiveDesc =>
+      'In single-page paged mode, tap the centre of the page to focus it and reveal the motion through a tear; tap again to dismiss. Zoomed, rotated, webtoon and double-page views keep the plain motion overlay';
+
+  @override
   String get motionEffectStateOff => 'Off';
 
   @override

@@ -566,7 +566,9 @@ class SettingsScreen extends StatelessWidget {
           '粒子',
           '樱花',
           '预设',
-          'motion'
+          '互动',
+          'motion',
+          'interactive'
         ],
         builder: (_) => const SettingsMotionEffectsScreen(),
       ),

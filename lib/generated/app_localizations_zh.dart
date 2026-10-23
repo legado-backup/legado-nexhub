@@ -4826,6 +4826,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '翻页停留或条漫滚动停止约 1 秒后，当前页在后台自动渲染为动态页；下方可逐项开关与调参';
 
   @override
+  String get motionInteractiveTitle => '互动阅读';
+
+  @override
+  String get motionInteractiveDesc =>
+      '翻页单页模式下点按页面中心，聚焦当前页并撕开揭示动效，再点收回；放大、旋转、条漫与双页模式保持普通动态页';
+
+  @override
   String get motionEffectStateOff => '已关闭';
 
   @override

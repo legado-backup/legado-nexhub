@@ -35,6 +35,7 @@ class MotionEffectSettings {
     this.durationSec = defaultDurationSec,
     this.maxDimension = defaultMaxDimension,
     this.webtoonRenderMode = MotionWebtoonRenderMode.dwell,
+    this.interactiveReaderEnabled = false,
   });
 
   /// 主开关。关闭 = 完全静态（零额外开销：不派发渲染任务）。
@@ -59,6 +60,10 @@ class MotionEffectSettings {
   /// 条漫滚动模式的渲染时机（[MotionWebtoonRenderMode.dwell] 省电默认 /
   /// [MotionWebtoonRenderMode.follow] 实时跟随）。仅条漫滚动模式读取。
   final MotionWebtoonRenderMode webtoonRenderMode;
+
+  /// 互动阅读层：翻页单页模式下点按页面聚焦并撕开揭示动效。默认关闭。
+  /// 与 [enabled] 独立：本开关不参与 [toEffectConfig]，只切换阅读器叠加层。
+  final bool interactiveReaderEnabled;
 
   static const int defaultFps = 12;
   static const double defaultDurationSec = 3.0;
@@ -92,6 +97,7 @@ class MotionEffectSettings {
     double? durationSec,
     int? maxDimension,
     MotionWebtoonRenderMode? webtoonRenderMode,
+    bool? interactiveReaderEnabled,
   }) {
     return MotionEffectSettings(
       enabled: enabled ?? this.enabled,
@@ -101,6 +107,8 @@ class MotionEffectSettings {
       durationSec: durationSec ?? this.durationSec,
       maxDimension: maxDimension ?? this.maxDimension,
       webtoonRenderMode: webtoonRenderMode ?? this.webtoonRenderMode,
+      interactiveReaderEnabled:
+          interactiveReaderEnabled ?? this.interactiveReaderEnabled,
     );
   }
 
@@ -147,6 +155,7 @@ class MotionEffectSettings {
           durationSec == other.durationSec &&
           maxDimension == other.maxDimension &&
           webtoonRenderMode == other.webtoonRenderMode &&
+          interactiveReaderEnabled == other.interactiveReaderEnabled &&
           _listEquals(effects, other.effects) &&
           _mapEquals(paramOverrides, other.paramOverrides);
 
@@ -183,6 +192,7 @@ class MotionEffectSettings {
         durationSec,
         maxDimension,
         webtoonRenderMode,
+        interactiveReaderEnabled,
         Object.hashAll(effects),
         Object.hashAllUnordered(paramOverrides.keys),
       );
@@ -195,6 +205,7 @@ class MotionEffectSettings {
         'durationSec': durationSec,
         'maxDimension': maxDimension,
         'webtoonRenderMode': webtoonRenderMode.name,
+        'interactiveReaderEnabled': interactiveReaderEnabled,
       };
 
   factory MotionEffectSettings.fromJson(dynamic raw) {
@@ -223,6 +234,7 @@ class MotionEffectSettings {
       webtoonRenderMode: j['webtoonRenderMode'] == 'follow'
           ? MotionWebtoonRenderMode.follow
           : MotionWebtoonRenderMode.dwell,
+      interactiveReaderEnabled: j['interactiveReaderEnabled'] as bool? ?? false,
     );
   }
 

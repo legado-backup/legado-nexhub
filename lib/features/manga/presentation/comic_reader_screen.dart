@@ -38,6 +38,8 @@ import '../../../core/platform/platform_service.dart';
 import '../../../core/comic/models/motion_effect_settings.dart';
 import 'package:comic_motion_flutter/comic_motion_flutter.dart'
     show MotionGifView;
+import 'package:comic_motion_flutter/reader.dart'
+    show InteractivePageLayer, InteractivePageLayerState;
 import 'reader_settings_sheet.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/settings/reader_default_settings.dart';
@@ -240,6 +242,11 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   final GlobalKey _topBarKey = GlobalKey();
   final GlobalKey _bottomBarKey = GlobalKey();
   final GlobalKey _tapZonesKey = GlobalKey();
+
+  /// 互动阅读层：page URL → 叠加层状态，供 [ReaderTapZones.onTapAt] 转发
+  /// 中心点按。仅翻页单页模式为当前页建键。
+  final Map<String, GlobalKey<InteractivePageLayerState>> _interactiveKeys =
+      <String, GlobalKey<InteractivePageLayerState>>{};
 
   late ReaderPreferences _prefs;
   int _chapterIndex = 0;
@@ -4092,9 +4099,32 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
     _motionCache[url] = _MotionCacheEntry(result, full);
   }
 
+  /// 互动阅读层是否作用于当前页：开关开、翻页单页、未旋转（未放大已由
+  /// [_withPageMotion] 提前回退）；条漫 / gallery / 双页保持旧叠加。
+  bool _interactiveReaderActive(int rotation) {
+    return _prefs.motionEffects.interactiveReaderEnabled &&
+        _prefs.readingMode.isPaged &&
+        !_isGalleryMode &&
+        !_isDoublePage &&
+        rotation == 0;
+  }
+
+  /// 中心 / toggle 热区单击转发给当前页互动层；返回 true 表示已消费
+  /// （聚焦或收回页面），热区层不再切换 UI。
+  bool _handleInteractiveTap(Offset globalPosition) {
+    if (_images.isEmpty) return false;
+    final int idx = _currentPage.clamp(0, _images.length - 1);
+    final InteractivePageLayerState? state =
+        _interactiveKeys[_images[idx]]?.currentState;
+    if (state == null) return false;
+    return state.handleTap(globalPosition);
+  }
+
   /// 叠加页面动态效果：该页渲染结果已就绪、未放大、开关开启时，在静态页
-  /// 之上叠加 [MotionGifView]（同 fit / 同旋转 / 同滤镜，与原图显示矩形对齐；
-  /// GIF 与原图同宽高比）。IgnorePointer：动效层不拦截任何手势。
+  /// 之上叠加动效层（同 fit / 同旋转 / 同滤镜，与原图显示矩形对齐；
+  /// GIF 与原图同宽高比）。互动开关开启且翻页单页时改用
+  /// [InteractivePageLayer]（点按聚焦 / 撕开揭示）；否则保持 [MotionGifView]。
+  /// IgnorePointer：动效层不拦截任何手势。
   /// Stack 用 passthrough（paged 视口紧约束 / 条漫高度无界均成立），
   /// 叠加层 [Positioned.fill] 随静态页的显示矩形铺满。
   Widget _withPageMotion(String url, int rotation, Widget page) {
@@ -4109,6 +4139,29 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
       ReaderInitialZoom.fitHeight => BoxFit.fitHeight,
       ReaderInitialZoom.original => BoxFit.contain,
     };
+    final Widget overlay = _interactiveReaderActive(rotation)
+        ? InteractivePageLayer(
+            key: _interactiveKeys.putIfAbsent(
+              url,
+              () => GlobalKey<InteractivePageLayerState>(),
+            ),
+            gifBytes: gif,
+            firstFramePng: result.firstFramePng,
+            // 与静态页同宽高比：按渲染尺寸求 contain 显示矩形，
+            // 整页格（T0）与静态页严格对齐（含留白）。
+            imageSize: Size(
+              result.width.toDouble(),
+              result.height.toDouble(),
+            ),
+            fit: fit,
+            pauseWhenNotVisible: true,
+          )
+        : MotionGifView(
+            gifBytes: gif,
+            firstFramePng: result.firstFramePng,
+            fit: fit,
+            pauseWhenNotVisible: true,
+          );
     final Widget motion = ReaderImageFiltered(
       brightness: _prefs.filterBrightness,
       contrast: _prefs.filterContrast,
@@ -4119,12 +4172,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
       grayscale: _prefs.filterGrayscale,
       colorProfile: _prefs.colorProfile,
       // 滚出视口（双页/每屏多图模式）自动静帧省电，滚回恢复。
-      child: MotionGifView(
-        gifBytes: gif,
-        firstFramePng: result.firstFramePng,
-        fit: fit,
-        pauseWhenNotVisible: true,
-      ),
+      child: overlay,
     );
     return Stack(
       fit: StackFit.passthrough,
@@ -4930,6 +4978,9 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
                     }
                     return false;
                   },
+                  // 互动阅读层：中心点按聚焦 / 收回页面；未命中返回 false，
+                  // 照常切换 UI。
+                  onTapAt: _handleInteractiveTap,
                   onLongPress: (_images.isEmpty ||
                           !_prefs.showLongPressMenu ||
                           _prefs.enableLongPressToZoom)

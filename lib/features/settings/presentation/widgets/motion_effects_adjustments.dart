@@ -171,6 +171,16 @@ class MotionEffectsAdjustments extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const SizedBox(height: AppTokens.spaceMd),
+              // 互动阅读层（翻页单页模式）
+              SettingsSwitchTile(
+                key: const ValueKey<String>('motion.interactiveReader'),
+                title: l10n.motionInteractiveTitle,
+                subtitle: l10n.motionInteractiveDesc,
+                value: m.interactiveReaderEnabled,
+                onChanged: (v) =>
+                    onChanged(m.copyWith(interactiveReaderEnabled: v)),
+              ),
+              const SizedBox(height: AppTokens.spaceMd),
               // 快速预设
               _chipSection(
                 context,

@@ -113,6 +113,11 @@ class ReaderTapZones extends StatefulWidget {
   /// 为 null 时不拦截。
   final bool Function()? onTapIntercept;
 
+  /// 互动阅读层点按钩子：中心 / toggle 热区单击、且不在缩放交互态时，以
+  /// 全局坐标调用；返回 true 表示宿主已消费（如聚焦 / 收回页面），本次不再
+  /// 派发 toggle UI。点击时间 / 位置仍会记录，保证紧随的第二次点击构成双击缩放。
+  final bool Function(Offset globalPosition)? onTapAt;
+
   /// 控制栏区域判定：返回 true 表示该坐标落在顶部/底部控制栏上，此次指针不参与
   /// 热区翻页，交给控制栏自身的按钮处理。避免控制栏展开时点按钮误触发翻页。
   /// 为 null 时不做保护（例如控制栏隐藏的沉浸阅读状态）。
@@ -151,6 +156,7 @@ class ReaderTapZones extends StatefulWidget {
       this.onLongPressRelease,
       this.onUndoPageTurn,
       this.onTapIntercept,
+      this.onTapAt,
       this.isToolbarRegion,
       this.showPreview = false,
       this.previewLabels,
@@ -587,6 +593,15 @@ class _ReaderTapZonesState extends State<ReaderTapZones> {
     _lastTapTime = now;
     _lastTapPos = e.localPosition;
     final _TapAction effective = _effectiveAction(action);
+    // 互动阅读层：中心 / toggle 单击优先交给宿主（全局坐标）；消费则吞掉
+    // toggle UI，但保留本次点击记录供双击缩放判定。
+    if (effective == _TapAction.toggle) {
+      final bool consumed = widget.onTapAt?.call(e.position) ?? false;
+      if (consumed) {
+        _lastTapAction = null;
+        return;
+      }
+    }
     _dispatchEffective(effective);
     _lastTapAction = effective;
   }

@@ -10,6 +10,7 @@ void main() {
   Widget build({
     required bool interactive,
     required List<String> calls,
+    bool Function(Offset)? onTapAt,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -27,6 +28,7 @@ void main() {
           onUndoPageTurn: (next) => calls.add('undo:$next'),
           isZoomed: () => false,
           isZoomInteractive: () => interactive,
+          onTapAt: onTapAt,
         ),
       ),
     );
@@ -34,6 +36,9 @@ void main() {
 
   // 双击两击落在 leftRight 布局的 next 热区（x > 0.55 屏宽）。
   const Offset nextTap = Offset(700, 600);
+
+  // leftRight 布局中心 toggle 热区（x ∈ [0.45, 0.55] 屏宽）。
+  const Offset centerTap = Offset(400, 600);
 
   Future<void> doubleTap(WidgetTester tester) async {
     await tester.tapAt(nextTap);
@@ -111,5 +116,108 @@ void main() {
     await tester.tapAt(nextTap);
     await tester.pump(const Duration(milliseconds: 50));
     expect(calls, isEmpty);
+  });
+
+  group('onTapAt 互动阅读层钩子', () {
+    testWidgets('仅中心热区调用，返回 true 吞掉 toggle', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      final List<String> calls = <String>[];
+      final List<Offset> hooks = <Offset>[];
+      await tester.pumpWidget(build(
+        interactive: false,
+        calls: calls,
+        onTapAt: (pos) {
+          hooks.add(pos);
+          return true;
+        },
+      ));
+
+      await tester.tapAt(centerTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(hooks, hasLength(1));
+      // 钩子收到的是全局坐标（与点击位置一致）。
+      expect(hooks.single, centerTap);
+      expect(calls, isEmpty);
+    });
+
+    testWidgets('返回 false 时照常切换 UI', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      final List<String> calls = <String>[];
+      await tester.pumpWidget(build(
+        interactive: false,
+        calls: calls,
+        onTapAt: (pos) => false,
+      ));
+
+      await tester.tapAt(centerTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(calls, ['toggle']);
+    });
+
+    testWidgets('prev/next 热区不调用钩子', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      final List<String> calls = <String>[];
+      final List<Offset> hooks = <Offset>[];
+      await tester.pumpWidget(build(
+        interactive: false,
+        calls: calls,
+        onTapAt: (pos) {
+          hooks.add(pos);
+          return true;
+        },
+      ));
+
+      await tester.tapAt(nextTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(hooks, isEmpty);
+      expect(calls, ['next']);
+    });
+
+    testWidgets('吞掉的单击仍参与双击：第二击触发缩放', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      final List<String> calls = <String>[];
+      final List<Offset> hooks = <Offset>[];
+      await tester.pumpWidget(build(
+        interactive: false,
+        calls: calls,
+        onTapAt: (pos) {
+          hooks.add(pos);
+          return true;
+        },
+      ));
+
+      await tester.tapAt(centerTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(centerTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(calls, contains('zoomAt'));
+      expect(calls, isNot(contains('toggle')));
+      // 第二击走双击分支，不再调用互动钩子。
+      expect(hooks, hasLength(1));
+    });
+
+    testWidgets('缩放交互态下不调用钩子', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      final List<String> calls = <String>[];
+      final List<Offset> hooks = <Offset>[];
+      await tester.pumpWidget(build(
+        interactive: true,
+        calls: calls,
+        onTapAt: (pos) {
+          hooks.add(pos);
+          return true;
+        },
+      ));
+
+      await tester.tapAt(centerTap);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(hooks, isEmpty);
+      expect(calls, isEmpty);
+    });
   });
 }

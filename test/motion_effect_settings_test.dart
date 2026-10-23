@@ -54,6 +54,16 @@ void main() {
       expect(a == a.copyWith(), isTrue);
     });
 
+    test('interactiveReaderEnabled 往返、参与相等、不改变渲染配置', () {
+      const a = MotionEffectSettings();
+      expect(a.interactiveReaderEnabled, isFalse);
+      const b = MotionEffectSettings(interactiveReaderEnabled: true);
+      expect(MotionEffectSettings.fromJson(b.toJson()), b);
+      expect(a == b, isFalse);
+      // 互动层只切换阅读器叠加层，不动引擎渲染配置。
+      expect(b.toEffectConfig().toJson(), a.toEffectConfig().toJson());
+    });
+
     test('webtoonRenderMode 往返与非法值回退', () {
       const m = MotionEffectSettings(
           webtoonRenderMode: MotionWebtoonRenderMode.follow);
