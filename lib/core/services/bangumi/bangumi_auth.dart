@@ -23,7 +23,11 @@ class BangumiAuth extends ChangeNotifier {
     required BangumiClient client,
     FlutterSecureStorage? storage,
   })  : _client = client,
-        _storage = storage ?? const FlutterSecureStorage();
+        _storage = storage ?? const FlutterSecureStorage() {
+    // 所有 Bangumi API 请求共用本 client：401 时用 refresh_token 续期，
+    // 成功后由 client 用新 token 自动重试原请求。
+    _client.onUnauthorized = _refreshOnUnauthorized;
+  }
 
   static const String _tokenKey = 'bangumi_access_token';
   static const String _usernameKey = 'bangumi_username';
@@ -43,6 +47,9 @@ class BangumiAuth extends ChangeNotifier {
 
   /// access_token 过期时刻（毫秒时间戳），null = 未知/不过期。
   int? _expiresAt;
+
+  /// 进行中的续期（并发 401 共用同一次刷新）。
+  Future<void>? _refreshing;
 
   bool get isLoggedIn => _token != null && _token!.isNotEmpty;
 
@@ -178,10 +185,33 @@ class BangumiAuth extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 用 refresh_token 续期 access_token（OAuth 登录且未过期时调用）。
+  /// 用 refresh_token 续期 access_token。
   ///
   /// 非 OAuth 登录（_refreshToken 为空）时直接返回，不做任何操作。
-  Future<void> refresh() async {
+  /// 并发调用共用同一次刷新，避免轮换后的 refresh_token 被并发请求作废。
+  Future<void> refresh() {
+    final pending = _refreshing;
+    if (pending != null) return pending;
+    final future = _doRefresh().whenComplete(() => _refreshing = null);
+    _refreshing = future;
+    return future;
+  }
+
+  /// [BangumiClient.onUnauthorized] 回调：续期成功返回 true。
+  ///
+  /// 无 refresh_token（个人 token 登录）或续期失败时返回 false，
+  /// 保留原始 401 交给调用方提示重新登录。
+  Future<bool> _refreshOnUnauthorized() async {
+    if (_refreshToken == null || _refreshToken!.isEmpty) return false;
+    try {
+      await refresh();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _doRefresh() async {
     if (_refreshToken == null || _refreshToken!.isEmpty) return;
     final token = await _client.refreshToken(
       clientId: BangumiOAuthConfig.clientId,

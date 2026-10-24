@@ -52,6 +52,12 @@ class BangumiClient {
   /// 当前 Bearer token（null = 匿名）。
   String? token;
 
+  /// 带 token 的请求收到 401 时的续期回调。
+  ///
+  /// 返回 true 表示 token 已更新，[_request] 会用新 token 立即重试一次；
+  /// 返回 false 表示无法续期，保留原始 401。由 [BangumiAuth] 注入。
+  Future<bool> Function()? onUnauthorized;
+
   /// 上一次请求完成时间（节流用）。
   DateTime _lastRequestAt = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -89,7 +95,9 @@ class BangumiClient {
       }
       Response<dynamic>? response;
       Object? lastError;
-      for (int attempt = 0; attempt < _maxAttempts; attempt++) {
+      int attempt = 0;
+      bool refreshed = false;
+      while (attempt < _maxAttempts) {
         if (attempt > 0) {
           // 指数退避：1s → 2s。
           await Future<void>.delayed(Duration(seconds: 1 << (attempt - 1)));
@@ -115,12 +123,23 @@ class BangumiClient {
           );
           lastError = null;
           final code = response.statusCode ?? 0;
+          // token 失效：续期成功则用新 token 立即重试，且只续期一次
+          // （continue 跳过 attempt 自增，重试不占用退避次数）。
+          if (code == 401 &&
+              !refreshed &&
+              token != null &&
+              token!.isNotEmpty &&
+              onUnauthorized != null) {
+            refreshed = true;
+            if (await onUnauthorized!()) continue;
+          }
           // 429/5xx 可重试，其余直接返回。
           if (code != 429 && code < 500) break;
         } on DioException catch (e) {
           lastError = e;
           response = null;
         }
+        attempt++;
       }
       _lastRequestAt = DateTime.now();
       if (response == null) {
@@ -200,6 +219,9 @@ class BangumiClient {
   }
 
   /// 用 refresh_token 续期（POST /oauth/access_token，grant_type=refresh_token）。
+  ///
+  /// 直连 [_dio]、不进 [_request] 的串行队列——401 续期回调在队列内执行，
+  /// 走队列会自锁。
   ///
   /// 返回的 refresh_token 会与请求值不同（Bangumi 轮换），方法已回退到原值。
   Future<BangumiToken> refreshToken({
