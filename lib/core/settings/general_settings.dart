@@ -122,6 +122,9 @@ class GeneralSettings {
   /// Hero 轮播背景图 URL 列表（默认二次元图，可自定本地/网络）。
   final List<String> heroImageUrls;
 
+  /// 鸿蒙：轻点系统状态栏回到当前页面顶部（默认开启）。
+  final bool statusBarTapToTop;
+
   /// 首次启动引导是否已完成（项 9）。全新安装为 false，走完引导页后置 true。
   final bool onboardingCompleted;
 
@@ -137,6 +140,7 @@ class GeneralSettings {
     this.glassBarOpacity = 0.78,
     this.sourceDragSplitEffect = false,
     this.heroImageUrls = kDefaultHeroImageUrls,
+    this.statusBarTapToTop = true,
     this.onboardingCompleted = false,
   });
 
@@ -152,6 +156,7 @@ class GeneralSettings {
     double? glassBarOpacity,
     bool? sourceDragSplitEffect,
     List<String>? heroImageUrls,
+    bool? statusBarTapToTop,
     bool? onboardingCompleted,
   }) =>
       GeneralSettings(
@@ -170,6 +175,7 @@ class GeneralSettings {
         sourceDragSplitEffect:
             sourceDragSplitEffect ?? this.sourceDragSplitEffect,
         heroImageUrls: heroImageUrls ?? this.heroImageUrls,
+        statusBarTapToTop: statusBarTapToTop ?? this.statusBarTapToTop,
         onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       );
 
@@ -185,6 +191,7 @@ class GeneralSettings {
         'glassBarOpacity': glassBarOpacity,
         'sourceDragSplitEffect': sourceDragSplitEffect,
         'heroImageUrls': heroImageUrls,
+        'statusBarTapToTop': statusBarTapToTop,
         'onboardingCompleted': onboardingCompleted,
       };
 
@@ -226,6 +233,8 @@ class GeneralSettings {
               ?.map((e) => e.toString())
               .toList() ??
           const <String>[],
+      // 缺省（老用户升级）回落 true：鸿蒙端轻点状态栏回顶为系统级惯例。
+      statusBarTapToTop: (json['statusBarTapToTop'] as bool?) ?? true,
       // 缺省（老用户升级/脏数据）回落 false：首次启动仍走引导，走完即置 true。
       onboardingCompleted: (json['onboardingCompleted'] as bool?) ?? false,
     );
@@ -310,6 +319,15 @@ class GeneralSettingsStore extends ChangeNotifier {
   Future<void> setSourceDragSplitEffect(bool value) async {
     if (value == _settings.sourceDragSplitEffect) return;
     await save(_settings.copyWith(sourceDragSplitEffect: value));
+  }
+
+  /// 鸿蒙：是否轻点状态栏回到页面顶部。
+  bool get statusBarTapToTop => _settings.statusBarTapToTop;
+
+  /// 设置鸿蒙状态栏点按回顶（持久化、广播）。
+  Future<void> setStatusBarTapToTop(bool value) async {
+    if (value == _settings.statusBarTapToTop) return;
+    await save(_settings.copyWith(statusBarTapToTop: value));
   }
 
   /// 设置「已看」阈值百分比（自动裁剪到 50–100 并持久化、广播）。

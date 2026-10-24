@@ -1,5 +1,8 @@
-
 import { FlutterAbility, FlutterEngine } from '@ohos/flutter_ohos';
+import AbilityConstant from '@ohos.app.ability.AbilityConstant';
+import type Want from '@ohos.app.ability.Want';
+import window from '@ohos.window';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant';
 import ClipboardPlugin from '../plugins/ClipboardPlugin';
 import FileExportPlugin from '../plugins/FileExportPlugin';
@@ -11,8 +14,18 @@ import VolumeKeyPlugin from '../plugins/VolumeKeyPlugin';
 import WallpaperColorPlugin from '../plugins/WallpaperColorPlugin';
 import DeviceFormPlugin from '../plugins/DeviceFormPlugin';
 import WindowControlPlugin from '../plugins/WindowControlPlugin';
+import HarmonyContinuationPlugin from '../plugins/HarmonyContinuationPlugin';
+import BackgroundTaskPlugin from '../plugins/BackgroundTaskPlugin';
+
+/// 跨设备接续数据在 want.parameters 中的键（与 Dart 侧约定一致）。
+const CONTINUATION_KEY: string = 'nexhub_continuation';
 
 export default class EntryAbility extends FlutterAbility {
+  /// 常驻实例：onContinue / onCreate 可能在 configureFlutterEngine 之前回调，
+  /// 未挂载引擎时通道为空，插件内部自行降级返回 null。
+  private continuation: HarmonyContinuationPlugin = new HarmonyContinuationPlugin();
+  private backgroundTask: BackgroundTaskPlugin = new BackgroundTaskPlugin();
+
   configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     GeneratedPluginRegistrant.registerWith(flutterEngine)
@@ -36,5 +49,81 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new DeviceFormPlugin())
     // 应用级原生通道：窗口全屏控制（2in1 PC，见 WindowControlPlugin 注释）。
     flutterEngine.getPlugins()?.add(new WindowControlPlugin())
+    // 应用级原生通道：跨设备接续（流转，见 HarmonyContinuationPlugin 注释）。
+    flutterEngine.getPlugins()?.add(this.continuation)
+    // 应用级原生通道：后台下载长任务（dataTransfer，见 BackgroundTaskPlugin 注释）。
+    flutterEngine.getPlugins()?.add(this.backgroundTask)
+  }
+
+  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam) {
+    super.onCreate(want, launchParam)
+    // 默认不可接续：仅当播放器 / 阅读器挂载后由 Dart 置为 ACTIVE，
+    // 避免无内容时对端出现接续入口、点击后提示接续失败。
+    this.context
+      .setMissionContinueState(AbilityConstant.ContinueState.INACTIVE)
+      .catch((err: BusinessError) => {
+        console.error(`setMissionContinueState failed: ${err.code} ${err.message}`);
+      });
+    if (this.handleContinuation(want, launchParam, false)) {
+      // 接续冷启动时系统触发 onWindowStageRestore 而非 onWindowStageCreate，
+      // FlutterAbility 不使用 ArkUI 页面栈，需主动恢复窗口内容。
+      this.context.restoreWindowStage(new LocalStorage());
+    }
+  }
+
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam) {
+    super.onNewWant(want, launchParam)
+    // 热启动：窗口与 Flutter 引擎均已就绪，可直接推送通知 Dart 跳转。
+    this.handleContinuation(want, launchParam, true);
+  }
+
+  /**
+   * 接续冷启动的窗口恢复回调。FlutterAbility 未实现此回调（不使用
+   * ArkUI 页面栈），按正常创建流程初始化 Flutter 视图并加载页面。
+   */
+  onWindowStageRestore(windowStage: window.WindowStage): void {
+    this.onWindowStageCreate(windowStage);
+  }
+
+  /**
+   * 源端（发起方）：系统发起接续时向 Dart 拉取当前播放/阅读快照。
+   * 无持有者（Dart 返回 null）时拒绝本次接续。
+   */
+  async onContinue(
+    wantParam: Record<string, Object>): Promise<AbilityConstant.OnContinueResult> {
+    const state: string | null = await this.continuation.getContinuationState();
+    if (state == null || state.length == 0) {
+      return AbilityConstant.OnContinueResult.REJECT;
+    }
+    wantParam[CONTINUATION_KEY] = state;
+    return AbilityConstant.OnContinueResult.AGREE;
+  }
+
+  /**
+   * 对端（接收方）：从 want 中取出源端快照并暂存，由 Dart 首帧后拉取。
+   * 返回是否为接续启动。
+   */
+  private handleContinuation(want: Want, launchParam: AbilityConstant.LaunchParam,
+    notify: boolean): boolean {
+    if (launchParam.launchReason !== AbilityConstant.LaunchReason.CONTINUATION) {
+      return false;
+    }
+    const data: Object | undefined = want.parameters?.[CONTINUATION_KEY];
+    if (typeof data === 'string') {
+      const text: string = data as string;
+      if (text.length > 0) {
+        this.continuation.setPendingContinuation(text, notify);
+      }
+    }
+    return true;
+  }
+
+  onWindowStageCreate(windowStage: window.WindowStage) {
+    super.onWindowStageCreate(windowStage)
+    // 窗口尺寸与位置记忆（2in1 / 平板自由窗口）：交系统托管，
+    // 下次冷启动按上次关闭时的窗口矩形与状态恢复。
+    windowStage.setWindowRectAutoSave(true).catch((err: BusinessError) => {
+      console.error(`setWindowRectAutoSave failed: ${err.code} ${err.message}`);
+    });
   }
 }

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'core/player/player_runtime.dart';
 import 'core/platform/platform_service.dart';
 import 'core/platform/window_service.dart';
+import 'core/platform/harmony_continuation.dart';
 import 'core/network/runtime/nexhub_http_overrides.dart';
 import 'core/debug/crash_log.dart';
 import 'core/utils/app_log.dart';
@@ -26,6 +27,9 @@ void main() {
 
     // 鸿蒙需要原生 deviceType 才能区分手机 / PC；非鸿蒙立即返回。
     await PlatformService.instance.initializeFormFactor();
+
+    // 鸿蒙跨设备接续：尽早注册原生回调，系统发起接续时才能拉到快照。
+    HarmonyContinuation.initialize();
 
     // 内置开源字体许可（SIL OFL 1.1 要求随字体分发许可全文）。字体文件见
     // pubspec.yaml fonts 段，许可全文位于 assets/licenses/fonts/，注册进

@@ -28,6 +28,18 @@
         ],
         "minWindowWidth": 480,
         "minWindowHeight": 600,
+        // 跨设备接续（流转）：接收端冷启动走 onWindowStageRestore，
+        // 由 EntryAbility 接管后照常加载 Flutter 视图。
+        "continuable": true,
+        // 后台长任务：下载在后台继续（dataTransfer）。
+        // audioPlayback 暂不声明：audio_service 无鸿蒙实现，避免系统面板
+        // 出现「正在播放」却无音频后台任务可接管。
+        "backgroundModes": [
+          "dataTransfer"
+        ],
+        // 随传感器自由旋转；2in1 自由窗口下优先横屏布局。
+        "orientation": "auto_rotation_unspecified",
+        "preferMultiWindowOrientation": "landscape_auto",
         "exported": true,
         "skills": [
           {
@@ -43,6 +55,14 @@
     ],
     "requestPermissions": [
       {"name" :  "ohos.permission.INTERNET"},
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+        "reason": "$string:keep_background_running_reason",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
+      },
     ]
   }
 }

@@ -19,6 +19,7 @@ import '../../../core/theme/palette_style.dart';
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/settings/detail_appearance_settings.dart';
 import '../../../core/settings/general_settings.dart';
+import '../../../core/platform/platform_service.dart';
 import '../../../core/widgets/app_animations.dart';
 import '../../../core/widgets/app_alert_dialog.dart';
 import '../../../core/utils/app_haptics.dart';
@@ -509,6 +510,29 @@ class _SettingsAppearanceScreenState extends State<SettingsAppearanceScreen> {
                       );
                     },
                   ),
+                  // 鸿蒙：状态栏点按回顶（引擎转发 CLICK_STATUSBAR，非鸿蒙不显示）。
+                  if (PlatformService.instance.isOHOS)
+                    ListenableBuilder(
+                      listenable: GeneralSettingsStore.instance,
+                      builder: (context, _) {
+                        final GeneralSettingsStore store =
+                            GeneralSettingsStore.instance;
+                        return SettingsTile(
+                          icon: Icons.vertical_align_top_rounded,
+                          title: l10n.statusBarTapToTopTitle,
+                          subtitle: l10n.statusBarTapToTopDesc,
+                          trailing: Switch(
+                            value: store.settings.statusBarTapToTop,
+                            onChanged: (bool v) {
+                              v
+                                  ? AppHaptics.toggleOn()
+                                  : AppHaptics.toggleOff();
+                              store.setStatusBarTapToTop(v);
+                            },
+                          ),
+                        );
+                      },
+                    ),
                   SettingsTile(
                     icon: Icons.palette_rounded,
                     title: l10n.paletteStyleTitle,

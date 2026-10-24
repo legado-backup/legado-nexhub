@@ -39,6 +39,7 @@ import '../../../core/player/pip_actions_bridge.dart';
 import '../../../core/player/play_queue_store.dart';
 import '../../../core/player/subtitle_translation_controller.dart';
 import '../../../core/navigation/app_page_route.dart';
+import '../../../core/platform/harmony_continuation.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/settings/player_settings.dart';
 import '../../../core/player/widgets/seek_bar.dart';
@@ -166,6 +167,12 @@ class VideoPlayerScreen extends StatefulWidget {
   /// 封面 URL（用于收藏时透传，避免收藏书架缺封面）。
   final String? coverUrl;
 
+  /// 接续恢复：跳到指定播放位置（毫秒）。非空时覆盖本地保存的进度。
+  final int? initialPositionMs;
+
+  /// 接续恢复：起播后是否播放（对端暂停状态原样迁移）。
+  final bool initialPlaying;
+
   /// 媒体服务器播放控制器：非空时为媒体服务器直连播放——
   /// 进度只上报服务器（不写本地历史 box，§2.5）、续播 seek 用服务器进度、
   /// 弹幕入口隐藏、退出兜底上报 Stopped 并按 ≥90% 标记已看；
@@ -189,6 +196,8 @@ class VideoPlayerScreen extends StatefulWidget {
     this.detailUrl,
     this.coverUrl,
     this.restoreProgress = true,
+    this.initialPositionMs,
+    this.initialPlaying = true,
     this.mediaServerPlayback,
   });
 
@@ -605,6 +614,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   /// 因此恢复完成前一律不保存位置。切集时重置为 false。
   bool _positionRestoreDone = false;
 
+  /// 跨设备接续持有者 token（null = 未注册，如本地 / 直链播放）。
+  Object? _continuationToken;
+
   /// 当前剧集索引（若有全集列表）。
   late int _episodeIndex;
 
@@ -672,6 +684,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     // 过滤后的 ep 副本），未提供时退化为 null 表示"未分组 / 全部"。
     _selectedLine = widget.episode.lineName;
     _initFuture = _init();
+    // 跨设备接续：在线播放注册快照（本地文件 / 直链 / 媒体服务器对端无法重现）。
+    if (!_isDirectMode && !_isMediaServer && widget.sourceId.isNotEmpty) {
+      _continuationToken =
+          HarmonyContinuation.attach(_buildContinuationSnapshot);
+    }
     // 阅读/观看时长统计 —— 仅在有效 sourceId 时启用（本地模式不计入跨源时长）。
     if (widget.sourceId.isNotEmpty) {
       unawaited(ReadingSessionRecorder.instance.begin(
@@ -857,6 +874,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     return Uri.tryParse(base)?.resolve(url).toString();
   }
 
+  /// 打开媒体后起播。跨设备接续恢复对端的暂停状态时不自动播放。
+  void _startPlayback() {
+    if (widget.initialPlaying) {
+      unawaited(_controller.play());
+    }
+  }
+
+  /// 跨设备接续快照：内容标识 + 当前集 + 播放位置/状态。
+  ///
+  /// 仅在在线播放（有 sourceId）且播放器已创建时注册，见 [initState]。
+  Map<String, Object?>? _buildContinuationSnapshot() {
+    if (!_controllerCreated || _disposed) return null;
+    final List<Episode>? episodes = widget.episodes;
+    final Episode current = (episodes != null &&
+            _episodeIndex >= 0 &&
+            _episodeIndex < episodes.length)
+        ? episodes[_episodeIndex]
+        : widget.episode;
+    final ({List<Map<String, dynamic>> items, int start})? window =
+        HarmonyContinuation.encodeChapterWindow(episodes, _episodeIndex);
+    return <String, Object?>{
+      'type': 'video',
+      'title': widget.title,
+      'sourceId': widget.sourceId,
+      'contentId': widget.itemId,
+      'chapterIndex': _episodeIndex,
+      'episode': current.toJson(),
+      if (window != null) 'episodes': window.items,
+      if (window != null) 'episodeStart': window.start,
+      'positionMs': _position.inMilliseconds,
+      'playing': _isPlaying,
+      if (widget.detailUrl != null) 'detailUrl': widget.detailUrl,
+      if (widget.coverUrl != null) 'coverUrl': widget.coverUrl,
+    };
+  }
+
   Future<void> _init() async {
     // 鸿蒙阶段 4 前无播放内核（media_kit/libmpv）：不得创建 Player 与
     // VideoController（原生库缺失会异常），直接走统一错误页展示降级提示。
@@ -982,7 +1035,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             '可能是文件位置 media_kit 无法读取）');
       }
       // 直链 / 本地模式打开后自动播放（与在线分支对齐，修复「打开即暂停」）。
-      _controller.play();
+      _startPlayback();
       // 分级超时等待元数据，超时自动 re-open 一次自愈。
       unawaited(_retryOpenOnceIfStalled());
       AppLog.instance.i('[本地视频打开] media_kit.open 完成，'
@@ -1035,7 +1088,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
       await _controller.open(playUrl, headers: playHeaders);
       // 解析成功后自动开始播放
-      _controller.play();
+      _startPlayback();
       // 分级超时等待元数据（媒体服务器 30s），超时自动 re-open 一次自愈。
       unawaited(_retryOpenOnceIfStalled());
     }
@@ -1073,7 +1126,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         );
       }
     }
-    if (widget.restoreProgress) {
+    if (widget.restoreProgress || widget.initialPositionMs != null) {
       unawaited(_restoreSavedPosition());
     } else {
       _positionRestoreDone = true;
@@ -1958,6 +2011,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         if (widget.restoreProgress && savedMs > 5000) {
           await _seekWhenReady(Duration(milliseconds: savedMs));
         }
+        return;
+      }
+      // 跨设备接续带入的位置优先于本地保存的进度。
+      final int? initialMs = widget.initialPositionMs;
+      if (initialMs != null && initialMs > 5000) {
+        await _seekWhenReady(Duration(milliseconds: initialMs));
         return;
       }
       final mgr = context.read<MediaPlaybackPositionManager>();
@@ -3842,6 +3901,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // 跨设备接续：退场后本页不再作为接续来源。
+    final Object? continuationToken = _continuationToken;
+    if (continuationToken != null) {
+      _continuationToken = null;
+      HarmonyContinuation.detach(continuationToken);
+    }
     // 退出时保存最后播放位置（媒体服务器改走会话 Stopped 上报）。
     _saveCurrentPosition();
     if (_isMediaServer) {

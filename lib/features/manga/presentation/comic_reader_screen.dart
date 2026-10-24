@@ -19,6 +19,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../../../core/platform/brightness_compat.dart';
+import '../../../core/platform/harmony_continuation.dart';
 import '../../../core/platform/window_service.dart';
 
 import '../../../core/utils/app_haptics.dart';
@@ -200,6 +201,9 @@ class ComicReaderScreen extends StatefulWidget {
   /// - false：从详情页明确选择某话进入时，以 [initialChapterIndex] 为准。
   final bool restoreProgress;
 
+  /// 跨设备接续：在另一台设备上恢复到的页码（优先级高于本地存档）。
+  final int? initialPage;
+
   /// 详情页 URL（用于收藏时透传，避免历史/收藏详情灰屏）。
   final String? detailUrl;
 
@@ -219,6 +223,7 @@ class ComicReaderScreen extends StatefulWidget {
     this.localArchivePaths,
     this.localChapterDirs,
     this.restoreProgress = true,
+    this.initialPage,
     this.detailUrl,
     this.coverUrl,
   });
@@ -235,6 +240,9 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
   /// 下载管理器（initState 缓存引用，dispose 阶段 context 已不可用）。
   DownloadManager? _downloadManager;
   FavoritesManager? _favorites;
+
+  /// 跨设备接续快照订阅句柄（dispose 时解绑）。
+  Object? _continuationToken;
   final TransformationController _zoomController = TransformationController();
 
   /// 顶部 / 底部控制栏与点击热区覆盖层的全局键：用于 [ReaderTapZones.isToolbarRegion]
@@ -878,6 +886,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
     HardwareKeyboard.instance.addHandler(_onGlobalKey);
     _applyImageCacheBudget();
     _init();
+    // 跨设备接续：仅在线多章内容参与（本地文件无跨设备语义）。
+    if (!_isLocalMode && widget.sourceId.isNotEmpty) {
+      _continuationToken = HarmonyContinuation.attach(_buildContinuationSnapshot);
+    }
     // 阅读时长统计：进入阅读器即开始，dispose 时一次性结算。
     if (widget.sourceId.isNotEmpty) {
       final initialTitle = widget.chapters.isNotEmpty &&
@@ -894,6 +906,28 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
         lastChapterTitle: initialTitle,
       ));
     }
+  }
+
+  /// 跨设备接续快照：当前章 + 章节窗口（控制 want 参数体积）+ 页码。
+  Map<String, Object?>? _buildContinuationSnapshot() {
+    final List<Episode> chapters = widget.chapters;
+    if (chapters.isEmpty) return null;
+    final int idx = _chapterIndex.clamp(0, chapters.length - 1);
+    final ({List<Map<String, dynamic>> items, int start})? window =
+        HarmonyContinuation.encodeChapterWindow(chapters, idx);
+    return <String, Object?>{
+      'type': 'comic',
+      'title': widget.title,
+      'sourceId': widget.sourceId,
+      'contentId': widget.comicId,
+      'chapterIndex': idx,
+      'episode': chapters[idx].toJson(),
+      if (window != null) 'episodes': window.items,
+      if (window != null) 'episodeStart': window.start,
+      'page': _currentPage < 0 ? 0 : _currentPage,
+      if (widget.detailUrl != null) 'detailUrl': widget.detailUrl,
+      if (widget.coverUrl != null) 'coverUrl': widget.coverUrl,
+    };
   }
 
   Future<void> _init() async {
@@ -930,6 +964,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
           _chapterPageCache[ci] = e.value;
         }
       }
+    }
+    // 跨设备接续：接续页码优先于本地存档（另一台设备可能读得更远）。
+    if (widget.initialPage != null) {
+      _savedPage = widget.initialPage!;
     }
     _syncTranslation();
     _refreshFavorite();
@@ -1366,6 +1404,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen>
 
   @override
   void dispose() {
+    if (_continuationToken != null) {
+      HarmonyContinuation.detach(_continuationToken!);
+      _continuationToken = null;
+    }
     // 兜底提交设备/会话层草稿：设置面板开着直接退出阅读器（返回键 / 关窗）时，
     // 面板内的改动（自动翻页间隔、自动下载开关等）没有经过任何关闭路径提交，
     // 不在此落盘就会全部丢失（「设置完退出重进后消失」的根因）。

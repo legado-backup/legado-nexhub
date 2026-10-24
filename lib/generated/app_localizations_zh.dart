@@ -486,6 +486,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sourceDragSplitDesc => '拖动源排序时卡片断开、圆角实时跟随；关闭后为简化效果，卡片保持完整';
 
   @override
+  String get statusBarTapToTopTitle => '轻点状态栏回到顶部';
+
+  @override
+  String get statusBarTapToTopDesc => '鸿蒙设备上轻点系统状态栏，当前页面快速滚动回顶部';
+
+  @override
   String get glassBlurStrength => '模糊强度';
 
   @override

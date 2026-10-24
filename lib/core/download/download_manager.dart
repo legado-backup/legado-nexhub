@@ -28,6 +28,7 @@ import '../services/cloud_sync_service.dart';
 import '../services/novel_export_upload_service.dart';
 import '../utils/app_log.dart';
 import '../platform/platform_service.dart';
+import '../platform/background_task.dart';
 import '../local/saf_bridge.dart' show normalizeSafTreeUri;
 import '../platform/ohos_public_storage.dart'
     show OhosPublicStorage, isOhosDocPath;
@@ -1186,8 +1187,12 @@ class DownloadManager extends ChangeNotifier {
     List<Episode> chapters,
   ) async {
     _running++;
+    // 鸿蒙：有下载在跑时申请后台保活（dataTransfer），退后台不被冻结。
+    // 在首个 await 前持有，队列交接时新任务先持有、旧任务后释放，不会 stop/start 抖动。
+    BackgroundTask.acquire();
     if (_settings.wifiOnly && !await _isWifiConnected()) {
       _running--;
+      BackgroundTask.release();
       _updateTask(task.id, status: DownloadStatus.waitingForWifi);
       _waitingForWifi.add(_QueuedDownload(task, item, chapters));
       notifyListeners();
@@ -1199,6 +1204,7 @@ class DownloadManager extends ChangeNotifier {
     } finally {
       _running--;
       _pumpQueue();
+      BackgroundTask.release();
     }
   }
 

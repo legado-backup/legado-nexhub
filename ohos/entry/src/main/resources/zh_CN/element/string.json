@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "NexHub"
+    },
+    {
+      "name": "keep_background_running_reason",
+      "value": "下载在后台继续"
     }
   ]
 }

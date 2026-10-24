@@ -18,6 +18,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../../../core/platform/brightness_compat.dart';
+import '../../../core/platform/harmony_continuation.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -154,6 +155,10 @@ class NovelReaderScreen extends StatefulWidget {
   /// 章节列表点击场景）。默认 true（与本地模式等场景保持原行为兼容）。
   final bool restoreProgress;
 
+  /// 跨设备接续：进入时直接落到的页码 / 章内字符偏移（优先于本地进度）。
+  final int? initialPage;
+  final int? initialCharOffset;
+
   const NovelReaderScreen({
     super.key,
     required this.novelId,
@@ -167,6 +172,8 @@ class NovelReaderScreen extends StatefulWidget {
     this.detailUrl,
     this.coverUrl,
     this.restoreProgress = true,
+    this.initialPage,
+    this.initialCharOffset,
   });
 
   @override
@@ -404,6 +411,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// 网络拉取的原始图文块（未做繁简转换）。
   List<NovelBlock> _rawParagraphs = const <NovelBlock>[];
 
+  /// 跨设备接续持有者 token（null = 未注册，如本地书 / 无源）。
+  Object? _continuationToken;
+
   /// 实际渲染的图文块（应用繁简转换 + 替换规则后）。
   List<NovelBlock> _paragraphs = const <NovelBlock>[];
 
@@ -529,6 +539,30 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       widget.localTextPath != null ||
       widget.localEpubPath != null ||
       widget.localChapterPaths != null;
+
+  /// 跨设备接续快照：书标识 + 当前章 + 页码 / 字符偏移。
+  Map<String, Object?>? _buildContinuationSnapshot() {
+    final List<Episode> chapters = _effectiveChapters;
+    if (chapters.isEmpty) return null;
+    final int idx = _chapterIndex.clamp(0, chapters.length - 1);
+    final ({List<Map<String, dynamic>> items, int start})? window =
+        HarmonyContinuation.encodeChapterWindow(chapters, idx);
+    final int page = _currentPage < 0 ? 0 : _currentPage;
+    return <String, Object?>{
+      'type': 'novel',
+      'title': widget.title,
+      'sourceId': widget.sourceId,
+      'contentId': widget.novelId,
+      'chapterIndex': idx,
+      'episode': chapters[idx].toJson(),
+      if (window != null) 'episodes': window.items,
+      if (window != null) 'episodeStart': window.start,
+      'page': page,
+      if (_pagination != null) 'charOffset': _charOffsetForPage(page),
+      if (widget.detailUrl != null) 'detailUrl': widget.detailUrl,
+      if (widget.coverUrl != null) 'coverUrl': widget.coverUrl,
+    };
+  }
 
   /// 本地聚合模式（B 阶段）：多个文本/EPUB 文件合成一整本，每个文件 = 一章。
   bool get _isAggregatedLocal =>
@@ -685,6 +719,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _initBrightness();
     _initTimeAndBattery();
     _init();
+    // 跨设备接续：在线书籍注册快照（本地文件对端无法重现，不参与）。
+    if (!_isLocalMode && widget.sourceId.isNotEmpty) {
+      _continuationToken =
+          HarmonyContinuation.attach(_buildContinuationSnapshot);
+    }
     // 阅读时长统计：进入阅读器即开始，dispose 时一次性结算。
     if (widget.sourceId.isNotEmpty) {
       final initialTitle = widget.chapters.isNotEmpty &&
@@ -814,6 +853,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           _savedCharOffset = saved.charOffset;
         }
       }
+    }
+    // 跨设备接续：对端带入的页码 / 字符偏移优先于本地保存的进度
+    // （本机可能没有这本书的历史进度）。
+    if (widget.initialPage != null || widget.initialCharOffset != null) {
+      _savedPage = widget.initialPage ?? 0;
+      _savedCharOffset = widget.initialCharOffset;
     }
     _refreshFavorite();
     await _notes.init();
@@ -1860,6 +1905,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   @override
   void dispose() {
+    // 跨设备接续：退场后本页不再作为接续来源。
+    final Object? continuationToken = _continuationToken;
+    if (continuationToken != null) {
+      _continuationToken = null;
+      HarmonyContinuation.detach(continuationToken);
+    }
     // 离开阅读器中断预扫描（已完成章节已逐批落盘，重进可续扫）。
     _prescanCancelled = true;
     _prescanUi.dispose();

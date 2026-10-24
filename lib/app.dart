@@ -6,6 +6,8 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:provider/provider.dart';
 import 'package:saf/saf.dart';
 import 'core/locale/locale_controller.dart';
+import 'core/navigation/app_navigator.dart';
+import 'core/platform/harmony_continuation.dart';
 import 'core/platform/platform_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/system_wallpaper_color.dart';
@@ -15,6 +17,7 @@ import 'core/settings/general_settings.dart';
 import 'core/services/software_announcement_service.dart';
 import 'core/widgets/software_announcement_dialog.dart';
 import 'core/widgets/app_scroll_behavior.dart';
+import 'core/widgets/status_bar_tap_to_top.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
@@ -75,6 +78,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         return MaterialApp(
           title: 'nexhub',
           debugShowCheckedModeBanner: false,
+          navigatorKey: AppNavigator.key,
           scrollBehavior: const AppScrollBehavior(),
           // 桥接仍基于框架 flutter/material 的第三方包（flutter_js / inappwebview / media_kit）
           builder: (BuildContext context, Widget? child) {
@@ -83,7 +87,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
             // 无 AppBar 的页面也能生效；主题切换即时跟随。
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: AppTheme.systemOverlayStyle(Theme.of(context)),
-              child: MaterialUiCompatibilityBridge(child: child!),
+              child: StatusBarTapToTop(
+                child: MaterialUiCompatibilityBridge(child: child!),
+              ),
             );
           },
           theme: controller.lightTheme(lightDynamic),
@@ -129,7 +135,16 @@ class _AppBootstrapState extends State<_AppBootstrap> {
     if (_onboardingDone) {
       _maybeShowAnnouncements();
       _maybePromptPublicDownloadDir();
+      _consumeContinuation();
     }
+  }
+
+  /// 鸿蒙跨设备接续：首帧后取走暂存快照并打开对应页面。
+  /// 未完成引导时先不消费，等引导结束后再触发（见 [_onOnboardingDone]）。
+  void _consumeContinuation() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(HarmonyContinuation.consumePending());
+    });
   }
 
   void _onOnboardingDone() {
@@ -140,6 +155,7 @@ class _AppBootstrapState extends State<_AppBootstrap> {
     setState(() => _onboardingDone = true);
     _maybeShowAnnouncements();
     _maybePromptPublicDownloadDir();
+    _consumeContinuation();
   }
 
   /// 引导用户选择公开下载目录（仅 Android + 尚未设置过目录时）。

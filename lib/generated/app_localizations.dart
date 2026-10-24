@@ -1028,6 +1028,18 @@ abstract class AppLocalizations {
   /// **'Split the source card with live corner updates while reordering; off keeps the card intact (simpler effect)'**
   String get sourceDragSplitDesc;
 
+  /// No description provided for @statusBarTapToTopTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap status bar to top'**
+  String get statusBarTapToTopTitle;
+
+  /// No description provided for @statusBarTapToTopDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'On HarmonyOS, tap the system status bar to quickly scroll the current page back to the top'**
+  String get statusBarTapToTopDesc;
+
   /// No description provided for @glassBlurStrength.
   ///
   /// In en, this message translates to:

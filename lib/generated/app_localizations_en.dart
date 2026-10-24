@@ -498,6 +498,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Split the source card with live corner updates while reordering; off keeps the card intact (simpler effect)';
 
   @override
+  String get statusBarTapToTopTitle => 'Tap status bar to top';
+
+  @override
+  String get statusBarTapToTopDesc =>
+      'On HarmonyOS, tap the system status bar to quickly scroll the current page back to the top';
+
+  @override
   String get glassBlurStrength => 'Blur strength';
 
   @override
