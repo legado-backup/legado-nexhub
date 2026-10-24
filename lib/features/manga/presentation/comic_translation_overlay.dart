@@ -12,6 +12,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/ai/backfill_layout.dart';
 import '../../../core/ai/vision_translation_client.dart' show VisionTextSegment;
+import '../../../core/comic/comic_translation_manager.dart'
+    show ComicTranslationStatus;
 import '../../../core/comic/models/reader_preferences.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../generated/app_localizations.dart';
@@ -133,10 +135,30 @@ class ComicTranslationOverlay extends StatelessWidget {
         break;
       case ComicPageTranslationStatus.done:
         final data = state.data;
-        if (data != null &&
-            data.segments.isNotEmpty &&
-            state.naturalSize != Size.zero) {
-          children.add(_buildSegments(data.segments));
+        if (data != null && data.segments.isNotEmpty) {
+          if (state.naturalSize != Size.zero) {
+            children.add(_buildSegments(data.segments));
+          }
+          if (data.status == ComicTranslationStatus.partial) {
+            children.add(_badge(Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(l10n.comicTranslatePartial,
+                    style: const TextStyle(fontSize: 11)),
+                if (onRetry != null) ...<Widget>[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: onRetry,
+                    borderRadius: BorderRadius.circular(10),
+                    child: const Padding(
+                      padding: EdgeInsets.all(3),
+                      child: Icon(Icons.refresh_rounded, size: 14),
+                    ),
+                  ),
+                ],
+              ],
+            )));
+          }
         }
         break;
     }
@@ -182,7 +204,8 @@ class ComicTranslationOverlay extends StatelessWidget {
     );
     // 过小/异常框直接丢弃（AI 偶发返回噪声框）。
     if (box.width < 12 || box.height < 10) return const SizedBox.shrink();
-    final String text = seg.translation.isNotEmpty ? seg.translation : seg.text;
+    // 只渲染真正译出的文本；原文照抄/未译条目留空，不冒充译文。
+    final String text = seg.translation.trim();
     if (text.isEmpty) return const SizedBox.shrink();
     if (backfill) return _bubbleBackfill(box, text, seg);
     return Positioned(

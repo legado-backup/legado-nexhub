@@ -13,8 +13,23 @@ import 'package:hive/hive.dart';
 
 import '../ai/vision_translation_client.dart';
 
+/// 单页翻译结果的完整度。
+enum ComicTranslationStatus {
+  /// 所有识别区域都有可用译文。
+  complete,
+
+  /// 部分区域缺失/未通过校验，仍可展示已译部分。
+  partial,
+
+  /// 模型确认页面没有需要翻译的文字。
+  empty,
+}
+
 /// 单页翻译缓存记录。
 class ComicPageTranslation {
+  /// 缓存结构版本：0 = 旧版（无 status/version），1 = 当前。
+  static const int currentVersion = 1;
+
   /// 页面图片 URL / 本地路径（与请求时一致，用于校验缓存对应同一页）。
   final String imageUrl;
 
@@ -25,12 +40,30 @@ class ComicPageTranslation {
   final List<VisionTextSegment> segments;
   final int updatedAt;
 
+  /// 缓存写入版本（旧记录为 0，用于空页迁移判定）。
+  final int version;
+
+  final ComicTranslationStatus? _status;
+
+  /// 部分翻译的后台重试次数（跨会话累计，封顶 2）。
+  final int retries;
+
   const ComicPageTranslation({
     required this.imageUrl,
     required this.lang,
     required this.segments,
     required this.updatedAt,
-  });
+    this.version = currentVersion,
+    ComicTranslationStatus? status,
+    this.retries = 0,
+  }) : _status = status;
+
+  /// 结果完整度；旧记录未显式记录时按段列表推导。
+  ComicTranslationStatus get status =>
+      _status ??
+      (segments.isEmpty
+          ? ComicTranslationStatus.empty
+          : ComicTranslationStatus.complete);
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'imageUrl': imageUrl,
@@ -39,25 +72,45 @@ class ComicPageTranslation {
           for (final s in segments) s.toJson(),
         ],
         'updatedAt': updatedAt,
+        'version': version,
+        'status': status.name,
+        'retries': retries,
       };
 
-  factory ComicPageTranslation.fromJson(Map<String, dynamic> json) =>
-      ComicPageTranslation(
-        imageUrl: json['imageUrl'] as String? ?? '',
-        lang: json['lang'] as String? ?? 'zh',
-        segments: <VisionTextSegment>[
-          for (final s in (json['segments'] as List<dynamic>? ??
-              const <dynamic>[]))
-            if (s is Map<String, dynamic>)
-              VisionTextSegment.fromJson(s)
-            else if (s is Map)
-              VisionTextSegment.fromJson(s.cast<String, dynamic>()),
-        ],
-        updatedAt: (json['updatedAt'] as num?)?.toInt() ?? 0,
-      );
+  factory ComicPageTranslation.fromJson(Map<String, dynamic> json) {
+    final segments = <VisionTextSegment>[
+      for (final s in (json['segments'] as List<dynamic>? ?? const <dynamic>[]))
+        if (s is Map<String, dynamic>)
+          VisionTextSegment.fromJson(s)
+        else if (s is Map)
+          VisionTextSegment.fromJson(s.cast<String, dynamic>()),
+    ];
+    return ComicPageTranslation(
+      imageUrl: json['imageUrl'] as String? ?? '',
+      lang: json['lang'] as String? ?? 'zh',
+      segments: segments,
+      updatedAt: (json['updatedAt'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      status: _statusFromName(json['status'] as String?),
+      retries: (json['retries'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   /// 页面是否确实无文字（空页缓存也要记录，避免重复请求）。
   bool get isEmptyPage => segments.isEmpty;
+
+  /// 有效译文条数（覆盖层/徽标诊断用）。
+  int get translatedCount => segments
+      .where((s) => s.translation.trim().isNotEmpty)
+      .length;
+
+  static ComicTranslationStatus? _statusFromName(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    for (final status in ComicTranslationStatus.values) {
+      if (status.name == raw) return status;
+    }
+    return null;
+  }
 }
 
 /// 漫画翻译缓存管理器——Hive box `comic_translations`，
@@ -112,19 +165,37 @@ class ComicTranslationManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 读取缓存。
+  ///
+  /// - [expectedImageUrl] 非空时校验记录对应的图片；URL 变化（换源/换页）
+  ///   按未命中处理，避免把上一张图的坐标画到新图上；
+  /// - 旧版（version 0）空页记录不可信（旧实现把解析失败也缓存成空页），
+  ///   按未命中处理；旧版非空记录继续可用。
   Future<ComicPageTranslation?> load({
     required String comicId,
     required String chapterKey,
     required int pageIndex,
     required String lang,
+    String? expectedImageUrl,
   }) async {
     final box = await _ensureBox();
     final raw =
         box.get(keyFor(comicId, chapterKey, pageIndex, lang: lang));
     if (raw is! String || raw.isEmpty) return null;
     try {
-      return ComicPageTranslation.fromJson(
+      final translation = ComicPageTranslation.fromJson(
           jsonDecode(raw) as Map<String, dynamic>);
+      if (translation.version < ComicPageTranslation.currentVersion &&
+          translation.isEmptyPage) {
+        return null;
+      }
+      if (expectedImageUrl != null &&
+          expectedImageUrl.isNotEmpty &&
+          translation.imageUrl.isNotEmpty &&
+          translation.imageUrl != expectedImageUrl) {
+        return null;
+      }
+      return translation;
     } on Object {
       return null; // 损坏数据按无缓存处理。
     }
@@ -229,6 +300,9 @@ class ComicTranslationManager extends ChangeNotifier {
             for (final s in t.segments) s.toJson(),
           ],
           'updatedAt': t.updatedAt,
+          'version': t.version,
+          'status': t.status.name,
+          'retries': t.retries,
         });
       } on Object {
         // 损坏数据忽略。
@@ -279,6 +353,10 @@ class ComicTranslationManager extends ChangeNotifier {
           lang: lang,
           segments: segments,
           updatedAt: (m['updatedAt'] as num?)?.toInt() ?? 0,
+          version: (m['version'] as num?)?.toInt() ?? 0,
+          status: ComicPageTranslation._statusFromName(
+              m['status'] as String?),
+          retries: (m['retries'] as num?)?.toInt() ?? 0,
         );
         await box.put(key, jsonEncode(t.toJson()));
         imported++;

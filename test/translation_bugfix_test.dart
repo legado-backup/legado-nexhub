@@ -51,11 +51,16 @@ class _FakeVisionClient extends VisionTranslationClient {
   final int failTranslateTimes;
 
   @override
-  Future<List<VisionTextSegment>> recognizeImage({
+  Future<VisionParseOutcome> recognizeImageOutcome({
     required AiEndpointConfig config,
     required Uint8List imageBytes,
     required String mimeType,
     required String systemPrompt,
+    bool expectTranslation = true,
+    String? correctionNote,
+    int? maxTokens,
+    double temperature = 0.2,
+    Duration receiveTimeout = const Duration(seconds: 180),
     int maxSide = 1600,
   }) async {
     recognizeCalls++;
@@ -69,13 +74,35 @@ class _FakeVisionClient extends VisionTranslationClient {
       if (recognizeDelayMs > 0) {
         await Future<void>.delayed(Duration(milliseconds: recognizeDelayMs));
       }
-      return const <VisionTextSegment>[
-        VisionTextSegment(
-            x1: 0, y1: 0, x2: 500, y2: 100, text: '原文', translation: '译文'),
-      ];
+      return const VisionParseOutcome(
+        ok: true,
+        segments: <VisionTextSegment>[
+          VisionTextSegment(
+              x1: 0, y1: 0, x2: 500, y2: 100, text: '原文', translation: '译文'),
+        ],
+        raw: '[]',
+      );
     } finally {
       concurrentRecognize--;
     }
+  }
+
+  @override
+  Future<List<VisionTextSegment>> recognizeImage({
+    required AiEndpointConfig config,
+    required Uint8List imageBytes,
+    required String mimeType,
+    required String systemPrompt,
+    int maxSide = 1600,
+  }) async {
+    final outcome = await recognizeImageOutcome(
+      config: config,
+      imageBytes: imageBytes,
+      mimeType: mimeType,
+      systemPrompt: systemPrompt,
+      maxSide: maxSide,
+    );
+    return outcome.segments;
   }
 
   @override

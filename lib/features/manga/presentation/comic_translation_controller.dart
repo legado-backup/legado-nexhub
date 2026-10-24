@@ -6,8 +6,9 @@
 /// - 图片获取：本地路径直接读文件；网络 URL 走 [NexImageCacheManager]
 /// （命中磁盘缓存零流量，未命中带防盗链 headers 下载）；
 /// - 图片预处理：超过上限时经 [AiImageResizer] 下采样再编码，控制请求体积；
-/// - 调用 [VisionTranslationClient]（视觉模型一次完成 OCR + 翻译），
+/// - 调用 [ComicTranslationPipeline]（单次视觉翻译 + 校验纠错 + 两阶段兜底），
 /// 结果经 [ComicTranslationManager] 持久化（`comicId|章|页|语言` 键）；
+/// - 部分翻译先展示可用条目，延迟后台补译（跨会话最多 2 次）；
 /// - **并发信号量**：快速连续翻页时网络请求并发上限 2，防止瞬时打爆
 /// 接口限流；缓存命中路径不占槽位；
 /// - 错误归一化：catch 处统一转 [TranslationException] 可读文案，
@@ -25,7 +26,6 @@ import 'package:flutter/widgets.dart' show Size;
 // NexImageCacheManager 复用阅读器同款图片磁盘缓存（同 URL 不重复下载）。
 import 'package:nexhub/core/network/dio_image_file_service.dart';
 
-import '../../../core/ai/endpoint_router.dart';
 import '../../../core/ai/glossary_manager.dart';
 import '../../../core/ai/image_resizer.dart';
 import '../../../core/ai/prompt_builder.dart';
@@ -38,6 +38,8 @@ import '../../../core/scraper/http_fetcher.dart';
 import '../../../core/utils/app_log.dart';
 import '../../novel/domain/novel_summary_service.dart';
 import '../../novel/domain/novel_summary_settings.dart';
+import '../domain/comic_context_builder.dart';
+import '../domain/comic_translation_pipeline.dart';
 
 /// 单页翻译状态。
 enum ComicPageTranslationStatus { idle, loading, done, error }
@@ -78,11 +80,12 @@ class ComicTranslationController extends ChangeNotifier {
     PluginConfig? source,
     ComicTranslationManager? manager,
     VisionTranslationClient? client,
+    ComicTranslationPipeline? pipeline,
     GlossaryManager? glossary,
     TranslationOptionsStore? options,
   })  : _source = source,
         _manager = manager ?? ComicTranslationManager(),
-        _client = client ?? VisionTranslationClient(),
+        _pipeline = pipeline ?? ComicTranslationPipeline(client: client),
         _glossary = glossary ?? GlossaryManager(),
         _options = options ?? TranslationOptionsStore();
 
@@ -99,7 +102,7 @@ class ComicTranslationController extends ChangeNotifier {
 
   final String comicId;
   final ComicTranslationManager _manager;
-  final VisionTranslationClient _client;
+  final ComicTranslationPipeline _pipeline;
   final GlossaryManager _glossary;
   final TranslationOptionsStore _options;
 
@@ -131,9 +134,35 @@ class ComicTranslationController extends ChangeNotifier {
   /// 进行中的请求（防同页重复触发）。
   final Set<String> _inFlight = <String>{};
 
+  /// 部分结果后台补译去重（同一页同时只跑一个补译）。
+  final Set<String> _partialRetryInFlight = <String>{};
+
+  /// 部分结果后台补译上限（跨会话累计，存于缓存 retries 字段）。
+  static const int _maxPartialRetries = 2;
+
+  /// 后台补译定时器（dispose 时统一取消，避免回调打到已销毁的控制器）。
+  final Set<Timer> _timers = <Timer>{};
+  bool _disposed = false;
+
   // ── 并发信号量──
   int _active = 0;
   final List<void Function()> _waiters = <void Function()>[];
+
+  @override
+  void dispose() {
+    _disposed = true;
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    _timers.clear();
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
 
   bool get enabled => _enabled;
 
@@ -176,10 +205,18 @@ class ComicTranslationController extends ChangeNotifier {
     String url, {
     required String chapterKey,
     required int pageIndex,
+    bool force = false,
   }) async {
     if (!_enabled || url.isEmpty) return;
+    if (!_langLoaded) {
+      // 开关与翻页可能同时触发；先确定目标语言，避免用默认值查错缓存。
+      _targetLang = await NovelSummarySettings.instance
+          .getComicTranslationTargetLanguage();
+      _langLoaded = true;
+    }
     final existing = _states[url];
-    if (existing != null &&
+    if (!force &&
+        existing != null &&
         (existing.status == ComicPageTranslationStatus.loading ||
             existing.status == ComicPageTranslationStatus.done)) {
       return;
@@ -193,23 +230,29 @@ class ComicTranslationController extends ChangeNotifier {
     notifyListeners();
     try {
       await _manager.init();
-      final cached = await _manager.load(
-        comicId: comicId,
-        chapterKey: chapterKey,
-        pageIndex: pageIndex,
-        lang: _targetLang,
-      );
-      if (cached != null) {
-        _states[url] = ComicPageTranslationState(
-          status: ComicPageTranslationStatus.done,
-          data: cached,
-          naturalSize: existing?.naturalSize ?? Size.zero,
+      if (!force) {
+        final cached = await _manager.load(
+          comicId: comicId,
+          chapterKey: chapterKey,
+          pageIndex: pageIndex,
+          lang: _targetLang,
+          expectedImageUrl: url,
         );
-        // 空页缓存无解码机会，仍需补自然尺寸（供覆盖层坐标映射）。
-        if (_states[url]!.naturalSize == Size.zero) {
-          unawaited(_fillNaturalSize(url));
+        if (cached != null) {
+          _states[url] = ComicPageTranslationState(
+            status: ComicPageTranslationStatus.done,
+            data: cached,
+            naturalSize: existing?.naturalSize ?? Size.zero,
+          );
+          // 空页缓存无解码机会，仍需补自然尺寸（供覆盖层坐标映射）。
+          if (_states[url]!.naturalSize == Size.zero) {
+            unawaited(_fillNaturalSize(url));
+          }
+          if (cached.status == ComicTranslationStatus.partial) {
+            _schedulePartialRetry(url, chapterKey, pageIndex, cached);
+          }
+          return;
         }
-        return;
       }
       // 网络请求段受并发信号量约束。
       final result =
@@ -219,6 +262,7 @@ class ComicTranslationController extends ChangeNotifier {
         lang: _targetLang,
         segments: result.segments,
         updatedAt: DateTime.now().millisecondsSinceEpoch,
+        status: result.status,
       );
       _states[url] = ComicPageTranslationState(
         status: ComicPageTranslationStatus.done,
@@ -227,6 +271,9 @@ class ComicTranslationController extends ChangeNotifier {
       );
       // 空结果（无文字页）同样缓存，避免翻回来重复请求。
       await _saveTranslation(chapterKey, pageIndex, translation);
+      if (result.status == ComicTranslationStatus.partial) {
+        _schedulePartialRetry(url, chapterKey, pageIndex, translation);
+      }
     } on Object catch (e) {
       // 用户可见文案归一化，原始细节仅入日志。
       AppLog.instance.w('[漫画翻译] 页面翻译失败 url=$url: $e');
@@ -276,7 +323,7 @@ class ComicTranslationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 重试某页（错误态覆盖层的重试按钮）；重试同样受并发信号量约束。
+  /// 重试某页（错误态/部分结果覆盖层的重试按钮）：跳过缓存强制重新请求。
   Future<void> retry(
     String url, {
     required String chapterKey,
@@ -284,38 +331,112 @@ class ComicTranslationController extends ChangeNotifier {
   }) async {
     _states.remove(url);
     notifyListeners();
-    await ensureTranslated(url, chapterKey: chapterKey, pageIndex: pageIndex);
+    await ensureTranslated(
+      url,
+      chapterKey: chapterKey,
+      pageIndex: pageIndex,
+      force: true,
+    );
   }
 
-  /// 前一页已译短摘要——读上一页缓存（跨会话可用），把识别原文拼成
-  /// 1–2 句（截断 160 字符封顶）；无上一页/缓存时返回 null。
-  Future<String?> _prevPageSummary(String chapterKey, int pageIndex) async {
-    if (pageIndex <= 0) return null;
-    try {
-      final prev = await _manager.load(
-        comicId: comicId,
-        chapterKey: chapterKey,
-        pageIndex: pageIndex - 1,
-        lang: _targetLang,
-      );
-      final buf = StringBuffer();
-      for (final s in prev?.segments ?? const <VisionTextSegment>[]) {
-        final t = s.text.trim();
-        if (t.isEmpty) continue;
-        if (buf.isNotEmpty) buf.write('；');
-        buf.write(t);
-        if (buf.length >= 160) break;
-      }
-      final s = buf.toString();
-      if (s.isEmpty) return null;
-      return s.length > 160 ? s.substring(0, 160) : s;
-    } on Object {
-      return null;
+  /// 部分结果后台补译：先让当前页展示已译部分，延迟 4s 再整页重试一次。
+  ///
+  /// 只有译文条数确实增加才覆盖当前状态；无论是否变好都累计 retries
+  /// （持久化到缓存，跨会话封顶 [_maxPartialRetries]）。
+  void _schedulePartialRetry(
+    String url,
+    String chapterKey,
+    int pageIndex,
+    ComicPageTranslation current,
+  ) {
+    if (_disposed ||
+        current.retries >= _maxPartialRetries ||
+        !_enabled ||
+        _partialRetryInFlight.contains(url)) {
+      return;
     }
+    _partialRetryInFlight.add(url);
+    late final Timer timer;
+    timer = Timer(const Duration(seconds: 4), () async {
+      _timers.remove(timer);
+      ComicPageTranslation? next;
+      try {
+        if (!_enabled) return;
+        final state = _states[url];
+        if (state == null ||
+            state.status != ComicPageTranslationStatus.done ||
+            !identical(state.data, current)) {
+          return;
+        }
+        final result = await _withSlot(
+          () => _translatePage(url, chapterKey, pageIndex),
+        );
+        final retries = current.retries + 1;
+        final improved = result.segments
+                .where((s) => s.translation.trim().isNotEmpty)
+                .length >
+            current.translatedCount;
+        if (!improved) {
+          // 没变好：只记录次数并停止本轮，避免同一页反复烧请求。
+          await _saveTranslation(
+            chapterKey,
+            pageIndex,
+            _copyWithRetries(current, retries),
+          );
+          return;
+        }
+        final updated = ComicPageTranslation(
+          imageUrl: url,
+          lang: _targetLang,
+          segments: result.segments,
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
+          status: result.status,
+          retries: retries,
+        );
+        final latest = _states[url];
+        if (latest == null ||
+            latest.status != ComicPageTranslationStatus.done ||
+            !identical(latest.data, current)) {
+          return;
+        }
+        _states[url] = latest.copyWith(data: updated);
+        notifyListeners();
+        await _saveTranslation(chapterKey, pageIndex, updated);
+        if (updated.status == ComicTranslationStatus.partial) {
+          next = updated;
+        }
+      } on Object catch (e) {
+        AppLog.instance.w('[漫画翻译] 部分结果补译失败 url=$url: $e');
+      } finally {
+        _partialRetryInFlight.remove(url);
+      }
+      // 在去重集合释放后再排下一次，否则会被自身拦截。
+      if (next != null) {
+        _schedulePartialRetry(url, chapterKey, pageIndex, next);
+      }
+    });
+    _timers.add(timer);
   }
 
-  Future<({List<VisionTextSegment> segments, Size naturalSize})>
-      _translatePage(String url, String chapterKey, int pageIndex) async {
+  static ComicPageTranslation _copyWithRetries(
+    ComicPageTranslation t,
+    int retries,
+  ) =>
+      ComicPageTranslation(
+        imageUrl: t.imageUrl,
+        lang: t.lang,
+        segments: t.segments,
+        updatedAt: t.updatedAt,
+        version: t.version,
+        status: t.status,
+        retries: retries,
+      );
+
+  Future<({
+    List<VisionTextSegment> segments,
+    Size naturalSize,
+    ComicTranslationStatus status
+  })> _translatePage(String url, String chapterKey, int pageIndex) async {
     final settings = NovelSummarySettings.instance;
     final List<NovelSummaryConfig> endpointCfgs =
         await settings.getComicTranslationEndpoints();
@@ -350,11 +471,12 @@ class ComicTranslationController extends ChangeNotifier {
     } on Object {
       // 风格读取失败按标准风格。
     }
-    final systemPrompt = PromptBuilder.mangaSystemPrompt(
+    final contextPairs = await ComicContextBuilder.collect(
+      manager: _manager,
+      comicId: comicId,
+      chapterKey: chapterKey,
+      pageIndex: pageIndex,
       lang: lang,
-      glossary: glossary,
-      style: TranslationStyle.fromStorage(style),
-      prevPageSummary: await _prevPageSummary(chapterKey, pageIndex),
     );
 
     final bytes = await _loadImageBytes(url);
@@ -370,16 +492,16 @@ class ComicTranslationController extends ChangeNotifier {
         mime = 'image/png';
       }
     }
-    final segments = await AiEndpointRouter.execute<List<VisionTextSegment>>(
-      endpoints,
-      (cfg) => _client.recognizeImage(
-        config: cfg,
-        imageBytes: sendBytes,
-        mimeType: mime,
-        systemPrompt: systemPrompt,
-        maxSide: _kMaxSide,
-      ),
-    );
+    final outcome = await _pipeline.translatePage(ComicTranslationRequest(
+      endpoints: endpoints,
+      imageBytes: sendBytes,
+      mimeType: mime,
+      targetLang: lang,
+      glossary: glossary,
+      style: TranslationStyle.fromStorage(style),
+      contextPairs: contextPairs,
+    ));
+    final segments = outcome.segments;
     // 术语冲突检测（仅日志，不阻断显示）。
     if (glossary.isNotEmpty && segments.isNotEmpty) {
       try {
@@ -394,7 +516,11 @@ class ComicTranslationController extends ChangeNotifier {
         // 检测失败不影响主流程。
       }
     }
-    return (segments: segments, naturalSize: natural);
+    return (
+      segments: segments,
+      naturalSize: natural,
+      status: outcome.status,
+    );
   }
 
   /// 取图片字节：网络 URL 走缓存管理器（含防盗链 headers），本地路径直读。

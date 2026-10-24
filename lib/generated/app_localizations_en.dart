@@ -8678,6 +8678,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comicTranslateFailed => 'Translation failed';
 
   @override
+  String get comicTranslatePartial => 'Partially translated';
+
+  @override
   String get subTransSectionTitle => 'Live translation';
 
   @override

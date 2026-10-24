@@ -8466,6 +8466,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get comicTranslateFailed => '翻译失败';
 
   @override
+  String get comicTranslatePartial => '部分翻译';
+
+  @override
   String get subTransSectionTitle => '实时翻译';
 
   @override

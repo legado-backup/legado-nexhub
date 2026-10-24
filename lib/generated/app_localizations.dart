@@ -16280,6 +16280,12 @@ abstract class AppLocalizations {
   /// **'Translation failed'**
   String get comicTranslateFailed;
 
+  /// No description provided for @comicTranslatePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partially translated'**
+  String get comicTranslatePartial;
+
   /// No description provided for @subTransSectionTitle.
   ///
   /// In en, this message translates to:

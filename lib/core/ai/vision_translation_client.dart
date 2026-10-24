@@ -16,10 +16,33 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import 'batch_protocol.dart';
+import 'id_translation_protocol.dart';
+import 'llm_json.dart';
 import 'prompt_builder.dart';
+import 'translation_exception.dart';
 
 /// 一对「原文→译文」语境（上下文注入的对话历史单元）。
 typedef TranslationContextPair = ({String source, String translation});
+
+/// 一次视觉解析结果。
+///
+/// [ok] 区分「模型正常返回空数组」与「返回内容无法解析」：
+/// 前者是可以缓存的空页，后者需要纠错重试或两阶段兜底。
+class VisionParseOutcome {
+  const VisionParseOutcome({
+    required this.ok,
+    required this.segments,
+    required this.raw,
+  });
+
+  final bool ok;
+  final List<VisionTextSegment> segments;
+
+  /// 模型原始输出（解析失败时用于识别拒答/截断）。
+  final String raw;
+
+  bool get isEmpty => ok && segments.isEmpty;
+}
 
 /// 一段识别并翻译后的文字区域（坐标为相对图片宽高的千分比 0–1000）。
 class VisionTextSegment {
@@ -92,15 +115,36 @@ class VisionTranslationClient {
   /// [PromptBuilder.mangaSystemPrompt] 追加）。
   static String mangaBasePrompt(String targetLang) =>
       '你是专业的漫画翻译引擎。用户会给出一张漫画页面图片。'
-      '请识别图中所有带文字的区域（对话气泡、旁白框、拟声词、标注），'
-      '把每个区域的文字翻译成$targetLang。'
-      '只输出一个 JSON 数组，不要输出任何解释或 markdown 代码块围栏。'
-      '数组每个元素格式：'
-      '{"bbox":[x1,y1,x2,y2],"text":"原文","translation":"译文"}，'
-      '其中坐标是该区域在图片宽高上的千分比位置（0-1000，左上角为原点，'
-      'x 向右 y 向下），text 为识别的原文（保留日文/英文等原样），'
-      'translation 为翻译结果。忽略图片签名/水印/页码等非正文文字。'
-      '若图中没有需要翻译的文字，输出 []。';
+      '任务：先识别图中所有带文字的区域，再把每个区域的文字翻译成$targetLang。'
+      '需要处理对话气泡、旁白框、思考框、拟声词/音效、标注与小字。'
+      '规则：'
+      '1. 逐区域独立处理，不要合并、拆分、遗漏或重复区域；'
+      '2. 译文自然、符合角色语气与场景，保留称呼、语气词与强调；'
+      '拟声词译成$targetLang中自然的拟声表达；'
+      '3. text 保留图中原文（原语言原样），translation 必须是$targetLang，'
+      '不能照抄原文，不能为空；'
+      '4. 忽略签名、水印、页码、出版社标识等非正文文字；'
+      '5. 坐标是该区域外接矩形在整张图片宽高上的千分比'
+      '（0-1000，左上角为原点，x 向右 y 向下），按阅读顺序输出；'
+      '6. 只输出一个 JSON 数组，不要输出解释、注释或 markdown 代码块围栏；'
+      '7. 若图中没有需要翻译的文字，输出 []。'
+      '数组元素格式：'
+      '{"bbox":[x1,y1,x2,y2],"text":"原文","translation":"译文"}。';
+
+  /// 漫画页纯 OCR 提示词（两阶段兜底的第一阶段）：只识别不翻译。
+  static String mangaOcrBasePrompt() =>
+      '你是专业的漫画文字识别引擎。用户会给出一张漫画页面图片。'
+      '只做文字识别，不要翻译。识别图中所有带文字的区域'
+      '（对话气泡、旁白框、思考框、拟声词、标注与小字）。'
+      '规则：'
+      '1. 逐区域独立输出，不要合并、拆分、遗漏或重复区域；'
+      '2. text 保留图中原文（原语言原样），不要改写或翻译；'
+      '3. 忽略签名、水印、页码、出版社标识等非正文文字；'
+      '4. 坐标是该区域外接矩形在整张图片宽高上的千分比'
+      '（0-1000，左上角为原点），按阅读顺序输出；'
+      '5. 只输出一个 JSON 数组，不要输出解释、注释或 markdown 代码块围栏；'
+      '6. 若图中没有文字，输出 []。'
+      '数组元素格式：{"bbox":[x1,y1,x2,y2],"text":"原文"}。';
 
   /// 旧入口（兼容）：基础段别名。
   static String mangaSystemPrompt(String targetLang) =>
@@ -120,7 +164,7 @@ class VisionTranslationClient {
   static String videoOcrSystemPrompt(String targetLang) =>
       videoOcrBasePrompt(targetLang);
 
-  /// 单次视觉请求：识别并翻译图片中的文字。
+  /// 单次视觉请求：识别并翻译图片中的文字（兼容入口，解析失败返回空）。
   ///
   /// [mimeType] 目前支持 image/jpeg / image/png。
   Future<List<VisionTextSegment>> recognizeImage({
@@ -130,22 +174,44 @@ class VisionTranslationClient {
     required String systemPrompt,
     int maxSide = 1600,
   }) async {
+    final outcome = await recognizeImageOutcome(
+      config: config,
+      imageBytes: imageBytes,
+      mimeType: mimeType,
+      systemPrompt: systemPrompt,
+      maxSide: maxSide,
+    );
+    return outcome.segments;
+  }
+
+  /// 单次视觉请求，返回带「是否解析成功」信号的结果。
+  ///
+  /// [expectTranslation] 为 false 时走纯 OCR 解析（只读 `text`），
+  /// 不会把原文回填到 `translation`；[correctionNote] 会作为图片后的
+  /// 文本指令追加，用于纠错重试（例如要求只输出 JSON 数组）。
+  Future<VisionParseOutcome> recognizeImageOutcome({
+    required AiEndpointConfig config,
+    required Uint8List imageBytes,
+    required String mimeType,
+    required String systemPrompt,
+    bool expectTranslation = true,
+    String? correctionNote,
+    int? maxTokens,
+    double temperature = 0.2,
+    Duration receiveTimeout = const Duration(seconds: 180),
+    int maxSide = 1600,
+  }) async {
     final base = config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final note = correctionNote?.trim();
     final resp = await _dio.post<Map<String, dynamic>>(
       '$base/chat/completions',
       options: Options(
-        headers: <String, dynamic>{
-          'Content-Type': 'application/json',
-          if (config.apiKey.trim().isNotEmpty)
-            'Authorization': 'Bearer ${config.apiKey.trim()}',
-        },
+        headers: _headers(config),
         sendTimeout: const Duration(seconds: 60),
-        receiveTimeout: const Duration(seconds: 180),
+        receiveTimeout: receiveTimeout,
       ),
       data: <String, dynamic>{
-        'model': config.model.trim().isNotEmpty
-            ? config.model.trim()
-            : 'gpt-4o-mini',
+        'model': _model(config),
         'messages': <Map<String, dynamic>>[
           <String, dynamic>{'role': 'system', 'content': systemPrompt},
           <String, dynamic>{
@@ -158,18 +224,97 @@ class VisionTranslationClient {
                       'data:$mimeType;base64,${base64Encode(imageBytes)}',
                 },
               },
+              if (note != null && note.isNotEmpty)
+                <String, dynamic>{'type': 'text', 'text': note},
             ],
           },
         ],
-        'temperature': 0.2,
+        'temperature': temperature,
+        if (maxTokens != null) 'max_tokens': maxTokens,
       },
     );
     final content = _extractContent(resp.data);
     if (content == null || content.trim().isEmpty) {
-      throw Exception('AI 返回内容为空');
+      throw const TranslationException(
+        'AI 返回内容为空',
+        kind: TranslationKind.invalidResponse,
+      );
     }
-    return parseSegmentsJson(content);
+    return parseSegmentsOutcome(
+      content,
+      expectTranslation: expectTranslation,
+    );
   }
+
+  /// 纯文本逐条翻译：输入「编号 → 原文」，按编号解析译文。
+  ///
+  /// 两阶段漫画翻译的第二阶段使用；[correctionNote] 用于缺失编号的
+  /// 定向重试（只重发缺失条目）。解析结果不抛异常，由调用方按
+  /// [IdTranslationParse.missingIds] 决定部分接受或重试。
+  Future<IdTranslationParse> translateSegmentsById({
+    required AiEndpointConfig config,
+    required String systemPrompt,
+    required Map<int, String> sources,
+    String? correctionNote,
+    double temperature = 0.2,
+    int? maxTokens,
+    Duration receiveTimeout = const Duration(seconds: 120),
+  }) async {
+    final ids = sources.keys.toList()..sort();
+    if (ids.isEmpty) {
+      return const IdTranslationParse(
+        translations: <int, String>{},
+        missingIds: <int>[],
+        duplicateIds: <int>[],
+        unknownIds: <int>[],
+        lineCount: 0,
+      );
+    }
+    final base = config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final body = StringBuffer(IdTranslationProtocol.encodeMap(sources));
+    final note = correctionNote?.trim();
+    if (note != null && note.isNotEmpty) {
+      body
+        ..writeln()
+        ..writeln()
+        ..write(note);
+    }
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '$base/chat/completions',
+      options: Options(
+        headers: _headers(config),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: receiveTimeout,
+      ),
+      data: <String, dynamic>{
+        'model': _model(config),
+        'messages': <Map<String, dynamic>>[
+          <String, dynamic>{'role': 'system', 'content': systemPrompt},
+          <String, dynamic>{'role': 'user', 'content': body.toString()},
+        ],
+        'temperature': temperature,
+        if (maxTokens != null) 'max_tokens': maxTokens,
+      },
+    );
+    final content = _extractContent(resp.data);
+    if (content == null || content.trim().isEmpty) {
+      throw const TranslationException(
+        'AI 返回内容为空',
+        kind: TranslationKind.invalidResponse,
+      );
+    }
+    return IdTranslationProtocol.parse(content, expectedIds: ids);
+  }
+
+  Map<String, dynamic> _headers(AiEndpointConfig config) =>
+      <String, dynamic>{
+        'Content-Type': 'application/json',
+        if (config.apiKey.trim().isNotEmpty)
+          'Authorization': 'Bearer ${config.apiKey.trim()}',
+      };
+
+  static String _model(AiEndpointConfig config) =>
+      config.model.trim().isNotEmpty ? config.model.trim() : 'gpt-4o-mini';
 
   /// 批量翻译短句（视频字幕场景）：一次请求翻译多条，返回与输入等长的译文。
   ///
@@ -244,57 +389,143 @@ class VisionTranslationClient {
     return (choices.first['message'] as Map?)?['content'] as String?;
   }
 
-  /// 宽容解析模型返回的区域 JSON：剥掉 markdown 围栏 / 前后杂文，
-  /// 截取首个 `[` 到末个 `]` 之间的内容。
-  static List<VisionTextSegment> parseSegmentsJson(String raw) {
-    var s = raw.trim();
-    // 剥 ```json ... ``` 围栏。
-    final fence = RegExp(r'^```[a-zA-Z]*\s*|\s*```$');
-    s = s.replaceAll(fence, '').trim();
-    final start = s.indexOf('[');
-    final end = s.lastIndexOf(']');
-    if (start < 0 || end <= start) return const <VisionTextSegment>[];
-    s = s.substring(start, end + 1);
-    try {
-      final dynamic decoded = jsonDecode(s);
-      if (decoded is! List) return const <VisionTextSegment>[];
-      final result = <VisionTextSegment>[];
-      for (final dynamic item in decoded) {
-        if (item is! Map<String, dynamic>) continue;
-        // bbox 数组形式。
-        int? x1;
-        int? y1;
-        int? x2;
-        int? y2;
-        final bbox = item['bbox'];
-        if (bbox is List && bbox.length >= 4) {
-          x1 = (bbox[0] as num?)?.toInt();
-          y1 = (bbox[1] as num?)?.toInt();
-          x2 = (bbox[2] as num?)?.toInt();
-          y2 = (bbox[3] as num?)?.toInt();
-        } else {
-          // 平铺字段形式（x1/y1/x2/y2）。
-          x1 = (item['x1'] as num?)?.toInt();
-          y1 = (item['y1'] as num?)?.toInt();
-          x2 = (item['x2'] as num?)?.toInt();
-          y2 = (item['y2'] as num?)?.toInt();
-        }
-        final text = (item['text'] ?? item['original'] ?? '') as String? ?? '';
-        final translation =
-            (item['translation'] ?? item['translated'] ?? text) as String? ?? '';
-        if (text.trim().isEmpty && translation.trim().isEmpty) continue;
-        result.add(VisionTextSegment(
-          x1: x1,
-          y1: y1,
-          x2: x2,
-          y2: y2,
-          text: text.trim(),
-          translation: translation.trim(),
-        ));
-      }
-      return result;
-    } on Object {
-      return const <VisionTextSegment>[];
+  /// 宽容解析模型返回的区域 JSON（兼容入口；解析失败返回空列表）。
+  static List<VisionTextSegment> parseSegmentsJson(String raw) =>
+      parseSegmentsOutcome(raw).segments;
+
+  /// 宽容解析模型返回的区域 JSON，并保留「是否解析成功」信号。
+  ///
+  /// 剥掉 markdown 围栏 / 前后杂文后解析最外层数组；兼容
+  /// `{"segments":[...]}` 包裹、bbox 数组/对象、平铺坐标、0–1 归一化
+  /// 坐标。译文缺失时保留空串（不回填原文），让忠实度校验能识别漏译。
+  static VisionParseOutcome parseSegmentsOutcome(
+    String raw, {
+    bool expectTranslation = true,
+  }) {
+    final text = raw.trim();
+    if (text.isEmpty) {
+      return VisionParseOutcome(
+        ok: false,
+        segments: const <VisionTextSegment>[],
+        raw: raw,
+      );
     }
+    final dynamic decoded = LlmJson.tryDecode(text);
+    List<dynamic>? list;
+    if (decoded is List) {
+      list = decoded;
+    } else if (decoded is Map) {
+      for (final key in const <String>[
+        'segments',
+        'results',
+        'items',
+        'regions',
+        'data',
+      ]) {
+        final value = decoded[key];
+        if (value is List) {
+          list = value;
+          break;
+        }
+      }
+    }
+    if (list == null) {
+      return VisionParseOutcome(
+        ok: false,
+        segments: const <VisionTextSegment>[],
+        raw: raw,
+      );
+    }
+
+    final result = <VisionTextSegment>[];
+    for (final dynamic item in list) {
+      if (item is! Map) continue;
+      final map =
+          item is Map<String, dynamic> ? item : item.cast<String, dynamic>();
+      final coords = _readBbox(map['bbox'] ?? map['box']);
+      final int? x1 = coords.$1 ??
+          _toInt(map['x1'] ?? map['left'] ?? map['x']);
+      final int? y1 = coords.$2 ??
+          _toInt(map['y1'] ?? map['top'] ?? map['y']);
+      final int? x2 = coords.$3 ??
+          _toInt(map['x2'] ?? map['right']);
+      final int? y2 = coords.$4 ??
+          _toInt(map['y2'] ?? map['bottom']);
+      final source = _stringField(map, const <String>[
+        'text',
+        'original',
+        'source',
+      ]);
+      final translation = expectTranslation
+          ? _stringField(map, const <String>['translation', 'translated'])
+          : '';
+      if (source.isEmpty && translation.isEmpty) continue;
+      result.add(VisionTextSegment(
+        x1: x1,
+        y1: y1,
+        x2: x2,
+        y2: y2,
+        text: source,
+        translation: translation,
+      ));
+    }
+    // 数组非空但没有任何有效区域：按解析失败处理，避免误缓存为空页。
+    if (list.isNotEmpty && result.isEmpty) {
+      return VisionParseOutcome(
+        ok: false,
+        segments: const <VisionTextSegment>[],
+        raw: raw,
+      );
+    }
+    return VisionParseOutcome(ok: true, segments: result, raw: raw);
+  }
+
+  static int? _toInt(dynamic value) {
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  static String _stringField(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+      if (value is num) return value.toString();
+    }
+    return '';
+  }
+
+  /// 读取 bbox：支持 `[x1,y1,x2,y2]`、对象和平铺字段；0–1 归一化
+  /// 坐标自动换算为千分比（模型偶尔会忽略提示词的单位要求）。
+  static (int?, int?, int?, int?) _readBbox(dynamic raw) {
+    double? a;
+    double? b;
+    double? c;
+    double? d;
+    if (raw is List && raw.length >= 4) {
+      a = _toDouble(raw[0]);
+      b = _toDouble(raw[1]);
+      c = _toDouble(raw[2]);
+      d = _toDouble(raw[3]);
+    } else if (raw is Map) {
+      a = _toDouble(raw['x1'] ?? raw['left'] ?? raw['x']);
+      b = _toDouble(raw['y1'] ?? raw['top'] ?? raw['y']);
+      c = _toDouble(raw['x2'] ?? raw['right']);
+      d = _toDouble(raw['y2'] ?? raw['bottom']);
+    }
+    if (a == null || b == null || c == null || d == null) {
+      return (null, null, null, null);
+    }
+    final values = <double>[a, b, c, d];
+    final maxValue = values.reduce((x, y) => x > y ? x : y);
+    final normalized = maxValue <= 1.5;
+    int scale(double v) => normalized ? (v * 1000).round() : v.round();
+    return (scale(a), scale(b), scale(c), scale(d));
+  }
+
+  static double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim());
+    return null;
   }
 }

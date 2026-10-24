@@ -121,19 +121,87 @@ abstract final class PromptBuilder {
 
   /// 漫画页视觉 OCR+翻译 system prompt。
   ///
-  /// [prevPageSummary]：前一页已译短摘要（由上一页 segments 拼成
-  /// 1–2 句），供保持指代与语气连贯；成本封顶，不整页回灌。
+  /// [prevPageSummary]：前一页已译短摘要（兼容旧调用）；
+  /// [contextPairs]：滚动前文对话（优先使用，预算由调用方裁剪），
+  /// 仅用于理解指代与保持译名/语气连贯，不参与输出。
   static String mangaSystemPrompt({
     required String lang,
     List<GlossaryEntry> glossary = const <GlossaryEntry>[],
     TranslationStyle style = TranslationStyle.standard,
     String? prevPageSummary,
+    List<TranslationContextPair> contextPairs =
+        const <TranslationContextPair>[],
   }) {
     final buf = StringBuffer(VisionTranslationClient.mangaBasePrompt(lang));
     _appendCommon(buf, style: style, glossary: glossary);
-    final ctx = prevPageSummary?.trim();
-    if (ctx != null && ctx.isNotEmpty) {
-      buf.write('\n前一页内容摘要（保持指代与语气连贯，无需翻译输出）：$ctx');
+    final context = mangaContextSection(contextPairs);
+    if (context.isNotEmpty) {
+      buf.write('\n$context');
+    } else {
+      final ctx = prevPageSummary?.trim();
+      if (ctx != null && ctx.isNotEmpty) {
+        buf.write('\n前一页内容摘要（保持指代与语气连贯，无需翻译输出）：$ctx');
+      }
+    }
+    return buf.toString();
+  }
+
+  /// 漫画页纯 OCR system prompt（两阶段兜底第一阶段）。
+  static String mangaOcrSystemPrompt() =>
+      VisionTranslationClient.mangaOcrBasePrompt();
+
+  /// 漫画台词逐条翻译 system prompt（两阶段兜底第二阶段）。
+  ///
+  /// 输入为 `编号|原文` 行，输出必须逐行回写编号；不接受按顺序猜位，
+  /// 从协议层杜绝漏条导致的整页译文错位。
+  static String mangaSegmentTranslationSystemPrompt({
+    required String lang,
+    List<GlossaryEntry> glossary = const <GlossaryEntry>[],
+    TranslationStyle style = TranslationStyle.standard,
+    List<TranslationContextPair> contextPairs =
+        const <TranslationContextPair>[],
+  }) {
+    final buf = StringBuffer()
+      ..write('你是专业的漫画译者。用户会给出一组带编号的漫画台词'
+          '（每行格式：编号|原文），把每条翻译成$lang。')
+      ..write('\n输出规则：')
+      ..write('\n1. 每行一条，格式为「编号|译文」；编号必须与输入完全一致；')
+      ..write('\n2. 不要合并、拆分、遗漏、重复编号，也不要新增编号；')
+      ..write('\n3. 译文自然、符合角色语气与场景，保留称呼、语气词与强调；'
+          '拟声词译成$lang中自然的拟声表达；')
+      ..write('\n4. 只输出编号行，不要输出原文、解释、注释或 markdown；')
+      ..write('\n5. 上下文仅用于理解指代，不要翻译或输出上下文。');
+    _appendCommon(buf, style: style, glossary: glossary);
+    final context = mangaContextSection(contextPairs);
+    if (context.isNotEmpty) {
+      buf.write('\n$context');
+    }
+    return buf.toString();
+  }
+
+  /// 漫画滚动上下文段：最多 32 对、1800 字符，按时间升序紧凑排版。
+  static String mangaContextSection(
+    List<TranslationContextPair> contextPairs,
+  ) {
+    if (contextPairs.isEmpty) return '';
+    final picked = <TranslationContextPair>[];
+    var chars = 0;
+    for (var i = contextPairs.length - 1;
+        i >= 0 && picked.length < 32;
+        i--) {
+      final source = contextPairs[i].source.trim();
+      final translation = contextPairs[i].translation.trim();
+      if (source.isEmpty || translation.isEmpty) continue;
+      final cost = source.length + translation.length;
+      if (picked.isNotEmpty && chars + cost > 1800) break;
+      picked.add((source: source, translation: translation));
+      chars += cost;
+    }
+    if (picked.isEmpty) return '';
+    final buf = StringBuffer(
+        '前文漫画对话（仅用于理解指代与保持译名/语气连贯，不要翻译或输出）：\n');
+    for (final pair in picked.reversed) {
+      buf.writeln('${pair.source} → ${pair.translation}');
     }
     return buf.toString();
   }

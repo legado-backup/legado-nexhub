@@ -1,8 +1,9 @@
 /// AI 端点失败路由（多提供商与失败路由）。
 ///
 /// 每个翻译功能支持「主 + 备用」端点列表；请求按序尝试，仅在
-/// **连接失败 / 超时 / 429 限流**三类可切换错误上落到下一端点
-/// （[TranslationKind] 归一化判定），解析失败等其他错误不切换。
+/// **连接失败 / 超时 / 429 限流 / 额度不足 / 5xx 服务端错误** 等可恢复
+/// 错误上落到下一端点（[TranslationException.isEndpointSwitchable] 判定），
+/// 认证失败、拒答、解析失败等不切换。
 ///
 /// **会话内健康度**：某端点连续 2 次失败后停用 5 分钟（内存记忆，
 /// 不跨进程），路由直接跳过被熔断的端点；切换记录入 [AppLog]。
@@ -55,7 +56,7 @@ abstract final class AiEndpointRouter {
 
   /// 按端点顺序执行 [task]：
   /// - 跳过未配置（baseUrl 为空）与熔断中的端点；
-  /// - 仅 connection / timeout / rateLimit 类错误切换下一端点；
+  /// - 仅 [TranslationException.isEndpointSwitchable] 为 true 的错误切换；
   /// - 全部失败时抛最后一次异常（调用方按现状展示）。
   static Future<T> execute<T>(
     List<AiEndpointConfig> endpoints,
@@ -82,15 +83,11 @@ abstract final class AiEndpointRouter {
         return result;
       } on Object catch (e) {
         lastError = e;
-        final kind = e is TranslationException
-            ? e.kind
-            : TranslationException.from(e).kind;
+        final error = TranslationException.from(e);
         _recordFailure(cfg);
-        final switchable = kind == TranslationKind.connection ||
-            kind == TranslationKind.timeout ||
-            kind == TranslationKind.rateLimit;
-        AppLog.instance.w('[路由] 端点失败（$kind，可切换=$switchable）: '
-            '${cfg.baseUrl}');
+        final switchable = error.isEndpointSwitchable;
+        AppLog.instance.w('[路由] 端点失败（${error.kind}，可切换=$switchable）: '
+            '${cfg.baseUrl}${error.retryAfter == null ? '' : '（建议 ${error.retryAfter!.inSeconds}s 后重试）'}');
         if (!switchable) rethrow;
         switched = true;
       }

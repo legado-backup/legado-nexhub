@@ -4631,6 +4631,7 @@
   "comicTranslateTurnOff": "关闭翻译",
   "comicTranslateLoading": "翻译中…",
   "comicTranslateFailed": "翻译失败",
+  "comicTranslatePartial": "部分翻译",
   "subTransSectionTitle": "实时翻译",
   "subTransToggle": "实时翻译字幕",
   "subTransToggleDesc": "识别当前字幕并实时显示译文",

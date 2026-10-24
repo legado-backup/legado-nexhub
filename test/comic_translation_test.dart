@@ -59,6 +59,17 @@ void main() {
       expect(VisionTranslationClient.parseSegmentsJson(''), isEmpty);
     });
 
+    test('非空数组但没有有效区域：标记解析失败，不再冒充空页', () {
+      final outcome = VisionTranslationClient.parseSegmentsOutcome('[{}]');
+      expect(outcome.ok, isFalse);
+      expect(outcome.segments, isEmpty);
+      // 空数组仍是可信的空页。
+      expect(
+        VisionTranslationClient.parseSegmentsOutcome('[]').ok,
+        isTrue,
+      );
+    });
+
     test('无坐标段 hasBbox 为 false（视频 OCR 行）', () {
       const raw = '[{"text":"hello","translation":"你好"}]';
       final segments = VisionTranslationClient.parseSegmentsJson(raw);

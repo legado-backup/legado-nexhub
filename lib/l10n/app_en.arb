@@ -4675,6 +4675,7 @@
   "comicTranslateTurnOff": "Turn off translation",
   "comicTranslateLoading": "Translating…",
   "comicTranslateFailed": "Translation failed",
+  "comicTranslatePartial": "Partially translated",
   "subTransSectionTitle": "Live translation",
   "subTransToggle": "Translate subtitles in real time",
   "subTransToggleDesc": "Detect the current subtitle line and show the translation on screen",
