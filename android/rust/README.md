@@ -82,6 +82,8 @@ bash build-ohos.sh --setup    # 仅准备 Rust 目标与工具链包装器
     归档分片生成独立 `@response-file`。
 - **产物位置**：`ohos/entry/libs/arm64-v8a/libechproxy.so`（gitignore，不入库）。
   重新出包前需先跑一次构建脚本；`flutter build hap` 会由 hvigor 自动打包。
+  CI（`.github/workflows/build_ohos.yml`）在出包前自动交叉编译，并对最终 HAP
+  校验 `.so` 是否存在、体积与四个 `ech_*` 导出符号是否齐全，缺失即中断发布。
 - **验证**：脚本自检 AArch64 架构、`ech_start_proxy` / `ech_stop_proxy` /
   `ech_is_alive` / `ech_set_scope` 四个导出符号，以及 `ech_get_retry_config`
   辅助符号（缺失即说明静默退化成了 `no_ech`，脚本直接失败）。

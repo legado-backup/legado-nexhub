@@ -85,6 +85,11 @@ cpu_count() {
 find_ndk() {
     if [ -n "${OHOS_NDK_HOME:-}" ]; then
         NDK_DIR="$(to_posix_path "$OHOS_NDK_HOME")"
+        # setup-ohos 等工具把 OHOS_NDK_HOME 指向 openharmony 根目录（native 的父级），
+        # DevEco Studio 用户则习惯直接指向 native；两种约定都接受。
+        if [ -d "$NDK_DIR/native/sysroot" ]; then
+            NDK_DIR="$NDK_DIR/native"
+        fi
     else
         local CANDIDATES=(
             "$HOME/DevEco-Studio/sdk/default/openharmony/native"

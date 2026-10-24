@@ -86,6 +86,46 @@ jobs:
           brew install coreutils 2>&1 | tail -2 || true
           which gtimeout || echo "gtimeout missing (fallback without timeout)"
 
+      - name: 缓存 ECH 引擎的 OpenSSL 静态库
+        # OpenSSL 交叉编译是整条 ECH 链路里最慢的一步；install 目录带
+        # .threads-ok 标记，脚本命中后直接跳过。key 绑定构建脚本（编译参数
+        # 一变就必须重编），不设 restore-keys 以免复用旧参数产物。
+        uses: actions/cache@v4
+        with:
+          path: android/rust/openssl/build-ohos-arm64/install
+          key: ech-ohos-openssl-${{ runner.os }}-${{ hashFiles('android/rust/build-ohos.sh') }}
+
+      - name: 缓存 ECH 引擎的 Rust 编译产物
+        # Cargo 指纹能识别源码变化，restore-keys 可安全复用同 OS 的旧缓存。
+        uses: actions/cache@v4
+        with:
+          path: android/rust/target
+          key: ech-ohos-target-${{ runner.os }}-${{ hashFiles('android/rust/Cargo.lock', 'android/rust/Cargo.toml', 'android/rust/build.rs', 'android/rust/src/**', 'android/rust/ech_helper.c') }}
+          restore-keys: |
+            ech-ohos-target-${{ runner.os }}-
+
+      - name: 编译 ECH 引擎（libechproxy.so）
+        # clean checkout 下 libs/arm64-v8a/libechproxy.so 被 gitignore，CI 必须
+        # 交叉编译后复制进 HAP 工程，否则 hvigor 打出的包没有 ECH 引擎。脚本会
+        # 自检 AArch64 架构、ECH helper 与四个导出符号，失败即中断发版。
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${OHOS_NDK_HOME:-}" ]; then
+            echo "::error::setup-ohos 未导出 OHOS_NDK_HOME"
+            exit 1
+          fi
+          # setup-ohos 把 OHOS_NDK_HOME 指向 openharmony 根目录（native 的父级），
+          # build-ohos.sh 会自动下钻到 native/。
+          echo "OHOS_NDK_HOME=$OHOS_NDK_HOME"
+          if [ ! -d "$OHOS_NDK_HOME/native/sysroot" ] && [ ! -d "$OHOS_NDK_HOME/sysroot" ]; then
+            echo "::error::OHOS_NDK_HOME 下找不到 sysroot"
+            exit 1
+          fi
+          command -v rustup >/dev/null 2>&1 || { echo "::error::runner 缺少 rustup"; exit 1; }
+          rustup target add aarch64-unknown-linux-ohos
+          bash android/rust/build-ohos.sh
+
       - name: 缓存 pub cache
         # 11 个 gitcode 依赖首次克隆成本高且易受网络随机挂死影响；
         # 以 pubspec.lock 哈希为 key 缓存整个 pub cache，后续 run 直接命中。
@@ -312,6 +352,34 @@ jobs:
               grep -naE "error:|Error:" ohos_build.log | tail -n 8 | cut -c1-380 \
                 | while IFS= read -r line; do echo "::error::${line//%/%25}"; done
               exit 1; }
+
+      - name: 校验 ECH 引擎已打包 (libechproxy.so)
+        # 曾经的发布 HAP 因 clean checkout 缺 .so 而静默丢失 ECH（Dart 侧回落
+        # 直连，功能表面正常）。这里对最终 HAP 做硬校验：文件存在、体积正常、
+        # 四个 dart:ffi 入口符号齐全，任一不满足即失败。
+        shell: bash
+        run: |
+          set -euo pipefail
+          HAP=ohos/entry/build/default/outputs/default/entry-default-unsigned.hap
+          [ -f "$HAP" ] || { echo "::error::未找到 $HAP"; exit 1; }
+          ENTRY="$(unzip -l "$HAP" | grep -E 'libs/arm64-v8a/libechproxy\.so$' | tail -n1 || true)"
+          if [ -z "$ENTRY" ]; then
+            echo "::error::HAP 缺少 libs/arm64-v8a/libechproxy.so（ECH 引擎未打包）"
+            unzip -l "$HAP" | grep 'libs/' || true
+            exit 1
+          fi
+          SIZE="$(echo "$ENTRY" | awk '{print $1}')"
+          echo "已打包: $ENTRY"
+          if [ "$SIZE" -lt 2000000 ]; then
+            echo "::error::libechproxy.so 仅 $SIZE 字节，疑似空壳产物"
+            exit 1
+          fi
+          unzip -p "$HAP" libs/arm64-v8a/libechproxy.so > "$RUNNER_TEMP/libechproxy.so"
+          for SYM in ech_start_proxy ech_stop_proxy ech_is_alive ech_set_scope; do
+            grep -aq "$SYM" "$RUNNER_TEMP/libechproxy.so" \
+              || { echo "::error::libechproxy.so 缺少导出符号 $SYM"; exit 1; }
+          done
+          echo "ECH 引擎已打包且导出符号完整"
 
       - name: 收集产物
         shell: bash
