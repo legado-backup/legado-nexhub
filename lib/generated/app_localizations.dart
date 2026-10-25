@@ -7184,6 +7184,90 @@ abstract class AppLocalizations {
   /// **'Follow default voice'**
   String get httpTtsVoiceFollowDefault;
 
+  /// No description provided for @httpTtsVoicePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get httpTtsVoicePreview;
+
+  /// No description provided for @httpTtsVoicePreviewSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello, this is a voice preview.'**
+  String get httpTtsVoicePreviewSample;
+
+  /// No description provided for @httpTtsVoicePreviewFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview failed. Please check the network'**
+  String get httpTtsVoicePreviewFail;
+
+  /// No description provided for @highlightsSyncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync highlights'**
+  String get highlightsSyncNow;
+
+  /// Manual highlight sync result
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {uploaded} books · merged {applied} from cloud'**
+  String highlightsSyncResult(int uploaded, int applied);
+
+  /// No description provided for @highlightsSyncedNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights already up to date'**
+  String get highlightsSyncedNone;
+
+  /// No description provided for @highlightsSyncStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight sync'**
+  String get highlightsSyncStatusTitle;
+
+  /// Local stats line of the highlight sync status card
+  ///
+  /// In en, this message translates to:
+  /// **'{total} highlights · {books} books on this device'**
+  String highlightsSyncLocal(int total, int books);
+
+  /// No description provided for @highlightsSyncLastNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not synced yet'**
+  String get highlightsSyncLastNone;
+
+  /// No description provided for @highlightsSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight sync failed. Check network and WebDAV settings'**
+  String get highlightsSyncFailed;
+
+  /// No description provided for @aiAskSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI'**
+  String get aiAskSection;
+
+  /// No description provided for @aiAskDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint for the reader\'s \"Ask AI\" action; falls back to the common endpoint when empty'**
+  String get aiAskDesc;
+
+  /// No description provided for @aiGroupGeneration.
+  ///
+  /// In en, this message translates to:
+  /// **'Content generation'**
+  String get aiGroupGeneration;
+
+  /// No description provided for @aiGroupTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get aiGroupTranslation;
+
   /// No description provided for @httpTtsVoiceMap.
   ///
   /// In en, this message translates to:
@@ -18674,6 +18758,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bing is unavailable right now; AI fallback will be used'**
   String get bingTranslationTestFail;
+
+  /// No description provided for @translationNotNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in the target language; no translation needed'**
+  String get translationNotNeeded;
 
   /// No description provided for @bingTranslationPrivacy.
   ///

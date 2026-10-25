@@ -3758,6 +3758,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get httpTtsVoiceFollowDefault => 'Follow default voice';
 
   @override
+  String get httpTtsVoicePreview => 'Preview';
+
+  @override
+  String get httpTtsVoicePreviewSample => 'Hello, this is a voice preview.';
+
+  @override
+  String get httpTtsVoicePreviewFail =>
+      'Preview failed. Please check the network';
+
+  @override
+  String get highlightsSyncNow => 'Sync highlights';
+
+  @override
+  String highlightsSyncResult(int uploaded, int applied) {
+    return 'Uploaded $uploaded books · merged $applied from cloud';
+  }
+
+  @override
+  String get highlightsSyncedNone => 'Highlights already up to date';
+
+  @override
+  String get highlightsSyncStatusTitle => 'Highlight sync';
+
+  @override
+  String highlightsSyncLocal(int total, int books) {
+    return '$total highlights · $books books on this device';
+  }
+
+  @override
+  String get highlightsSyncLastNone => 'Not synced yet';
+
+  @override
+  String get highlightsSyncFailed =>
+      'Highlight sync failed. Check network and WebDAV settings';
+
+  @override
+  String get aiAskSection => 'Ask AI';
+
+  @override
+  String get aiAskDesc =>
+      'Endpoint for the reader\'s \"Ask AI\" action; falls back to the common endpoint when empty';
+
+  @override
+  String get aiGroupGeneration => 'Content generation';
+
+  @override
+  String get aiGroupTranslation => 'Translation';
+
+  @override
   String get httpTtsVoiceMap => 'Role → voice (one \'role=voice\' per line)';
 
   @override
@@ -10006,6 +10055,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bingTranslationTestFail =>
       'Bing is unavailable right now; AI fallback will be used';
+
+  @override
+  String get translationNotNeeded =>
+      'Already in the target language; no translation needed';
 
   @override
   String get bingTranslationPrivacy =>

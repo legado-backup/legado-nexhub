@@ -3681,6 +3681,52 @@ class AppLocalizationsZh extends AppLocalizations {
   String get httpTtsVoiceFollowDefault => '跟随默认音色';
 
   @override
+  String get httpTtsVoicePreview => '试听';
+
+  @override
+  String get httpTtsVoicePreviewSample => '你好，这是音色试听。';
+
+  @override
+  String get httpTtsVoicePreviewFail => '试听失败，请检查网络';
+
+  @override
+  String get highlightsSyncNow => '同步划线笔记';
+
+  @override
+  String highlightsSyncResult(int uploaded, int applied) {
+    return '上传 $uploaded 本 · 云端并入 $applied 条';
+  }
+
+  @override
+  String get highlightsSyncedNone => '划线已是最新';
+
+  @override
+  String get highlightsSyncStatusTitle => '划线笔记同步';
+
+  @override
+  String highlightsSyncLocal(int total, int books) {
+    return '本机划线 $total 条 · $books 本书';
+  }
+
+  @override
+  String get highlightsSyncLastNone => '尚未同步';
+
+  @override
+  String get highlightsSyncFailed => '划线同步失败，请检查网络与 WebDAV 配置';
+
+  @override
+  String get aiAskSection => '问 AI';
+
+  @override
+  String get aiAskDesc => '阅读器选区「问AI」使用的接口，留空回落通用接口';
+
+  @override
+  String get aiGroupGeneration => '内容生成';
+
+  @override
+  String get aiGroupTranslation => '翻译';
+
+  @override
   String get httpTtsVoiceMap => '角色 → 音色（每行「角色=音色」）';
 
   @override
@@ -9757,6 +9803,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bingTranslationTestFail => 'Bing 当前不可用，将使用 AI 兜底';
+
+  @override
+  String get translationNotNeeded => '该内容已是目标语言，无需翻译';
 
   @override
   String get bingTranslationPrivacy =>
