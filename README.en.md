@@ -1,6 +1,6 @@
 **English** | [简体中文](./README.md)
 
-> Latest release: **v3.2.0 (stable)**. The previous release is **v3.1.0** (stable — frame-by-frame stepping / auto-fullscreen playback, sniffer candidate ranking and live search hot words). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
+> Latest release: **v3.3.0 (stable)**. The previous release is **v3.2.0** (stable — official HarmonyOS support, unsigned iOS build and built-in free translation). The project is under continuous development. Contributions and ideas are welcome via Pull Requests / issues. See [RELEASE_NOTES](./RELEASE_NOTES.md) for the full changelog.
 >
 > 📱 **HarmonyOS / OpenHarmony is officially supported**: fully usable on arm64 devices; an unsigned iOS build is also provided. See [Platform Support](#2-platform-support) below.
 

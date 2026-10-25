@@ -1,6 +1,6 @@
 **[简体中文](./README.md)** | [English](./README.en.md)
 
-> 当前最新版 **v3.2.0（正式版）**。上一版本为 **v3.1.0**（正式版，播放器逐帧步进 / 起播自动全屏、视频嗅探选优与搜索实时热词）。项目持续迭代中，欢迎通过 Pull Request / issues 贡献代码和想法。完整更新历史见 [RELEASE_NOTES](./RELEASE_NOTES.md)。
+> 当前最新版 **v3.3.0（正式版）**。上一版本为 **v3.2.0**（正式版，鸿蒙正式支持 + iOS 未签名构建 + 内置免费翻译）。项目持续迭代中，欢迎通过 Pull Request / issues 贡献代码和想法。完整更新历史见 [RELEASE_NOTES](./RELEASE_NOTES.md)。
 >
 > 📱 **鸿蒙（HarmonyOS / OpenHarmony）正式支持**：arm64 真机完整可用，另提供 iOS 未签名构建；详情见下方[「平台支持」](#二平台支持)。
 

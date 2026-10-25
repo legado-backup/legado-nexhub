@@ -1,5 +1,16 @@
 [
   {
+    "id": "v3.3.0-announce",
+    "date": "2026-10-25",
+    "title": "NexHub 3.3.0 正式版",
+    "titleEn": "NexHub 3.3.0 (stable release)",
+    "body": "NexHub 3.3.0 正式版来了！本次是翻译与阅读体验的集中升级：小说翻译新增上下文增强、术语闭环（自动提取/冲突裁决）、缓存指纹过期提示、精译模式（三稿合成）与 AI 审校；漫画翻译改为单次优先 + 两阶段兜底，更稳更省；小说阅读器新增多角色朗读（角色卡/AI 分镜/跨章连播）、划词翻译、问 AI、笔记 Markdown 导出、划线笔记云同步、阅读时长趋势图与内置 Edge 语音；鸿蒙端补齐 PC（2in1）适配、跨设备接续、应用分身与后台下载保活。另修复 Bangumi 401 自动续期、详情页长按翻译等一批问题。无破坏性数据变更，沿用同一签名密钥可直接覆盖安装。",
+    "bodyEn": "NexHub 3.3.0 (stable) is here! A release focused on translation and reading: novel translation gains context enhancement, a terminology loop (auto-extraction / conflict adjudication), cache fingerprints with expiry prompts, a refined mode (three drafts merged) and AI review; manga translation now tries a single pass first with a two-stage fallback — more stable and cheaper; the novel reader adds multi-character TTS (character cards / AI attribution / cross-chapter), selection translation, Ask AI, Markdown note export, highlight cloud sync, reading-time trends and built-in Edge voices; HarmonyOS gains PC (2-in-1) adaptation, cross-device handover, app cloning and background download keep-alive. Also fixes Bangumi 401 auto-refresh and long-press translation issues. No breaking data changes — same signing key, just overwrite-install.",
+    "url": "",
+    "urlText": "",
+    "urlTextEn": ""
+  },
+  {
     "id": "v3.2.0-announce",
     "date": "2026-10-21",
     "title": "NexHub 3.2.0 正式版",
