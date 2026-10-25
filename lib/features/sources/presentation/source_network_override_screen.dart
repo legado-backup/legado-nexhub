@@ -505,9 +505,13 @@ class _SourceNetworkOverrideScreenState
                       .firstWhere((e) => e.value == _dohUrlCtrl.text.trim())
                       .key
                   : null,
+              elevation: 0,
+              borderRadius: BorderRadius.circular(12),
               decoration: InputDecoration(
                 labelText: l10n.networkDohPreset,
-                border: const OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 prefixIcon: const Icon(Icons.public_rounded),
               ),
               items: <DropdownMenuItem<String>>[

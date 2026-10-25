@@ -200,8 +200,14 @@ class _NovelTtsCastSheetState extends State<NovelTtsCastSheet> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: systemVoice,
+                    elevation: 0,
+                    borderRadius: BorderRadius.circular(12),
                     decoration: InputDecoration(
-                        labelText: l10n.ttsCastSystemVoice),
+                      labelText: l10n.ttsCastSystemVoice,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     items: <DropdownMenuItem<String>>[
                       DropdownMenuItem<String>(
                         value: '',

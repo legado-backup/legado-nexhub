@@ -189,4 +189,45 @@ class NovelHighlightManager {
     final all = await listFor(novelId);
     return all.where((h) => h.chapterIndex == chapterIndex).toList();
   }
+
+  /// 全库统计：划线总条数与涉及书目数（云同步状态卡展示用）。
+  /// 单条损坏数据跳过。
+  Future<({int total, int books})> statsAll() async {
+    final box = await _openBox();
+    final totalByBook = <String, int>{};
+    for (final key in box.keys) {
+      final raw = box.get(key);
+      if (raw is! String || raw.isEmpty) continue;
+      try {
+        final hl =
+            NovelHighlight.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        if (hl.novelId.isEmpty) continue;
+        totalByBook[hl.novelId] = (totalByBook[hl.novelId] ?? 0) + 1;
+      } on Object {
+        // 损坏数据忽略。
+      }
+    }
+    return (
+      total: totalByBook.values.fold(0, (a, b) => a + b),
+      books: totalByBook.length,
+    );
+  }
+
+  /// 全库涉及的 novelId 列表（全量云同步遍历用）。
+  Future<List<String>> allNovelIds() async {
+    final box = await _openBox();
+    final ids = <String>{};
+    for (final key in box.keys) {
+      final raw = box.get(key);
+      if (raw is! String || raw.isEmpty) continue;
+      try {
+        final hl =
+            NovelHighlight.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        if (hl.novelId.isNotEmpty) ids.add(hl.novelId);
+      } on Object {
+        // 损坏数据忽略。
+      }
+    }
+    return ids.toList();
+  }
 }

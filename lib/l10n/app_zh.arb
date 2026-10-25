@@ -1890,6 +1890,42 @@
   "httpTtsUrlTemplate": "URL 模板",
   "httpTtsDefaultVoice": "默认音色",
   "httpTtsVoiceFollowDefault": "跟随默认音色",
+  "httpTtsVoicePreview": "试听",
+  "httpTtsVoicePreviewSample": "你好，这是音色试听。",
+  "httpTtsVoicePreviewFail": "试听失败，请检查网络",
+  "highlightsSyncNow": "同步划线笔记",
+  "highlightsSyncResult": "上传 {uploaded} 本 · 云端并入 {applied} 条",
+  "@highlightsSyncResult": {
+    "description": "划线笔记手动同步结果",
+    "placeholders": {
+      "uploaded": {
+        "type": "int"
+      },
+      "applied": {
+        "type": "int"
+      }
+    }
+  },
+  "highlightsSyncedNone": "划线已是最新",
+  "highlightsSyncStatusTitle": "划线笔记同步",
+  "highlightsSyncLocal": "本机划线 {total} 条 · {books} 本书",
+  "@highlightsSyncLocal": {
+    "description": "划线同步状态卡的本机统计行",
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "books": {
+        "type": "int"
+      }
+    }
+  },
+  "highlightsSyncLastNone": "尚未同步",
+  "highlightsSyncFailed": "划线同步失败，请检查网络与 WebDAV 配置",
+  "aiAskSection": "问 AI",
+  "aiAskDesc": "阅读器选区「问AI」使用的接口，留空回落通用接口",
+  "aiGroupGeneration": "内容生成",
+  "aiGroupTranslation": "翻译",
   "httpTtsVoiceMap": "角色 → 音色（每行「角色=音色」）",
   "httpTtsConcurrency": "预下载并发（1-8）",
   "httpTtsMaxFailures": "连续失败停止阈值",

@@ -412,6 +412,11 @@ class SettingsSegmentedTile<T extends Object> extends StatelessWidget {
   final List<ButtonSegment<T>> segments;
   final EdgeInsetsGeometry? margin;
 
+  /// 是否自带卡框（默认 true，与历史行为一致）。传 false 时平铺渲染
+  ///（标题小字 + 分段按钮，无 SettingsCard 包裹），用于嵌入已有卡片的
+  /// 场景——与卡内其他行（文本框/开关）视觉统一，不出现「卡中卡」。
+  final bool boxed;
+
   const SettingsSegmentedTile({
     super.key,
     required this.title,
@@ -420,30 +425,48 @@ class SettingsSegmentedTile<T extends Object> extends StatelessWidget {
     required this.onSelectionChanged,
     required this.segments,
     this.margin,
+    this.boxed = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Widget segmented = AppValuePulse(
+      trigger: selected.isEmpty ? null : selected.first,
+      from: 0.93,
+      child: SegmentedButton<T>(
+        selected: selected,
+        onSelectionChanged: (selection) {
+          // MD3「Selected」：单选组选中 → tick。
+          AppHaptics.tick();
+          onSelectionChanged(selection);
+        },
+        segments: segments,
+      ),
+    );
+    // 非卡框模式：平铺（标题/说明由本控件渲染，无卡中卡）。
+    if (!boxed) {
+      return Padding(
+        padding: const EdgeInsets.only(top: AppTokens.spaceXxs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: AppTokens.spaceXs),
+            segmented,
+          ],
+        ),
+      );
+    }
     return SettingsCard(
       title: title,
       description: description,
       margin: margin,
-      children: <Widget>[
-        // 选项切换时轻微弹性脉冲。
-        AppValuePulse(
-          trigger: selected.isEmpty ? null : selected.first,
-          from: 0.93,
-          child: SegmentedButton<T>(
-            selected: selected,
-            onSelectionChanged: (selection) {
-              // MD3「Selected」：单选组选中 → tick。
-              AppHaptics.tick();
-              onSelectionChanged(selection);
-            },
-            segments: segments,
-          ),
-        ),
-      ],
+      children: <Widget>[segmented],
     );
   }
 }

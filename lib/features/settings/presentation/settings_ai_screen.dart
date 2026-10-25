@@ -68,6 +68,11 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
   final _summaryModelCtrl = TextEditingController();
   NovelOverviewMode _summaryMode = NovelOverviewMode.local;
 
+  // 问 AI（选区/章节问答）
+  final _askBaseCtrl = TextEditingController();
+  final _askKeyCtrl = TextEditingController();
+  final _askModelCtrl = TextEditingController();
+
   // AI 配图
   final _illBaseCtrl = TextEditingController();
   final _illKeyCtrl = TextEditingController();
@@ -276,6 +281,12 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
     final trBak = await _settings.getTranslationBackupConfig();
     final comicBak = await _settings.getComicTranslationBackupConfig();
     final mediaBak = await _settings.getMediaTranslationBackupConfig();
+    // 问AI：仅回显功能级专用端点（与通用一致时留空）。
+    final askCfg = await _settings.getAskAiConfig();
+    final askBase =
+        askCfg.baseUrl == defaultCfg.baseUrl ? '' : askCfg.baseUrl;
+    final askKey = askCfg.apiKey == defaultCfg.apiKey ? '' : askCfg.apiKey;
+    final askModel = askCfg.model == defaultCfg.model ? '' : askCfg.model;
     final flags = TranslationFeatureFlags.instance;
     await flags.ensureLoaded();
 
@@ -297,6 +308,10 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
       _summaryKeyCtrl.text = sKey;
       _summaryModelCtrl.text = sModel;
       _summaryMode = mode;
+
+      _askBaseCtrl.text = askBase;
+      _askKeyCtrl.text = askKey;
+      _askModelCtrl.text = askModel;
 
       _illBaseCtrl.text = iBase;
       _illKeyCtrl.text = iKey;
@@ -400,6 +415,11 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
         model: _summaryModelCtrl.text.trim(),
       ));
       await _settings.setMode(_summaryMode);
+      await _settings.saveAskAiConfig(NovelSummaryConfig(
+        baseUrl: _askBaseCtrl.text.trim(),
+        apiKey: _askKeyCtrl.text.trim(),
+        model: _askModelCtrl.text.trim(),
+      ));
       await _settings.saveIllustrationConfig(NovelSummaryConfig(
         baseUrl: _illBaseCtrl.text.trim(),
         apiKey: _illKeyCtrl.text.trim(),
@@ -490,6 +510,23 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
     }
   }
 
+  /// 分区标题（通用接口 / 内容生成 / 翻译 三段分组）。
+  Widget _sectionHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: AppTokens.spaceLg,
+        bottom: AppTokens.spaceXs,
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -513,6 +550,8 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 ),
               ],
             ),
+            // ── 分区：内容生成 ──
+            _sectionHeader(l10n.aiGroupGeneration),
             SettingsCard(
               key: const ValueKey<String>('ai.summary'),
               title: l10n.aiSummarySection,
@@ -520,6 +559,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
               children: <Widget>[
                 SettingsSegmentedTile<NovelOverviewMode>(
                   title: l10n.aiSummaryMode,
+                  boxed: false,
                   segments: <ButtonSegment<NovelOverviewMode>>[
                     ButtonSegment<NovelOverviewMode>(
                       value: NovelOverviewMode.local,
@@ -547,6 +587,28 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                   baseCtrl: _summaryBaseCtrl,
                   keyCtrl: _summaryKeyCtrl,
                   modelCtrl: _summaryModelCtrl,
+                  baseHint: l10n.aiBaseUrlHint,
+                  modelHint: l10n.aiModelHint,
+                ),
+              ],
+            ),
+            SettingsCard(
+              key: const ValueKey<String>('ai.ask'),
+              title: l10n.aiAskSection,
+              description: l10n.aiAskDesc,
+              children: <Widget>[
+                Text(
+                  l10n.aiOverrideHint,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Theme.of(context).colorScheme.outline),
+                ),
+                const SizedBox(height: AppTokens.spaceSm),
+                _ApiFields(
+                  baseCtrl: _askBaseCtrl,
+                  keyCtrl: _askKeyCtrl,
+                  modelCtrl: _askModelCtrl,
                   baseHint: l10n.aiBaseUrlHint,
                   modelHint: l10n.aiModelHint,
                 ),
@@ -584,6 +646,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 const SizedBox(height: AppTokens.spaceMd),
                 SettingsChoiceChips<String>(
                   title: l10n.aiIllustrationSize,
+                  boxed: false,
                   selected: _illSize,
                   onSelected: (s) => setState(() => _illSize = s),
                   options: <SettingsChoiceChipData<String>>[
@@ -593,6 +656,8 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 ),
               ],
             ),
+            // ── 分区：翻译 ──
+            _sectionHeader(l10n.aiGroupTranslation),
             SettingsCard(
               key: const ValueKey<String>('translation.bing'),
               title: l10n.bingTranslationTitle,
@@ -715,6 +780,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 // 翻译风格预设（三个模块共用）。
                 SettingsChoiceChips<TranslationStyle>(
                   title: l10n.translationStyle,
+                  boxed: false,
                   selected: _trStyle,
                   onSelected: (s) => setState(() => _trStyle = s),
                   options: <SettingsChoiceChipData<TranslationStyle>>[
@@ -792,6 +858,7 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 // 小说译文附录排版开关。
                 SettingsChoiceChips<String>(
                   title: l10n.translationExportLayout,
+                  boxed: false,
                   selected: _trExportLayout,
                   onSelected: (s) => setState(() => _trExportLayout = s),
                   options: <SettingsChoiceChipData<String>>[
@@ -1031,8 +1098,8 @@ class _ApiFields extends StatelessWidget {
   }
 }
 
-/// 备用接口输入组：默认折叠，展开后填写备用 baseUrl / key / model。
-class _BackupFields extends StatefulWidget {
+/// 备用接口输入组：随卡片一级折叠展开，不再单独折叠。
+class _BackupFields extends StatelessWidget {
   final TextEditingController baseCtrl;
   final TextEditingController keyCtrl;
   final TextEditingController modelCtrl;
@@ -1044,38 +1111,25 @@ class _BackupFields extends StatefulWidget {
   });
 
   @override
-  State<_BackupFields> createState() => _BackupFieldsState();
-}
-
-class _BackupFieldsState extends State<_BackupFields> {
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        TextButton.icon(
-          onPressed: () => setState(() => _expanded = !_expanded),
-          icon: Icon(
-              _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-              size: 18),
-          label: Text(l10n.aiBackupSection,
-              style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          l10n.aiBackupSection,
+          style: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(fontWeight: FontWeight.w500),
         ),
-        AnimatedCrossFade(
-          duration: const Duration(milliseconds: 180),
-          crossFadeState:
-              _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-          firstChild: _ApiFields(
-            baseCtrl: widget.baseCtrl,
-            keyCtrl: widget.keyCtrl,
-            modelCtrl: widget.modelCtrl,
-            baseHint: l10n.aiBaseUrlHint,
-            modelHint: l10n.aiModelHint,
-          ),
-          secondChild: const SizedBox.shrink(),
+        const SizedBox(height: AppTokens.spaceSm),
+        _ApiFields(
+          baseCtrl: baseCtrl,
+          keyCtrl: keyCtrl,
+          modelCtrl: modelCtrl,
+          baseHint: l10n.aiBaseUrlHint,
+          modelHint: l10n.aiModelHint,
         ),
       ],
     );

@@ -4,14 +4,16 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/comic/models/reader_preferences.dart';
-import '../../../core/novel/novel_edge_tts_engine.dart' show kEdgeTtsVoices;
+import '../../../core/novel/novel_edge_tts_engine.dart';
 import '../../../core/novel/novel_http_tts_config.dart';
 import '../../../core/novel/novel_tts_audio_cache.dart';
 import '../../../core/novel/novel_page_animation.dart';
@@ -95,6 +97,7 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
     _exportSaveDebounce?.cancel();
     _exportCssController.dispose();
     _exportIntroController.dispose();
+    _stopVoicePreview();
     super.dispose();
   }
 
@@ -145,33 +148,155 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
   }
 
   /// Edge 模式音色选择：内置音色下拉（含空选项「跟随默认」；
-  /// 当前值不在内置表时追加原值项，避免自由填写的 id 丢失显示）。
+  /// 当前值不在内置表时追加原值项，避免自由填写的 id 丢失显示）+
+  /// 试听按钮（合成一句样例并播放）。
+  ///
+  /// 样式：弹层无阴影 + 圆角，输入框边框同步圆角。
   Widget _edgeVoiceField({
     required String label,
     required String value,
     required ValueChanged<String> onChanged,
   }) {
     final l10n = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
     final items = <String>[...kEdgeTtsVoices.keys];
     if (value.isNotEmpty && !kEdgeTtsVoices.containsKey(value)) {
       items.insert(0, value);
     }
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-      items: <DropdownMenuItem<String>>[
-        DropdownMenuItem<String>(
-          value: '',
-          child: Text(l10n.httpTtsVoiceFollowDefault),
-        ),
-        for (final id in items)
-          DropdownMenuItem<String>(
-            value: id,
-            child: Text(kEdgeTtsVoices[id] ?? id),
+    final previewVoice = value.isEmpty ? kEdgeTtsDefaultVoice : value;
+    final previewing = _previewingVoice == previewVoice;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            initialValue: value,
+            elevation: 0,
+            borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+            decoration: InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+              ),
+            ),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem<String>(
+                value: '',
+                child: Text(l10n.httpTtsVoiceFollowDefault),
+              ),
+              for (final id in items)
+                DropdownMenuItem<String>(
+                  value: id,
+                  child: Text(kEdgeTtsVoices[id] ?? id),
+                ),
+            ],
+            onChanged: (v) => onChanged(v ?? ''),
           ),
+        ),
+        IconButton(
+          tooltip: l10n.httpTtsVoicePreview,
+          onPressed: () => _previewEdgeVoice(previewVoice),
+          icon: previewing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  previewing
+                      ? Icons.stop_rounded
+                      : Icons.play_arrow_rounded,
+                  color: previewing ? cs.primary : null,
+                ),
+        ),
       ],
-      onChanged: (v) => onChanged(v ?? ''),
     );
+  }
+
+  /// 试听播放器与当前试听音色（null = 无试听进行中）。
+  Player? _previewPlayer;
+  String? _previewingVoice;
+
+  /// 停止并清理当前试听（切音色 / 离开页面时调用）。
+  Future<void> _stopVoicePreview() async {
+    final p = _previewPlayer;
+    _previewPlayer = null;
+    if (mounted) setState(() => _previewingVoice = null);
+    if (p != null) {
+      try {
+        await p.dispose();
+      } on Object {
+        // 播放器已释放时忽略。
+      }
+    }
+  }
+
+  /// 试听音色：合成一句样例（走 Edge 在线合成 + 缓存），media_kit 播放。
+  /// 再点同音色 = 停止；点其他音色 = 停旧播新。
+  Future<void> _previewEdgeVoice(String voiceId) async {
+    if (_previewingVoice == voiceId) {
+      await _stopVoicePreview();
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    await _stopVoicePreview();
+    setState(() => _previewingVoice = voiceId);
+    Player? player;
+    try {
+      final engine = EdgeTtsSynthesisEngine();
+      final result = await engine.synthesize(
+        text: l10n.httpTtsVoicePreviewSample,
+        voice: voiceId,
+        role: 'preview',
+      );
+      final bytes = result.bytes;
+      if (bytes == null || !mounted) {
+        setState(() => _previewingVoice = null);
+        return;
+      }
+      final dir = await Directory.systemTemp.createTemp('nexhub_tts_preview_');
+      final file = File('${dir.path}/preview.mp3');
+      await file.writeAsBytes(bytes);
+      player = Player();
+      _previewPlayer = player;
+      await player.open(Media(file.path));
+      final done = Completer<void>();
+      late final StreamSubscription<bool> sub;
+      sub = player.stream.completed.listen((d) {
+        if (d && !done.isCompleted) done.complete();
+      });
+      final errSub = player.stream.error.listen((_) {
+        if (!done.isCompleted) done.complete();
+      });
+      await done.future.timeout(const Duration(seconds: 15), onTimeout: () {});
+      await sub.cancel();
+      await errSub.cancel();
+      try {
+        await dir.delete(recursive: true);
+      } on Object {
+        // 临时目录清理失败不影响功能。
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.httpTtsVoicePreviewFail)),
+        );
+      }
+    } finally {
+      if (player != null && _previewPlayer == player) {
+        _previewPlayer = null;
+      }
+      try {
+        await player?.dispose();
+      } on Object {
+        // 忽略重复释放。
+      }
+      if (mounted && _previewingVoice == voiceId) {
+        setState(() => _previewingVoice = null);
+      }
+    }
   }
 
   /// 解析「角色=音色」多行文本为映射（忽略空行/无=行）。

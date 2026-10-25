@@ -3355,77 +3355,107 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _selectionController.setPersistedHighlights(list);
   }
 
-  /// 选区工具条：复制 / 整段 / 划线色板 / 取消。
+  /// 选区工具条：复制 / 整段 / 划线色板 / 问AI / 分享。
+  ///
+  /// 宽屏放得下时按钮等宽均分；窄屏改横向滑动（固定按钮宽 + 回弹物理，
+  /// 滑动有「灵动」回弹手感）。Material 铺满到屏幕底（SafeArea 在其内），
+  /// 避免系统导航栏区域露出未着色的空白条。
   Widget _buildSelectionToolbar() {
     final l10n = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final buttons = <Widget>[
+      _selToolbarButton(
+        icon: Icons.copy_rounded,
+        label: l10n.selectionCopy,
+        onPressed: _selCopy,
+      ),
+      _selToolbarButton(
+        icon: Icons.subject_rounded,
+        label: l10n.selectionParagraph,
+        onPressed: _selParagraph,
+      ),
+      _selToolbarButton(
+        icon: Icons.palette_rounded,
+        label: l10n.selectionHighlight,
+        onPressed: () => _showColorPicker(),
+      ),
+      _selToolbarButton(
+        icon: Icons.format_underline_rounded,
+        label: l10n.selectionUnderline,
+        onPressed: () => _showUnderlinePicker(),
+      ),
+      _selToolbarButton(
+        icon: Icons.edit_note_rounded,
+        label: l10n.selectionNote,
+        onPressed: () => _selHighlightWithNote(),
+      ),
+      _selToolbarButton(
+        icon: Icons.translate_rounded,
+        label: l10n.selectionTranslate,
+        onPressed: _selTranslate,
+      ),
+      _selToolbarButton(
+        icon: Icons.auto_awesome_rounded,
+        label: l10n.selectionAskAi,
+        onPressed: _askAiAboutSelection,
+      ),
+      _selToolbarButton(
+        icon: Icons.share_rounded,
+        label: l10n.selectionShare,
+        onPressed: () => _selShare(),
+      ),
+    ];
+    const hPad = AppTokens.spaceXs;
     return Positioned(
       left: 0,
       right: 0,
       bottom: 0,
-      child: SafeArea(
-        top: false,
-        bottom: true,
-        child: Material(
-          elevation: 8,
-          color: cs.surface,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.spaceXs,
-              vertical: AppTokens.spaceXs,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.copy_rounded,
-                  label: l10n.selectionCopy,
-                  onPressed: _selCopy,
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.subject_rounded,
-                  label: l10n.selectionParagraph,
-                  onPressed: _selParagraph,
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.palette_rounded,
-                  label: l10n.selectionHighlight,
-                  onPressed: () => _showColorPicker(),
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.format_underline_rounded,
-                  label: l10n.selectionUnderline,
-                  onPressed: () => _showUnderlinePicker(),
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.edit_note_rounded,
-                  label: l10n.selectionNote,
-                  onPressed: () => _selHighlightWithNote(),
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.translate_rounded,
-                  label: l10n.selectionTranslate,
-                  onPressed: _selTranslate,
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.auto_awesome_rounded,
-                  label: l10n.selectionAskAi,
-                  onPressed: _askAiAboutSelection,
-                )),
-                Expanded(
-                    child: _selToolbarButton(
-                  icon: Icons.share_rounded,
-                  label: l10n.selectionShare,
-                  onPressed: () => _selShare(),
-                )),
-              ],
-            ),
+      child: Material(
+        elevation: 8,
+        color: cs.surface,
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 全部按钮按固定宽排开的总宽 ≤ 可用宽 → 等宽均分；否则滑动。
+              final canFit = constraints.maxWidth >=
+                  buttons.length * 64.0 + hPad * 2;
+              if (canFit) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: hPad,
+                    vertical: AppTokens.spaceXs,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      for (final b in buttons) Expanded(child: b),
+                    ],
+                  ),
+                );
+              }
+              return ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  // 鼠标/触控笔也可拖动滑动（默认仅触摸），回弹物理带灵动手感。
+                  dragDevices: const <PointerDeviceKind>{
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.stylus,
+                    PointerDeviceKind.trackpad,
+                  },
+                  physics: const BouncingScrollPhysics(),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: hPad,
+                    vertical: AppTokens.spaceXs,
+                  ),
+                  child: Row(children: buttons),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -3650,24 +3680,28 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     required VoidCallback onPressed,
   }) {
     final cs = Theme.of(context).colorScheme;
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: cs.onSurface,
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 16),
-          const SizedBox(height: 1),
-          Text(label,
-              style: const TextStyle(fontSize: 9),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1),
-        ],
+    // 固定宽度：横向滑动工具条下不再互相挤压（窄屏超出部分可滑动）。
+    return SizedBox(
+      width: 64,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: cs.onSurface,
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(icon, size: 16),
+            const SizedBox(height: 1),
+            Text(label,
+                style: const TextStyle(fontSize: 9),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1),
+          ],
+        ),
       ),
     );
   }

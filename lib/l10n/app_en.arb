@@ -1910,6 +1910,42 @@
   "httpTtsUrlTemplate": "URL template",
   "httpTtsDefaultVoice": "Default voice",
   "httpTtsVoiceFollowDefault": "Follow default voice",
+  "httpTtsVoicePreview": "Preview",
+  "httpTtsVoicePreviewSample": "Hello, this is a voice preview.",
+  "httpTtsVoicePreviewFail": "Preview failed. Please check the network",
+  "highlightsSyncNow": "Sync highlights",
+  "highlightsSyncResult": "Uploaded {uploaded} books · merged {applied} from cloud",
+  "@highlightsSyncResult": {
+    "description": "Manual highlight sync result",
+    "placeholders": {
+      "uploaded": {
+        "type": "int"
+      },
+      "applied": {
+        "type": "int"
+      }
+    }
+  },
+  "highlightsSyncedNone": "Highlights already up to date",
+  "highlightsSyncStatusTitle": "Highlight sync",
+  "highlightsSyncLocal": "{total} highlights · {books} books on this device",
+  "@highlightsSyncLocal": {
+    "description": "Local stats line of the highlight sync status card",
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "books": {
+        "type": "int"
+      }
+    }
+  },
+  "highlightsSyncLastNone": "Not synced yet",
+  "highlightsSyncFailed": "Highlight sync failed. Check network and WebDAV settings",
+  "aiAskSection": "Ask AI",
+  "aiAskDesc": "Endpoint for the reader's \"Ask AI\" action; falls back to the common endpoint when empty",
+  "aiGroupGeneration": "Content generation",
+  "aiGroupTranslation": "Translation",
   "httpTtsVoiceMap": "Role → voice (one 'role=voice' per line)",
   "httpTtsConcurrency": "Preload concurrency (1-8)",
   "httpTtsMaxFailures": "Consecutive failure stop threshold",

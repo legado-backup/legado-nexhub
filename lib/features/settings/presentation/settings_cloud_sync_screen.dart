@@ -9,15 +9,19 @@
 /// 6. 明确的中文错误提示（按语义码映射）
 library;
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/novel/novel_progress_conflict.dart';
+import '../../../core/novel/novel_highlight_manager.dart';
 import '../../../core/novel/novel_progress_manager.dart';
 import '../../../core/services/backup_archive.dart';
 import '../../../core/services/cloud_sync_service.dart';
+import '../../../core/services/novel_highlight_sync_service.dart';
 import '../../../core/services/novel_progress_sync_service.dart';
 import '../../../core/settings/general_settings.dart';
 import '../../../core/utils/app_haptics.dart';
@@ -45,6 +49,11 @@ class _SettingsCloudSyncScreenState extends State<SettingsCloudSyncScreen> {
   bool _syncing = false;
   bool _pulling = false;
   bool _resolving = false;
+  bool _syncingHighlights = false;
+
+  /// 划线状态卡：本机统计与上次同步结果（进入页面 / 同步后刷新）。
+  String _highlightStats = '';
+  String? _highlightLastResult;
   Set<BackupCategory> _selected = <BackupCategory>{
     BackupCategory.source,
     BackupCategory.bookmark,
@@ -61,6 +70,63 @@ class _SettingsCloudSyncScreenState extends State<SettingsCloudSyncScreen> {
     final config = context.read<CloudSyncService>().config;
     _urlController = TextEditingController(text: config.url);
     _usernameController = TextEditingController(text: config.username);
+    unawaited(_refreshHighlightStats());
+  }
+
+  /// 刷新划线状态卡的本机统计行。
+  Future<void> _refreshHighlightStats() async {
+    try {
+      final s = await NovelHighlightManager().statsAll();
+      if (!mounted) return;
+      setState(() {
+        _highlightStats =
+            AppLocalizations.of(context).highlightsSyncLocal(s.total, s.books);
+      });
+    } on Object {
+      // 统计失败不阻断页面。
+    }
+  }
+
+  /// 手动全量同步划线笔记：遍历本机有划线的书逐本「拉取合并 + 上传」。
+  Future<void> _syncHighlights(AppLocalizations l10n) async {
+    if (_syncingHighlights) return;
+    setState(() => _syncingHighlights = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final ids = await NovelHighlightManager().allNovelIds();
+      var uploaded = 0;
+      var applied = 0;
+      final service = NovelHighlightSyncService();
+      for (final id in ids) {
+        final r = await service.syncOne(id);
+        if (r.uploaded) uploaded++;
+        applied += r.appliedFromRemote;
+      }
+      if (!mounted) return;
+      setState(() {
+        _highlightLastResult = (uploaded == 0 && applied == 0)
+            ? l10n.highlightsSyncedNone
+            : l10n.highlightsSyncResult(uploaded, applied);
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            (uploaded == 0 && applied == 0)
+                ? l10n.highlightsSyncedNone
+                : l10n.highlightsSyncResult(uploaded, applied),
+          ),
+        ),
+      );
+      await _refreshHighlightStats();
+    } on Object {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.highlightsSyncFailed)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncingHighlights = false);
+    }
   }
 
   @override
@@ -396,6 +462,42 @@ class _SettingsCloudSyncScreenState extends State<SettingsCloudSyncScreen> {
       GeneralSettingsStore.instance.settings.dateFormat
           .format(DateTime.fromMillisecondsSinceEpoch(ts), withTime: true);
 
+  /// 划线笔记同步状态卡：本机统计 + 上次手动同步结果。
+  Widget _buildHighlightStatusCard(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.spaceMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.highlight_alt_rounded,
+                    size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: AppTokens.spaceSm),
+                Text(l10n.highlightsSyncStatusTitle,
+                    style: theme.textTheme.titleSmall),
+              ],
+            ),
+            const SizedBox(height: AppTokens.spaceSm),
+            Text(
+              _highlightStats.isEmpty ? '—' : _highlightStats,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppTokens.spaceXs),
+            Text(
+              _highlightLastResult ?? l10n.highlightsSyncLastNone,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 同步状态明细卡片：展示上次备份 / 恢复的时间、成功与否、数据条数、范围。
   Widget _buildStatusCard(CloudSyncConfig config, AppLocalizations l10n) {
     final theme = Theme.of(context);
@@ -646,8 +748,25 @@ class _SettingsCloudSyncScreenState extends State<SettingsCloudSyncScreen> {
             icon: const Icon(Icons.menu_book_rounded, size: 18),
             label: Text(l10n.novelProgressSyncNow),
           ),
+          const SizedBox(height: AppTokens.spaceSm),
+          // 划线笔记逐书合并同步。
+          OutlinedButton.icon(
+            onPressed:
+                _syncingHighlights ? null : () => _syncHighlights(l10n),
+            icon: _syncingHighlights
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.highlight_alt_rounded, size: 18),
+            label: Text(l10n.highlightsSyncNow),
+          ),
           const SizedBox(height: AppTokens.spaceMd),
           _buildStatusCard(config, l10n),
+
+          const SizedBox(height: AppTokens.spaceSm),
+          _buildHighlightStatusCard(l10n),
 
           const SizedBox(height: AppTokens.spaceLg),
           const Divider(),

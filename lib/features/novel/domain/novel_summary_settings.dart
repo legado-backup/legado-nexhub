@@ -33,6 +33,11 @@ class NovelSummarySettings {
   static const String _kIllModelName = 'novel_illustration_model_v1';
   static const String _kIllSize = 'novel_illustration_size_v1';
 
+  // 问 AI（选区/章节问答）功能级端点；baseUrl 为空时回落翻译端点→通用。
+  static const String _kAskBase = 'novel_ask_ai_api_base_v1';
+  static const String _kAskKey = 'novel_ask_ai_api_key_v1';
+  static const String _kAskModel = 'novel_ask_ai_api_model_v1';
+
   // ── 双语/段落翻译功能级接口与选项 ──
   static const String _kTrBase = 'novel_translation_api_base_v1';
   static const String _kTrKey = 'novel_translation_api_key_v1';
@@ -145,6 +150,28 @@ class NovelSummarySettings {
   Future<void> saveIllustrationSize(String size) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kIllSize, size.trim().isEmpty ? '1024x1024' : size.trim());
+  }
+
+  // ─────────────────── 问 AI（选区/章节问答）接口 ───────────────────
+
+  /// 问 AI 功能级配置；baseUrl 为空时回落通用配置（调用方自行决定
+  /// 是否再回落翻译端点）。
+  Future<NovelSummaryConfig> getAskAiConfig() async {
+    final p = await SharedPreferences.getInstance();
+    final specific = _readConfig(p, _kAskBase, _kAskKey, _kAskModel);
+    if (specific.baseUrl.trim().isNotEmpty) return specific;
+    return _readConfig(p, _kBase, _kKey, _kModel);
+  }
+
+  /// 问 AI 端点是否配置了功能级专用接口（区别于回落）。
+  Future<bool> hasAskAiSpecificConfig() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kAskBase)?.trim().isNotEmpty ?? false;
+  }
+
+  Future<void> saveAskAiConfig(NovelSummaryConfig cfg) async {
+    final p = await SharedPreferences.getInstance();
+    await _writeConfig(p, _kAskBase, _kAskKey, _kAskModel, cfg);
   }
 
   // ─────────────────── 翻译接口与选项 ───────────────────

@@ -75,10 +75,24 @@ class _NovelSelectionAiDialogState extends State<NovelSelectionAiDialog> {
     super.dispose();
   }
 
+  /// 端点解析：优先「问AI」功能级专用接口（设置→AI 配置），
+  /// 未配置时回落翻译端点链（多路失败路由，含通用接口兜底）。
   Future<List<AiEndpointConfig>> _resolveEndpoints() async {
     try {
-      final cfgs =
-          await NovelSummarySettings.instance.getTranslationEndpoints();
+      final settings = NovelSummarySettings.instance;
+      if (await settings.hasAskAiSpecificConfig()) {
+        final cfg = await settings.getAskAiConfig();
+        if (cfg.baseUrl.trim().isNotEmpty) {
+          return <AiEndpointConfig>[
+            AiEndpointConfig(
+              baseUrl: cfg.baseUrl,
+              apiKey: cfg.apiKey,
+              model: cfg.model,
+            ),
+          ];
+        }
+      }
+      final cfgs = await settings.getTranslationEndpoints();
       return <AiEndpointConfig>[
         for (final c in cfgs)
           if (c.baseUrl.trim().isNotEmpty)

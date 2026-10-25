@@ -35,6 +35,9 @@ const String _kTrustedClientToken =
 /// 连接 URL 中的 Edge 版本标记（v2 DRM 对应 143 系列）。
 const String _kGecVersion = '2-143.0.3650.75';
 
+/// Edge 模式未指定音色时的默认音色（引擎内部回退同款）。
+const String kEdgeTtsDefaultVoice = 'zh-CN-XiaoxiaoNeural';
+
 /// 内置 Edge 音色（voice id → 显示名）。
 ///
 /// 精选中文主流音色 + 英/日常用，避免上百条全量列表的噪音；
@@ -78,7 +81,7 @@ class EdgeTtsSynthesisEngine implements TtsSynthesisEngine {
       return TtsSynthesisResult(bytes: null, role: role);
     }
     final resolvedVoice =
-        voice.trim().isEmpty ? 'zh-CN-XiaoxiaoNeural' : voice.trim();
+        voice.trim().isEmpty ? kEdgeTtsDefaultVoice : voice.trim();
     final rateLabel = rate.toStringAsFixed(1);
     final key = TtsAudioFileCache.keyFor(
       urlTemplate: 'edge-tts://$resolvedVoice',
