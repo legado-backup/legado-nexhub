@@ -11,6 +11,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/comic/models/reader_preferences.dart';
+import '../../../core/novel/novel_edge_tts_engine.dart' show kEdgeTtsVoices;
 import '../../../core/novel/novel_http_tts_config.dart';
 import '../../../core/novel/novel_tts_audio_cache.dart';
 import '../../../core/novel/novel_page_animation.dart';
@@ -140,6 +141,36 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
           .textTheme
           .bodyMedium
           ?.copyWith(fontWeight: FontWeight.w500),
+    );
+  }
+
+  /// Edge 模式音色选择：内置音色下拉（含空选项「跟随默认」；
+  /// 当前值不在内置表时追加原值项，避免自由填写的 id 丢失显示）。
+  Widget _edgeVoiceField({
+    required String label,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final items = <String>[...kEdgeTtsVoices.keys];
+    if (value.isNotEmpty && !kEdgeTtsVoices.containsKey(value)) {
+      items.insert(0, value);
+    }
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+      items: <DropdownMenuItem<String>>[
+        DropdownMenuItem<String>(
+          value: '',
+          child: Text(l10n.httpTtsVoiceFollowDefault),
+        ),
+        for (final id in items)
+          DropdownMenuItem<String>(
+            value: id,
+            child: Text(kEdgeTtsVoices[id] ?? id),
+          ),
+      ],
+      onChanged: (v) => onChanged(v ?? ''),
     );
   }
 
@@ -1815,82 +1846,156 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                             _updateHttpTts(_httpTts.copyWith(enabled: v)),
                       ),
                       if (_httpTts.enabled) ...<Widget>[
-                        _label(l10n.httpTtsUrlTemplate),
+                        // 在线语音来源：内置 Edge 语音 / 自定义 HTTP 端点。
+                        _label(l10n.httpTtsProvider),
                         const SizedBox(height: AppTokens.spaceXs),
-                        TextField(
-                          controller:
-                              TextEditingController(text: _httpTts.urlTemplate),
-                          decoration: const InputDecoration(
-                            hintText:
-                                'https://tts.example/api?text={text}&voice={voice}',
-                            isDense: true,
-                            border: OutlineInputBorder(),
-                          ),
-                          onSubmitted: (v) =>
-                              _updateHttpTts(_httpTts.copyWith(urlTemplate: v)),
+                        SegmentedButton<String>(
+                          segments: <ButtonSegment<String>>[
+                            ButtonSegment<String>(
+                              value: 'edge',
+                              label: Text(l10n.httpTtsProviderEdge),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'custom',
+                              label: Text(l10n.httpTtsProviderCustom),
+                            ),
+                          ],
+                          selected: <String>{_httpTts.provider},
+                          onSelectionChanged: (Set<String> s) {
+                            if (s.isEmpty) return;
+                            var next = _httpTts.copyWith(provider: s.first);
+                            // 切到 Edge 时补默认音色（引擎虽有回退，
+                            // 显式配置便于查看与修改）。
+                            if (s.first == 'edge' &&
+                                next.defaultVoice.trim().isEmpty) {
+                              next = next.copyWith(
+                                  defaultVoice: 'zh-CN-XiaoxiaoNeural');
+                            }
+                            _updateHttpTts(next);
+                          },
                         ),
-                        const SizedBox(height: AppTokens.spaceSm),
-                        _label(l10n.httpTtsDefaultVoice),
-                        const SizedBox(height: AppTokens.spaceXs),
-                        TextField(
-                          controller: TextEditingController(
-                              text: _httpTts.defaultVoice),
-                          decoration: const InputDecoration(
-                            hintText: 'xiaoyun',
-                            isDense: true,
-                            border: OutlineInputBorder(),
+                        if (_httpTts.isEdge) ...<Widget>[
+                          const SizedBox(height: AppTokens.spaceSm),
+                          Text(
+                            l10n.httpTtsEdgeHint,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                           ),
-                          onSubmitted: (v) => _updateHttpTts(
-                              _httpTts.copyWith(defaultVoice: v)),
-                        ),
+                          const SizedBox(height: AppTokens.spaceSm),
+                          _edgeVoiceField(
+                            label: l10n.httpTtsDefaultVoice,
+                            value: _httpTts.defaultVoice,
+                            onChanged: (v) => _updateHttpTts(
+                                _httpTts.copyWith(defaultVoice: v)),
+                          ),
+                        ] else ...<Widget>[
+                          _label(l10n.httpTtsUrlTemplate),
+                          const SizedBox(height: AppTokens.spaceXs),
+                          TextField(
+                            controller: TextEditingController(
+                                text: _httpTts.urlTemplate),
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'https://tts.example/api?text={text}&voice={voice}',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (v) => _updateHttpTts(
+                                _httpTts.copyWith(urlTemplate: v)),
+                          ),
+                          const SizedBox(height: AppTokens.spaceSm),
+                          _label(l10n.httpTtsDefaultVoice),
+                          const SizedBox(height: AppTokens.spaceXs),
+                          TextField(
+                            controller: TextEditingController(
+                                text: _httpTts.defaultVoice),
+                            decoration: const InputDecoration(
+                              hintText: 'xiaoyun',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (v) => _updateHttpTts(
+                                _httpTts.copyWith(defaultVoice: v)),
+                          ),
+                        ],
                         const SizedBox(height: AppTokens.spaceSm),
                         _label(l10n.ttsCastNarratorVoice),
                         const SizedBox(height: AppTokens.spaceXs),
-                        TextField(
-                          controller: TextEditingController(
-                              text: _httpTts.narratorVoice),
-                          decoration: InputDecoration(
-                            hintText: _httpTts.defaultVoice.isEmpty
-                                ? null
-                                : _httpTts.defaultVoice,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
+                        if (_httpTts.isEdge)
+                          _edgeVoiceField(
+                            label: l10n.ttsCastNarratorVoice,
+                            value: _httpTts.narratorVoice,
+                            onChanged: (v) => _updateHttpTts(
+                                _httpTts.copyWith(narratorVoice: v)),
+                          )
+                        else
+                          TextField(
+                            controller: TextEditingController(
+                                text: _httpTts.narratorVoice),
+                            decoration: InputDecoration(
+                              hintText: _httpTts.defaultVoice.isEmpty
+                                  ? null
+                                  : _httpTts.defaultVoice,
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
+                            onSubmitted: (v) => _updateHttpTts(
+                                _httpTts.copyWith(narratorVoice: v)),
                           ),
-                          onSubmitted: (v) => _updateHttpTts(
-                              _httpTts.copyWith(narratorVoice: v)),
-                        ),
                         const SizedBox(height: AppTokens.spaceSm),
                         _label(l10n.ttsCastMaleVoice),
                         const SizedBox(height: AppTokens.spaceXs),
-                        TextField(
-                          controller:
-                              TextEditingController(text: _httpTts.maleVoice),
-                          decoration: InputDecoration(
-                            hintText: _httpTts.defaultVoice.isEmpty
-                                ? null
-                                : _httpTts.defaultVoice,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
+                        if (_httpTts.isEdge)
+                          _edgeVoiceField(
+                            label: l10n.ttsCastMaleVoice,
+                            value: _httpTts.maleVoice,
+                            onChanged: (v) => _updateHttpTts(
+                                _httpTts.copyWith(maleVoice: v)),
+                          )
+                        else
+                          TextField(
+                            controller: TextEditingController(
+                                text: _httpTts.maleVoice),
+                            decoration: InputDecoration(
+                              hintText: _httpTts.defaultVoice.isEmpty
+                                  ? null
+                                  : _httpTts.defaultVoice,
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
+                            onSubmitted: (v) => _updateHttpTts(
+                                _httpTts.copyWith(maleVoice: v)),
                           ),
-                          onSubmitted: (v) =>
-                              _updateHttpTts(_httpTts.copyWith(maleVoice: v)),
-                        ),
                         const SizedBox(height: AppTokens.spaceSm),
                         _label(l10n.ttsCastFemaleVoice),
                         const SizedBox(height: AppTokens.spaceXs),
-                        TextField(
-                          controller: TextEditingController(
-                              text: _httpTts.femaleVoice),
-                          decoration: InputDecoration(
-                            hintText: _httpTts.defaultVoice.isEmpty
-                                ? null
-                                : _httpTts.defaultVoice,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
+                        if (_httpTts.isEdge)
+                          _edgeVoiceField(
+                            label: l10n.ttsCastFemaleVoice,
+                            value: _httpTts.femaleVoice,
+                            onChanged: (v) => _updateHttpTts(
+                                _httpTts.copyWith(femaleVoice: v)),
+                          )
+                        else
+                          TextField(
+                            controller: TextEditingController(
+                                text: _httpTts.femaleVoice),
+                            decoration: InputDecoration(
+                              hintText: _httpTts.defaultVoice.isEmpty
+                                  ? null
+                                  : _httpTts.defaultVoice,
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
+                            onSubmitted: (v) => _updateHttpTts(
+                                _httpTts.copyWith(femaleVoice: v)),
                           ),
-                          onSubmitted: (v) => _updateHttpTts(
-                              _httpTts.copyWith(femaleVoice: v)),
-                        ),
                         const SizedBox(height: AppTokens.spaceSm),
                         _label(l10n.httpTtsVoiceMap),
                         const SizedBox(height: AppTokens.spaceXs),

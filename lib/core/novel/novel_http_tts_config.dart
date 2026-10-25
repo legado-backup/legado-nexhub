@@ -17,7 +17,11 @@ class NovelHttpTtsConfig {
   /// 是否启用在线 TTS（false = 继续使用 flutter_tts 离线引擎）。
   final bool enabled;
 
-  /// URL 模板，占位符：{text} / {voice} / {rate}。
+  /// 合成通道：`custom`（自定义 HTTP 端点模板，默认）或
+  /// `edge`（内置 Edge 在线语音，无需自建服务）。
+  final String provider;
+
+  /// URL 模板，占位符：{text} / {voice} / {rate}（provider == custom 用）。
   final String urlTemplate;
 
   /// 默认音色 id（模板 {voice} 未映射角色时的回退值）。
@@ -46,6 +50,7 @@ class NovelHttpTtsConfig {
 
   const NovelHttpTtsConfig({
     this.enabled = false,
+    this.provider = 'custom',
     this.urlTemplate = '',
     this.defaultVoice = '',
     this.narratorVoice = '',
@@ -59,6 +64,7 @@ class NovelHttpTtsConfig {
 
   NovelHttpTtsConfig copyWith({
     bool? enabled,
+    String? provider,
     String? urlTemplate,
     String? defaultVoice,
     String? narratorVoice,
@@ -71,6 +77,7 @@ class NovelHttpTtsConfig {
   }) {
     return NovelHttpTtsConfig(
       enabled: enabled ?? this.enabled,
+      provider: provider ?? this.provider,
       urlTemplate: urlTemplate ?? this.urlTemplate,
       defaultVoice: defaultVoice ?? this.defaultVoice,
       narratorVoice: narratorVoice ?? this.narratorVoice,
@@ -94,8 +101,12 @@ class NovelHttpTtsConfig {
     return voiceByRole[role] ?? defaultVoice;
   }
 
+  /// 是否走内置 Edge 在线语音（provider == edge）。
+  bool get isEdge => provider == 'edge';
+
   Map<String, dynamic> toJson() => <String, dynamic>{
         'enabled': enabled,
+        'provider': provider,
         'urlTemplate': urlTemplate,
         'defaultVoice': defaultVoice,
         'narratorVoice': narratorVoice,
@@ -111,6 +122,7 @@ class NovelHttpTtsConfig {
     final rawMap = json['voiceByRole'];
     return NovelHttpTtsConfig(
       enabled: json['enabled'] as bool? ?? false,
+      provider: json['provider'] as String? ?? 'custom',
       urlTemplate: json['urlTemplate'] as String? ?? '',
       defaultVoice: json['defaultVoice'] as String? ?? '',
       narratorVoice: json['narratorVoice'] as String? ?? '',

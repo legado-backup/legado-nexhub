@@ -3733,13 +3733,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get httpTtsEnableDesc =>
-      'Synthesize speech via an HTTP endpoint (self-hosted or third-party; no built-in keys)';
+      'Synthesize speech online (built-in Edge voices, or a self-hosted/third-party HTTP endpoint)';
+
+  @override
+  String get httpTtsProvider => 'Online voice source';
+
+  @override
+  String get httpTtsProviderEdge => 'Edge voices';
+
+  @override
+  String get httpTtsProviderCustom => 'Custom endpoint';
+
+  @override
+  String get httpTtsEdgeHint =>
+      'Microsoft Edge read-aloud interface: free online synthesis, no service to configure; usually better than system TTS, requires network';
 
   @override
   String get httpTtsUrlTemplate => 'URL template';
 
   @override
   String get httpTtsDefaultVoice => 'Default voice';
+
+  @override
+  String get httpTtsVoiceFollowDefault => 'Follow default voice';
 
   @override
   String get httpTtsVoiceMap => 'Role → voice (one \'role=voice\' per line)';
@@ -7878,6 +7894,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsHeatmap => 'Heatmap';
 
   @override
+  String get statsSectionTrend => 'Trend';
+
+  @override
+  String get statsTrend7d => '7 days';
+
+  @override
+  String get statsTrend30d => '30 days';
+
+  @override
   String get statsTotalDuration => 'Total duration';
 
   @override
@@ -8628,6 +8653,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectionShare => 'Share';
+
+  @override
+  String get selectionTranslate => 'Translate';
+
+  @override
+  String get selectionAskAi => 'Ask AI';
+
+  @override
+  String get selTranslateTitle => 'Translate selection';
+
+  @override
+  String get selTranslateSource => 'Source';
+
+  @override
+  String get selTranslateResult => 'Translation';
+
+  @override
+  String get selTranslateRetry => 'Retry';
+
+  @override
+  String get selTranslateFailed => 'Translation failed';
+
+  @override
+  String get askAiTitle => 'Ask AI';
+
+  @override
+  String get askAiHint => 'Ask about the selection or this chapter…';
+
+  @override
+  String get askAiSend => 'Send';
+
+  @override
+  String get askAiThinking => 'Thinking…';
+
+  @override
+  String get askAiFailed => 'Request failed, please retry';
+
+  @override
+  String get askAiNoEndpoints =>
+      'No AI endpoint configured. Configure one in \"Settings → AI\" first';
+
+  @override
+  String askAiContextTag(String book, String chapter) {
+    return 'Context: $book · $chapter';
+  }
+
+  @override
+  String get notesSheetTitle => 'Notes';
+
+  @override
+  String get notesExport => 'Export Markdown';
+
+  @override
+  String notesExported(int count) {
+    return 'Generated Markdown with $count items';
+  }
 
   @override
   String get shareChangeCover => 'Change Cover';

@@ -50,6 +50,8 @@ import '../../../core/novel/novel_reader_preferences.dart';
 import '../../../core/novel/novel_tts_router.dart' show NovelTtsSystemSlots;
 import '../../../core/novel/novel_pre_download_preferences.dart';
 import '../../../core/novel/novel_pre_downloader.dart';
+import '../../../core/services/novel_highlight_sync_service.dart';
+import 'novel_selection_ai_dialog.dart';
 import '../../../core/reader/tap_zone_resolver.dart';
 import '../../../core/reader/reading_queue_store.dart';
 import '../../../core/widgets/reading_queue_sheet.dart'
@@ -742,6 +744,23 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         lastChapterTitle: initialTitle,
       ));
     }
+    // 划线/笔记云同步：启动时静默拉取合并（远端新划线并入本地，
+    // 并入后刷新本章渲染）；best-effort，失败不阻塞阅读。
+    unawaited(
+        _syncHighlightsWithCloud(refreshOnApplied: true));
+  }
+
+  /// 划线/笔记 WebDAV 同步（启动 pull 合并 / 退后台与退出 push 共用
+  /// 同一「合并后上传」语义），best-effort 不阻塞阅读器。
+  Future<void> _syncHighlightsWithCloud({bool refreshOnApplied = false}) async {
+    try {
+      final result = await NovelHighlightSyncService().syncOne(widget.novelId);
+      if (refreshOnApplied && result.appliedFromRemote > 0) {
+        await _reloadHighlightsForChapter();
+      }
+    } on Object {
+      // 云同步 best-effort：失败静默。
+    }
   }
 
   @override
@@ -754,6 +773,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       // 云同步增强：退后台即细粒度（逐书文件）静默上传当前进度，
       // 多端「暂停即同步」；云端领先时不覆盖（防回退），失败静默。
       unawaited(_pushProgressToCloud());
+      // 划线/笔记同样退后台即同步（合并后上传，远端新增不丢）。
+      unawaited(_syncHighlightsWithCloud());
     }
     // TTS 后台朗读开关：关闭时应用进入后台即暂停朗读；
     // 开启时保持朗读（wakelock_plus 已持有唤醒锁）。
@@ -1584,6 +1605,119 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     );
   }
 
+  /// 导出当前书全部划线与笔记为 Markdown 文件（临时目录），经系统分享
+  /// 面板保存 / 发送（Obsidian 等笔记软件可直接导入）。按章节分组，
+  /// 划线用引用块、笔记用 💭 前缀，与导出时间一起写入文件头。
+  Future<void> _exportHighlightsMarkdown() async {
+    final highlights = await NovelHighlightManager().listFor(widget.novelId);
+    final notes = await _notes.notesForNovel(widget.novelId);
+    final entries = <_MergedNoteEntry>[
+      for (final n in notes)
+        _MergedNoteEntry(
+          chapterIndex: n.chapterIndex,
+          chapterTitle: n.chapterTitle,
+          quote: n.selectedText,
+          note: n.note,
+          createdAt: n.createdAt,
+          isHighlightNote: false,
+          deleteKey: n.id,
+        ),
+      for (final h in highlights)
+        _MergedNoteEntry(
+          chapterIndex: h.chapterIndex,
+          chapterTitle: h.chapterTitle,
+          quote: h.quote,
+          note: h.note ?? '',
+          createdAt: h.createdAt,
+          isHighlightNote: true,
+          deleteKey: h.key,
+        ),
+    ]..sort((a, b) {
+        final byChapter = a.chapterIndex.compareTo(b.chapterIndex);
+        return byChapter != 0 ? byChapter : a.createdAt.compareTo(b.createdAt);
+      });
+    final l10n = AppLocalizations.of(context);
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.highlightEmpty)),
+      );
+      return;
+    }
+    final now = DateTime.now();
+    final buf = StringBuffer()
+      ..writeln('# 《${widget.title}》划线笔记')
+      ..writeln()
+      ..writeln('> NexHub 导出于 ${now.year}-${_pad(now.month)}-'
+          '${_pad(now.day)} · 共 ${entries.length} 条')
+      ..writeln();
+    var lastChapter = -1;
+    for (final e in entries) {
+      if (e.chapterIndex != lastChapter) {
+        lastChapter = e.chapterIndex;
+        buf
+          ..writeln('## ${l10n.chapterN(e.chapterIndex + 1)} · '
+              '${e.chapterTitle}')
+          ..writeln();
+      }
+      if (e.quote.isNotEmpty) {
+        for (final line in e.quote.split('\n')) {
+          buf.writeln('> $line');
+        }
+        buf.writeln();
+      }
+      if (e.note.isNotEmpty) {
+        buf
+          ..writeln('${e.isHighlightNote ? '💭' : '📝'} ${e.note}')
+          ..writeln();
+      }
+    }
+    final safeTitle = widget.title.replaceAll(RegExp(r'[\\/:*?"<>|\r\n]'), '_');
+    final dir = await getTemporaryDirectory();
+    final file = File(p.join(dir.path,
+        'nexhub_notes_${now.millisecondsSinceEpoch}.md'));
+    await file.writeAsString(buf.toString(), flush: true);
+    if (!mounted) return;
+    await Share.shareXFiles(
+      <XFile>[
+        XFile(
+          file.path,
+          mimeType: 'text/markdown',
+          name: '《$safeTitle》划线笔记-'
+              '${now.year}${_pad(now.month)}${_pad(now.day)}.md',
+        ),
+      ],
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.notesExported(entries.length))),
+    );
+  }
+
+  /// 笔记 / 标记列表弹窗顶部标题栏（右侧为 Markdown 导出入口）。
+  Widget _buildNotesSheetHeader(AppLocalizations l10n, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.file_download_outlined, size: 18),
+            label: Text(l10n.notesExport),
+            onPressed: _exportHighlightsMarkdown,
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 显示笔记列表（三点菜单），包含独立笔记与划线摘录笔记。
   Future<void> _showNoteList() async {
     final notes = await _notes.notesForNovel(widget.novelId);
@@ -1625,10 +1759,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                 maxHeight: MediaQuery.of(ctx).size.height * 0.85),
             child: merged.isEmpty
                 ? Center(child: Text(l10n.noNotes))
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: merged.length,
-                    itemBuilder: (_, i) {
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _buildNotesSheetHeader(l10n, l10n.notesSheetTitle),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: merged.length,
+                          itemBuilder: (_, i) {
                       final entry = merged[i];
                       return ListTile(
                         leading: Icon(
@@ -1734,9 +1873,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           Navigator.of(ctx).pop();
                         },
                       );
-                    },
+                        },
+                      ),
+                        ),
+                    ],
                   ),
-          ),
+              ),
         );
       },
     );
@@ -1771,10 +1913,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             ),
             child: list.isEmpty
                 ? Center(child: Text(l10n.highlightEmpty))
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: list.length,
-                    itemBuilder: (_, i) {
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _buildNotesSheetHeader(l10n, l10n.highlightList),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: list.length,
+                          itemBuilder: (_, i) {
                       final h = list[i];
                       final swatch = Color(h.color);
                       final isUnderline = h.effect != 'bg';
@@ -1874,7 +2021,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           });
                         },
                       );
-                    },
+                        },
+                      ),
+                        ),
+                    ],
                   ),
           ),
         );
@@ -1986,6 +2136,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 退出时把当前书进度静默上传到 WebDAV（best-effort；未配置/
     // 网络失败/云端领先均静默忽略，不阻塞退出）。
     unawaited(_pushProgressToCloud());
+    // 划线/笔记退出时同样静默同步（与进度同点位）。
+    unawaited(_syncHighlightsWithCloud());
     // 退出时一次性结算本次阅读会话（commit 内部 best-effort）。
     if (widget.sourceId.isNotEmpty) {
       unawaited(ReadingSessionRecorder.instance.commit(
@@ -3256,6 +3408,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                 )),
                 Expanded(
                     child: _selToolbarButton(
+                  icon: Icons.translate_rounded,
+                  label: l10n.selectionTranslate,
+                  onPressed: _selTranslate,
+                )),
+                Expanded(
+                    child: _selToolbarButton(
+                  icon: Icons.auto_awesome_rounded,
+                  label: l10n.selectionAskAi,
+                  onPressed: _askAiAboutSelection,
+                )),
+                Expanded(
+                    child: _selToolbarButton(
                   icon: Icons.share_rounded,
                   label: l10n.selectionShare,
                   onPressed: () => _selShare(),
@@ -3519,6 +3683,50 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context).selectionCopied)),
+    );
+  }
+
+  /// 划词翻译：把当前选中文本交给小说翻译管线（术语表/风格与整章翻译
+  /// 共用同一套配置），弹窗展示原文与译文。
+  Future<void> _selTranslate() async {
+    final quote = _selectionController.quote;
+    if (quote.isEmpty) return;
+    _selectionController.clearSelection();
+    setState(() {
+      _showSelectionToolbar = false;
+      _uiVisible = true; // 恢复控制面板
+    });
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _SelectionTranslateDialog(
+        text: quote,
+        novelId: widget.novelId,
+      ),
+    );
+  }
+
+  /// 选区问 AI：携带当前章节上下文与选中文本打开轻量问答对话框。
+  Future<void> _askAiAboutSelection() async {
+    final quote = _selectionController.quote;
+    if (quote.isEmpty) return;
+    _selectionController.clearSelection();
+    setState(() {
+      _showSelectionToolbar = false;
+      _uiVisible = true; // 恢复控制面板
+    });
+    final chs = _effectiveChapters;
+    final chapterTitle = (_chapterIndex >= 0 && _chapterIndex < chs.length)
+        ? chs[_chapterIndex].title
+        : '';
+    final chapterText = _paragraphs.join('\n');
+    await showDialog<void>(
+      context: context,
+      builder: (_) => NovelSelectionAiDialog(
+        bookTitle: widget.title,
+        chapterTitle: chapterTitle,
+        chapterText: chapterText,
+        selection: quote,
+      ),
     );
   }
 
@@ -11037,6 +11245,145 @@ class _MergedNoteEntry {
     required this.isHighlightNote,
     required this.deleteKey,
   });
+}
+
+/// 划词翻译对话框：复用小说整章翻译管线翻译单条选中文本。
+class _SelectionTranslateDialog extends StatefulWidget {
+  final String text;
+  final String novelId;
+
+  const _SelectionTranslateDialog({
+    required this.text,
+    required this.novelId,
+  });
+
+  @override
+  State<_SelectionTranslateDialog> createState() =>
+      _SelectionTranslateDialogState();
+}
+
+class _SelectionTranslateDialogState extends State<_SelectionTranslateDialog> {
+  String? _result;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final translated = await NovelTranslationService()
+          .translateParagraphs(<String>[widget.text], workId: widget.novelId);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _result = translated.isNotEmpty ? translated.first : '';
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.selTranslateTitle),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: _loading
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(l10n.askAiThinking),
+                ],
+              )
+            : _error != null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text('${l10n.selTranslateFailed}\n$_error'),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _run,
+                          child: Text(l10n.selTranslateRetry),
+                        ),
+                      ),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          l10n.selTranslateSource,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(widget.text),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.selTranslateResult,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          _result ?? '',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                height: 1.5,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+      ],
+    );
+  }
 }
 
 /// 简易颜色滑块：直接操作 int 颜色值，滑块拖动实时更新。

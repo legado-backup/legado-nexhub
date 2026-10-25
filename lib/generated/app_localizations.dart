@@ -7139,8 +7139,32 @@ abstract class AppLocalizations {
   /// No description provided for @httpTtsEnableDesc.
   ///
   /// In en, this message translates to:
-  /// **'Synthesize speech via an HTTP endpoint (self-hosted or third-party; no built-in keys)'**
+  /// **'Synthesize speech online (built-in Edge voices, or a self-hosted/third-party HTTP endpoint)'**
   String get httpTtsEnableDesc;
+
+  /// No description provided for @httpTtsProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Online voice source'**
+  String get httpTtsProvider;
+
+  /// No description provided for @httpTtsProviderEdge.
+  ///
+  /// In en, this message translates to:
+  /// **'Edge voices'**
+  String get httpTtsProviderEdge;
+
+  /// No description provided for @httpTtsProviderCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom endpoint'**
+  String get httpTtsProviderCustom;
+
+  /// No description provided for @httpTtsEdgeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Microsoft Edge read-aloud interface: free online synthesis, no service to configure; usually better than system TTS, requires network'**
+  String get httpTtsEdgeHint;
 
   /// No description provided for @httpTtsUrlTemplate.
   ///
@@ -7153,6 +7177,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default voice'**
   String get httpTtsDefaultVoice;
+
+  /// No description provided for @httpTtsVoiceFollowDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow default voice'**
+  String get httpTtsVoiceFollowDefault;
 
   /// No description provided for @httpTtsVoiceMap.
   ///
@@ -14804,6 +14834,24 @@ abstract class AppLocalizations {
   /// **'Heatmap'**
   String get statsHeatmap;
 
+  /// No description provided for @statsSectionTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend'**
+  String get statsSectionTrend;
+
+  /// No description provided for @statsTrend7d.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get statsTrend7d;
+
+  /// No description provided for @statsTrend30d.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get statsTrend30d;
+
   /// Summary metric: total duration
   ///
   /// In en, this message translates to:
@@ -16183,6 +16231,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Share'**
   String get selectionShare;
+
+  /// No description provided for @selectionTranslate.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate'**
+  String get selectionTranslate;
+
+  /// No description provided for @selectionAskAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI'**
+  String get selectionAskAi;
+
+  /// No description provided for @selTranslateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate selection'**
+  String get selTranslateTitle;
+
+  /// No description provided for @selTranslateSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get selTranslateSource;
+
+  /// No description provided for @selTranslateResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get selTranslateResult;
+
+  /// No description provided for @selTranslateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get selTranslateRetry;
+
+  /// No description provided for @selTranslateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation failed'**
+  String get selTranslateFailed;
+
+  /// No description provided for @askAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI'**
+  String get askAiTitle;
+
+  /// No description provided for @askAiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about the selection or this chapter…'**
+  String get askAiHint;
+
+  /// No description provided for @askAiSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get askAiSend;
+
+  /// No description provided for @askAiThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get askAiThinking;
+
+  /// No description provided for @askAiFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed, please retry'**
+  String get askAiFailed;
+
+  /// No description provided for @askAiNoEndpoints.
+  ///
+  /// In en, this message translates to:
+  /// **'No AI endpoint configured. Configure one in \"Settings → AI\" first'**
+  String get askAiNoEndpoints;
+
+  /// Ask AI dialog context label
+  ///
+  /// In en, this message translates to:
+  /// **'Context: {book} · {chapter}'**
+  String askAiContextTag(String book, String chapter);
+
+  /// No description provided for @notesSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notesSheetTitle;
+
+  /// No description provided for @notesExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Markdown'**
+  String get notesExport;
+
+  /// Highlight notes export done toast
+  ///
+  /// In en, this message translates to:
+  /// **'Generated Markdown with {count} items'**
+  String notesExported(int count);
 
   /// No description provided for @shareChangeCover.
   ///

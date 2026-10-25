@@ -28,6 +28,7 @@ import '../../../core/widgets/app_segmented_tabs.dart';
 import '../../../core/widgets/progress_card.dart' show formatRelativeTime;
 import '../../../core/utils/app_haptics.dart';
 import 'heatmap_sheet.dart';
+import 'trend_chart.dart';
 import '../../../core/widgets/app_glass_bar.dart';
 
 /// 统计页（从设置主页「统计」入口进入）。
@@ -43,6 +44,9 @@ class _StatsOverviewScreenState extends State<StatsOverviewScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   bool _searching = false;
+
+  /// 趋势折线图窗口（天）。
+  int _trendDays = 30;
 
   @override
   void dispose() {
@@ -314,6 +318,84 @@ class _StatsOverviewScreenState extends State<StatsOverviewScreen> {
     );
   }
 
+  /// 趋势段：近 7 / 30 天每日时长折线（当前 Tab 类型过滤）。
+  Widget _buildTrendSection(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final repo = StatsRepository.instance;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(Duration(days: _trendDays - 1));
+    final secs = <int>[
+      for (final d in repo.dailyForRange(start, today))
+        switch (_type) {
+          StatsMediaType.media => d.mediaDurationSec,
+          StatsMediaType.comic => d.comicDurationSec,
+          StatsMediaType.novel => d.novelDurationSec,
+        },
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTokens.spaceLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTokens.spaceXs,
+              0,
+              AppTokens.spaceXs,
+              AppTokens.spaceMd,
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    l10n.statsSectionTrend,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                SizedBox(
+                  width: 168,
+                  child: AppSegmentedTabs<int>(
+                    selected: <int>{_trendDays},
+                    onSelectionChanged: (Set<int> s) {
+                      if (s.isEmpty) return;
+                      setState(() => _trendDays = s.first);
+                    },
+                    segments: <ButtonSegment<int>>[
+                      ButtonSegment(value: 7, label: Text(l10n.statsTrend7d)),
+                      ButtonSegment(value: 30, label: Text(l10n.statsTrend30d)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Entrance(
+            onceKey: 'stats_section_trend',
+            child: AppCard(
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.spaceLg,
+                AppTokens.spaceXl,
+                AppTokens.spaceLg,
+                AppTokens.spaceMd,
+              ),
+              child: TrendChart(
+                dailySec: secs,
+                startDate: start,
+                lineColor: scheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSearchField(AppLocalizations l10n) {
     return AnimatedSize(
       duration: AppTokens.durBase,
@@ -466,6 +548,7 @@ class _StatsOverviewScreenState extends State<StatsOverviewScreen> {
                   _buildOverviewSection(l10n, list),
                   _buildActivitySection(l10n),
                   _buildPaceSection(l10n),
+                  _buildTrendSection(l10n),
                   if (list.isEmpty)
                     _EmptyState(l10n: l10n)
                   else

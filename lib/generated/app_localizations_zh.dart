@@ -3657,13 +3657,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get httpTtsEnable => '在线 TTS 引擎';
 
   @override
-  String get httpTtsEnableDesc => '使用 HTTP 端点合成语音（需自建/第三方 TTS 服务，不内置密钥）';
+  String get httpTtsEnableDesc => '在线合成语音（内置 Edge 语音，或自建/第三方 HTTP 端点）';
+
+  @override
+  String get httpTtsProvider => '在线语音来源';
+
+  @override
+  String get httpTtsProviderEdge => 'Edge 语音';
+
+  @override
+  String get httpTtsProviderCustom => '自定义端点';
+
+  @override
+  String get httpTtsEdgeHint => '微软 Edge 朗读接口，免费在线合成、无需配置服务；音质通常优于系统 TTS，需联网';
 
   @override
   String get httpTtsUrlTemplate => 'URL 模板';
 
   @override
   String get httpTtsDefaultVoice => '默认音色';
+
+  @override
+  String get httpTtsVoiceFollowDefault => '跟随默认音色';
 
   @override
   String get httpTtsVoiceMap => '角色 → 音色（每行「角色=音色」）';
@@ -7699,6 +7714,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statsHeatmap => '热力图';
 
   @override
+  String get statsSectionTrend => '趋势';
+
+  @override
+  String get statsTrend7d => '近 7 天';
+
+  @override
+  String get statsTrend30d => '近 30 天';
+
+  @override
   String get statsTotalDuration => '总时长';
 
   @override
@@ -8416,6 +8440,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get selectionShare => '分享';
+
+  @override
+  String get selectionTranslate => '翻译';
+
+  @override
+  String get selectionAskAi => '问AI';
+
+  @override
+  String get selTranslateTitle => '划词翻译';
+
+  @override
+  String get selTranslateSource => '原文';
+
+  @override
+  String get selTranslateResult => '译文';
+
+  @override
+  String get selTranslateRetry => '重试';
+
+  @override
+  String get selTranslateFailed => '翻译失败';
+
+  @override
+  String get askAiTitle => '问 AI';
+
+  @override
+  String get askAiHint => '就选中内容或本章提问…';
+
+  @override
+  String get askAiSend => '发送';
+
+  @override
+  String get askAiThinking => '思考中…';
+
+  @override
+  String get askAiFailed => '请求失败，请重试';
+
+  @override
+  String get askAiNoEndpoints => '未配置 AI 接口，请先在「设置 → AI」中配置';
+
+  @override
+  String askAiContextTag(String book, String chapter) {
+    return '上下文：《$book》· $chapter';
+  }
+
+  @override
+  String get notesSheetTitle => '笔记';
+
+  @override
+  String get notesExport => '导出 Markdown';
+
+  @override
+  String notesExported(int count) {
+    return '已生成 $count 条划线笔记';
+  }
 
   @override
   String get shareChangeCover => '更换封面';

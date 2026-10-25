@@ -1882,9 +1882,14 @@
   "novelMenuConfigureToolbar": "配置底部工具栏",
   "novelTtsBackground": "后台朗读",
   "httpTtsEnable": "在线 TTS 引擎",
-  "httpTtsEnableDesc": "使用 HTTP 端点合成语音（需自建/第三方 TTS 服务，不内置密钥）",
+  "httpTtsEnableDesc": "在线合成语音（内置 Edge 语音，或自建/第三方 HTTP 端点）",
+  "httpTtsProvider": "在线语音来源",
+  "httpTtsProviderEdge": "Edge 语音",
+  "httpTtsProviderCustom": "自定义端点",
+  "httpTtsEdgeHint": "微软 Edge 朗读接口，免费在线合成、无需配置服务；音质通常优于系统 TTS，需联网",
   "httpTtsUrlTemplate": "URL 模板",
   "httpTtsDefaultVoice": "默认音色",
+  "httpTtsVoiceFollowDefault": "跟随默认音色",
   "httpTtsVoiceMap": "角色 → 音色（每行「角色=音色」）",
   "httpTtsConcurrency": "预下载并发（1-8）",
   "httpTtsMaxFailures": "连续失败停止阈值",
@@ -4061,6 +4066,9 @@
     "description": "统计页搜索框提示"
   },
   "statsHeatmap": "热力图",
+  "statsSectionTrend": "趋势",
+  "statsTrend7d": "近 7 天",
+  "statsTrend30d": "近 30 天",
   "@statsHeatmap": {
     "description": "热力图弹窗标题"
   },
@@ -4615,6 +4623,42 @@
   "customColorApply": "应用自定义颜色",
   "selectionNote": "摘录",
   "selectionShare": "分享",
+  "selectionTranslate": "翻译",
+  "selectionAskAi": "问AI",
+  "selTranslateTitle": "划词翻译",
+  "selTranslateSource": "原文",
+  "selTranslateResult": "译文",
+  "selTranslateRetry": "重试",
+  "selTranslateFailed": "翻译失败",
+  "askAiTitle": "问 AI",
+  "askAiHint": "就选中内容或本章提问…",
+  "askAiSend": "发送",
+  "askAiThinking": "思考中…",
+  "askAiFailed": "请求失败，请重试",
+  "askAiNoEndpoints": "未配置 AI 接口，请先在「设置 → AI」中配置",
+  "askAiContextTag": "上下文：《{book}》· {chapter}",
+  "@askAiContextTag": {
+    "description": "问 AI 对话框顶部的上下文标签",
+    "placeholders": {
+      "book": {
+        "type": "String"
+      },
+      "chapter": {
+        "type": "String"
+      }
+    }
+  },
+  "notesSheetTitle": "笔记",
+  "notesExport": "导出 Markdown",
+  "notesExported": "已生成 {count} 条划线笔记",
+  "@notesExported": {
+    "description": "导出划线笔记完成提示",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "shareChangeCover": "更换封面",
   "selectionCancel": "取消",
   "selectionParagraph": "整段",

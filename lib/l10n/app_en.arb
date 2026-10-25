@@ -1902,9 +1902,14 @@
   "novelMenuConfigureToolbar": "Configure bottom toolbar",
   "novelTtsBackground": "Background playback",
   "httpTtsEnable": "Online TTS engine",
-  "httpTtsEnableDesc": "Synthesize speech via an HTTP endpoint (self-hosted or third-party; no built-in keys)",
+  "httpTtsEnableDesc": "Synthesize speech online (built-in Edge voices, or a self-hosted/third-party HTTP endpoint)",
+  "httpTtsProvider": "Online voice source",
+  "httpTtsProviderEdge": "Edge voices",
+  "httpTtsProviderCustom": "Custom endpoint",
+  "httpTtsEdgeHint": "Microsoft Edge read-aloud interface: free online synthesis, no service to configure; usually better than system TTS, requires network",
   "httpTtsUrlTemplate": "URL template",
   "httpTtsDefaultVoice": "Default voice",
+  "httpTtsVoiceFollowDefault": "Follow default voice",
   "httpTtsVoiceMap": "Role → voice (one 'role=voice' per line)",
   "httpTtsConcurrency": "Preload concurrency (1-8)",
   "httpTtsMaxFailures": "Consecutive failure stop threshold",
@@ -4105,6 +4110,9 @@
     "description": "Statistics page search field hint"
   },
   "statsHeatmap": "Heatmap",
+  "statsSectionTrend": "Trend",
+  "statsTrend7d": "7 days",
+  "statsTrend30d": "30 days",
   "@statsHeatmap": {
     "description": "Heatmap sheet title"
   },
@@ -4659,6 +4667,42 @@
   "customColorApply": "Apply Custom Color",
   "selectionNote": "Note",
   "selectionShare": "Share",
+  "selectionTranslate": "Translate",
+  "selectionAskAi": "Ask AI",
+  "selTranslateTitle": "Translate selection",
+  "selTranslateSource": "Source",
+  "selTranslateResult": "Translation",
+  "selTranslateRetry": "Retry",
+  "selTranslateFailed": "Translation failed",
+  "askAiTitle": "Ask AI",
+  "askAiHint": "Ask about the selection or this chapter…",
+  "askAiSend": "Send",
+  "askAiThinking": "Thinking…",
+  "askAiFailed": "Request failed, please retry",
+  "askAiNoEndpoints": "No AI endpoint configured. Configure one in \"Settings → AI\" first",
+  "askAiContextTag": "Context: {book} · {chapter}",
+  "@askAiContextTag": {
+    "description": "Ask AI dialog context label",
+    "placeholders": {
+      "book": {
+        "type": "String"
+      },
+      "chapter": {
+        "type": "String"
+      }
+    }
+  },
+  "notesSheetTitle": "Notes",
+  "notesExport": "Export Markdown",
+  "notesExported": "Generated Markdown with {count} items",
+  "@notesExported": {
+    "description": "Highlight notes export done toast",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "shareChangeCover": "Change Cover",
   "selectionCancel": "Cancel",
   "selectionParagraph": "Paragraph",

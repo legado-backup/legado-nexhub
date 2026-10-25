@@ -21,6 +21,7 @@ import 'package:flutter/foundation.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/novel/novel_http_tts_config.dart';
+import '../../../core/novel/novel_edge_tts_engine.dart';
 import '../../../core/novel/novel_http_tts_engine.dart';
 import '../../../core/novel/novel_http_tts_player.dart';
 import '../../../core/novel/novel_http_tts_sentence_player.dart';
@@ -226,9 +227,9 @@ class NovelTtsController extends ChangeNotifier {
     _session = await _buildSession(
         novelId: novelId, chapterId: chapterId, systemSlots: systemSlots);
 
-    // 在线引擎优先。
+    // 在线引擎优先（Edge 内置语音或自定义 HTTP 端点）。
     final cfg = await NovelHttpTtsConfigStore().load();
-    if (cfg.enabled && cfg.urlTemplate.isNotEmpty) {
+    if (cfg.enabled && (cfg.isEdge || cfg.urlTemplate.isNotEmpty)) {
       await _startOnline(cfg, paragraphs, startIndex: startIndex, chapterId: chapterId);
       return;
     }
@@ -246,11 +247,14 @@ class NovelTtsController extends ChangeNotifier {
     final session = _session;
     final generation = _sessionGeneration;
     final cache = await TtsAudioFileCache.createDefault();
-    final preloader = HttpTtsPreloader(config: cfg, rate: _rate, cache: cache);
+    // Edge 内置语音与自定义 HTTP 端点共用播放管线，仅合成引擎不同。
+    final engine = cfg.isEdge
+        ? EdgeTtsSynthesisEngine(rate: _rate, cache: cache)
+        : HttpTtsPreloader(config: cfg, rate: _rate, cache: cache);
     final player = NovelHttpTtsPlayer(
       config: cfg,
       rate: _rate,
-      engine: preloader,
+      engine: engine,
       player: buildDefaultTtsSentencePlayer(
         cancelled: () => _state == NovelTtsState.stopped || generation != _sessionGeneration,
       ),
