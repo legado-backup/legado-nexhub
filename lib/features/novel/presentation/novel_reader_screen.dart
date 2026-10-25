@@ -47,6 +47,7 @@ import '../../../core/novel/novel_page_animation.dart';
 import '../../../core/novel/novel_progress_conflict.dart';
 import '../../../core/novel/novel_progress_manager.dart';
 import '../../../core/novel/novel_reader_preferences.dart';
+import '../../../core/novel/novel_tts_router.dart' show NovelTtsSystemSlots;
 import '../../../core/novel/novel_pre_download_preferences.dart';
 import '../../../core/novel/novel_pre_downloader.dart';
 import '../../../core/reader/tap_zone_resolver.dart';
@@ -92,6 +93,7 @@ import 'novel_paginator.dart';
 import 'novel_selection_controller.dart';
 import '../../../core/novel/novel_highlight_manager.dart';
 import 'novel_tts_controller.dart';
+import 'novel_tts_cast_sheet.dart';
 import 'package:nexhub/core/widgets/app_alert_dialog.dart';
 import 'package:flutter/services.dart';
 import '../domain/novel_summary_service.dart';
@@ -1493,11 +1495,74 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     } else if (_tts.isPaused) {
       await _tts.resume();
     } else {
-      _tts.setBackground(_prefs.ttsBackground);
-      await _tts.setRate(_prefs.ttsSpeechRate);
-      await _tts.speak(_paragraphTexts, sleepTimer: _prefs.ttsSleepTimer);
+      await _startTtsFromParagraph();
     }
     if (mounted) setState(() {});
+  }
+
+  /// 从章首起朗读（多角色上下文 + 跨章回调注入；与旧行为一致从第 0 段开始）。
+  Future<void> _startTtsFromParagraph() async {
+    _tts.setBackground(_prefs.ttsBackground);
+    await _tts.setRate(_prefs.ttsSpeechRate);
+    await _speakChapter(0, sleepTimer: _prefs.ttsSleepTimer);
+  }
+
+  /// 以多角色上下文朗读当前章（跨章续读复用）。
+  Future<void> _speakChapter(int startIndex, {int sleepTimer = 0}) async {
+    _tts.onChapterFinished = _prefs.ttsAutoNext ? _onTtsChapterFinished : null;
+    await _tts.speak(
+      _paragraphTexts,
+      startIndex: startIndex,
+      sleepTimer: sleepTimer,
+      novelId: widget.novelId,
+      chapterId: _currentChapterId,
+      systemSlots: NovelTtsSystemSlots(
+        narrator: _prefs.ttsSystemNarratorVoice,
+        male: _prefs.ttsSystemMaleVoice,
+        female: _prefs.ttsSystemFemaleVoice,
+      ),
+      autoNextChapter: _prefs.ttsAutoNext,
+    );
+  }
+
+  /// 当前章 id（AI 分镜缓存键；本地无章节时为空）。
+  String? get _currentChapterId {
+    final chapters = _effectiveChapters;
+    if (_chapterIndex < 0 || _chapterIndex >= chapters.length) return null;
+    final id = chapters[_chapterIndex].id;
+    return id.isEmpty ? null : id;
+  }
+
+  /// 打开「角色与声音」面板（内联设置朗读组入口）。
+  Future<void> _showTtsCastSheet() async {
+    await showNovelTtsCastSheet(
+      context: context,
+      novelId: widget.novelId,
+      chapterId: _currentChapterId,
+      paragraphs: _paragraphTexts,
+      prefs: _prefs,
+      onPrefsChanged: _onPrefsChanged,
+      tts: _tts,
+    );
+  }
+
+  /// 朗读章末自动续下一章（跨章连播）。
+  Future<void> _onTtsChapterFinished() async {    final chapters = _effectiveChapters;
+    if (_chapterIndex >= chapters.length - 1) {
+      await _tts.stop();
+      return;
+    }
+    final target = _chapterIndex + 1;
+    try {
+      await _loadChapter(target);
+    } on Object {
+      // 加载失败（网络等）：停止朗读，避免停在无声播放态。
+      await _tts.stop();
+      return;
+    }
+    if (!mounted || _tts.state == NovelTtsState.stopped) return;
+    if (_chapterIndex != target) return; // 加载期间用户手动跳章
+    await _speakChapter(0);
   }
 
   /// 把当前作品加入待读队列（三点菜单入口）。
@@ -6843,6 +6908,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         onOpenSummary: _showReadingOverview,
         onTranslate: _showTranslationSheet,
         onGenerateIllustration: _generateAiIllustration,
+        // 多角色朗读：角色与声音面板入口。
+        onOpenTtsCast: _showTtsCastSheet,
       ),
     );
 
@@ -8443,6 +8510,9 @@ class _NovelInlineSettings extends StatelessWidget {
   final VoidCallback? onTranslate;
   final VoidCallback? onGenerateIllustration;
 
+  /// 多角色朗读：打开「角色与声音」面板。
+  final VoidCallback? onOpenTtsCast;
+
   const _NovelInlineSettings({
     required this.prefs,
     required this.brightness,
@@ -8463,6 +8533,7 @@ class _NovelInlineSettings extends StatelessWidget {
     this.onOpenSummary,
     this.onTranslate,
     this.onGenerateIllustration,
+    this.onOpenTtsCast,
   });
 
   @override
@@ -9794,6 +9865,28 @@ class _NovelInlineSettings extends StatelessWidget {
                                     : AppHaptics.toggleOff();
                                 onChanged(prefs.copyWith(ttsBackground: v));
                               },
+                            ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(l10n.ttsAutoNext),
+                              subtitle: Text(l10n.ttsAutoNextDesc),
+                              value: prefs.ttsAutoNext,
+                              onChanged: (v) {
+                                v == true
+                                    ? AppHaptics.toggleOn()
+                                    : AppHaptics.toggleOff();
+                                onChanged(prefs.copyWith(ttsAutoNext: v));
+                              },
+                            ),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading:
+                                  const Icon(Icons.theater_comedy_rounded),
+                              title: Text(l10n.ttsCastTitle),
+                              subtitle: Text(l10n.ttsCastSubtitle),
+                              trailing:
+                                  const Icon(Icons.chevron_right_rounded),
+                              onTap: onOpenTtsCast,
                             ),
                           ],
                         ),

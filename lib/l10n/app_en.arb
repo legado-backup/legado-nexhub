@@ -5439,5 +5439,160 @@
   "storageLocationSystemDownloads": "System Downloads folder",
   "storageLocationSystemDownloadsHint": "Visible in Files and kept after uninstall",
   "storageLocationSystemScreenshots": "System Downloads / Screenshots",
-  "storageLocationSystemScreenshotsHint": "Visible in Files and kept after uninstall"
+  "storageLocationSystemScreenshotsHint": "Visible in Files and kept after uninstall",
+  "ttsAutoNext": "Auto-continue chapters",
+  "@ttsAutoNext": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsAutoNextDesc": "Load and read the next chapter automatically when one finishes",
+  "@ttsAutoNextDesc": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastTitle": "Characters & voices",
+  "@ttsCastTitle": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastSubtitle": "Assign different voices per character; unassigned roles fall back to narrator/gender slots",
+  "@ttsCastSubtitle": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastHttpSlots": "Online voice fallback (HTTP TTS)",
+  "@ttsCastHttpSlots": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastSystemSlots": "System voices (device engine)",
+  "@ttsCastSystemSlots": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastNarratorVoice": "Narrator voice",
+  "@ttsCastNarratorVoice": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastMaleVoice": "Male fallback voice",
+  "@ttsCastMaleVoice": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastFemaleVoice": "Female fallback voice",
+  "@ttsCastFemaleVoice": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastHttpVoice": "Online voice ID (HTTP TTS)",
+  "@ttsCastHttpVoice": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastSystemVoice": "System voice",
+  "@ttsCastSystemVoice": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastEngineDefault": "Engine default",
+  "@ttsCastEngineDefault": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastCharacters": "Characters in this book",
+  "@ttsCastCharacters": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastEmpty": "No character cards yet. AI identifies speakers while reading; you can also add manually.",
+  "@ttsCastEmpty": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAddRole": "Add character",
+  "@ttsCastAddRole": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastEditRole": "Edit character",
+  "@ttsCastEditRole": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastRoleName": "Name",
+  "@ttsCastRoleName": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAliases": "Aliases (optional)",
+  "@ttsCastAliases": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAliasesHint": "Separate multiple aliases with commas",
+  "@ttsCastAliasesHint": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastMale": "Male",
+  "@ttsCastMale": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastFemale": "Female",
+  "@ttsCastFemale": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastGenderUnknown": "Unknown",
+  "@ttsCastGenderUnknown": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastEnable": "Enable",
+  "@ttsCastEnable": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastDisable": "Disable",
+  "@ttsCastDisable": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastDelete": "Delete",
+  "@ttsCastDelete": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAiRelabel": "AI attribution for this chapter",
+  "@ttsCastAiRelabel": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAiRunning": "AI attributing…",
+  "@ttsCastAiRunning": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAiDone": "AI attribution done: {count} lines labeled",
+  "@ttsCastAiDone": {
+    "description": "AI 归因完成句数提示",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ttsCastAiNoConfig": "No AI endpoint configured. Set the novel-overview or default endpoint in Settings → AI first.",
+  "@ttsCastAiNoConfig": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastAiFailed": "AI attribution failed; local results kept",
+  "@ttsCastAiFailed": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCastVoiceMapHint": "Global fallback map (name=voiceId, one per line); per-book setup lives in the reader's Characters & voices panel",
+  "@ttsCastVoiceMapHint": {
+    "description": "TTS cast sheet string"
+  },
+  "ttsCacheClear": "Clear TTS audio cache",
+  "@ttsCacheClear": {
+    "description": "TTS audio cache settings entry"
+  },
+  "ttsCacheEmpty": "No cached audio",
+  "@ttsCacheEmpty": {
+    "description": "TTS audio cache settings entry"
+  },
+  "ttsCacheCount": "{count} audio clips cached",
+  "@ttsCacheCount": {
+    "description": "TTS audio cache settings entry",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ttsCacheCleared": "Cleared {count} TTS audio clips",
+  "@ttsCacheCleared": {
+    "description": "TTS audio cache settings entry",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

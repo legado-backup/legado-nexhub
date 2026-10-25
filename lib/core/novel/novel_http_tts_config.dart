@@ -23,6 +23,15 @@ class NovelHttpTtsConfig {
   /// 默认音色 id（模板 {voice} 未映射角色时的回退值）。
   final String defaultVoice;
 
+  /// 旁白专用音色（空 = 回落 [defaultVoice]）。
+  final String narratorVoice;
+
+  /// 男性角色兜底音色（对白角色未绑定且判为男声时使用；空 = 回落默认）。
+  final String maleVoice;
+
+  /// 女性角色兜底音色（同上）。
+  final String femaleVoice;
+
   /// 角色 → 音色 id 映射（多角色）。
   final Map<String, String> voiceByRole;
 
@@ -39,6 +48,9 @@ class NovelHttpTtsConfig {
     this.enabled = false,
     this.urlTemplate = '',
     this.defaultVoice = '',
+    this.narratorVoice = '',
+    this.maleVoice = '',
+    this.femaleVoice = '',
     this.voiceByRole = const <String, String>{},
     this.concurrency = 2,
     this.maxConsecutiveFailures = 3,
@@ -49,6 +61,9 @@ class NovelHttpTtsConfig {
     bool? enabled,
     String? urlTemplate,
     String? defaultVoice,
+    String? narratorVoice,
+    String? maleVoice,
+    String? femaleVoice,
     Map<String, String>? voiceByRole,
     int? concurrency,
     int? maxConsecutiveFailures,
@@ -58,6 +73,9 @@ class NovelHttpTtsConfig {
       enabled: enabled ?? this.enabled,
       urlTemplate: urlTemplate ?? this.urlTemplate,
       defaultVoice: defaultVoice ?? this.defaultVoice,
+      narratorVoice: narratorVoice ?? this.narratorVoice,
+      maleVoice: maleVoice ?? this.maleVoice,
+      femaleVoice: femaleVoice ?? this.femaleVoice,
       voiceByRole: voiceByRole ?? this.voiceByRole,
       concurrency: concurrency ?? this.concurrency,
       maxConsecutiveFailures:
@@ -68,6 +86,9 @@ class NovelHttpTtsConfig {
   }
 
   /// 按角色解析音色：命中映射表取专属音色，否则回退默认音色。
+  ///
+  /// 旧版兼容入口（仅含「角色映射→默认」两级）；完整多级路由见
+  /// [NovelTtsRouter]（角色卡绑定→映射→性别槽→旁白槽→默认）。
   String voiceForRole(String role) {
     if (role.isEmpty) return defaultVoice;
     return voiceByRole[role] ?? defaultVoice;
@@ -77,6 +98,9 @@ class NovelHttpTtsConfig {
         'enabled': enabled,
         'urlTemplate': urlTemplate,
         'defaultVoice': defaultVoice,
+        'narratorVoice': narratorVoice,
+        'maleVoice': maleVoice,
+        'femaleVoice': femaleVoice,
         'voiceByRole': voiceByRole,
         'concurrency': concurrency,
         'maxConsecutiveFailures': maxConsecutiveFailures,
@@ -89,6 +113,9 @@ class NovelHttpTtsConfig {
       enabled: json['enabled'] as bool? ?? false,
       urlTemplate: json['urlTemplate'] as String? ?? '',
       defaultVoice: json['defaultVoice'] as String? ?? '',
+      narratorVoice: json['narratorVoice'] as String? ?? '',
+      maleVoice: json['maleVoice'] as String? ?? '',
+      femaleVoice: json['femaleVoice'] as String? ?? '',
       voiceByRole: rawMap is Map<String, dynamic>
           ? rawMap.map((k, v) => MapEntry(k, v.toString()))
           : const <String, String>{},

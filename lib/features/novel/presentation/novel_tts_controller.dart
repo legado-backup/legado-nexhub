@@ -1,10 +1,18 @@
 /// 小说阅读器 TTS 朗读控制器。
 ///
-/// 封装系统朗读引擎（Android/iOS 为 flutter_tts，鸿蒙为 CoreSpeechKit），
+/// 封装朗读引擎（Android/iOS/桌面为 flutter_tts，鸿蒙为 CoreSpeechKit），
 /// 提供逐段朗读、暂停/恢复/停止、自动翻段功能。
 /// 朗读状态通过 [notifyListeners] 广播，阅读器据此更新 UI。
-/// 支持在线 HTTP TTS 引擎（[novel_http_tts_player.dart]），
-/// 由配置 [NovelHttpTtsConfig] 启用时优先走在线管线。
+///
+/// 多角色朗读（参考 legado_NG 架构按 nexhub 体量裁剪）：
+/// - **系统链路逐句读**：整段朗读改为分句朗读，每句前按路由
+///   （[NovelTtsRouter].systemVoice）切换系统声音；
+/// - **在线链路**：HTTP TTS 走 [NovelHttpTtsPlayer] 滑动窗口管线，
+///   音色按路由（httpVoice）解析，音频经 [TtsAudioFileCache] 落盘缓存；
+/// - **AI 分镜后台归因**：朗读开始即用本地分句结果开播，AI 归因在后台
+///   按章缓存执行，完成后剩余句子自动升级（合成时刻经 provider 查询）；
+/// - **跨章续读**：[autoNext] 开启时章末回调 [onChapterFinished]，由
+///   阅读器加载下一章并继续朗读。
 library;
 
 import 'dart:async';
@@ -13,9 +21,15 @@ import 'package:flutter/foundation.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/novel/novel_http_tts_config.dart';
+import '../../../core/novel/novel_http_tts_engine.dart';
 import '../../../core/novel/novel_http_tts_player.dart';
 import '../../../core/novel/novel_http_tts_sentence_player.dart';
+import '../../../core/novel/novel_speech_segmenter.dart';
+import '../../../core/novel/novel_tts_audio_cache.dart';
+import '../../../core/novel/novel_tts_cast_store.dart';
 import '../../../core/novel/novel_tts_engine.dart';
+import '../../../core/novel/novel_tts_router.dart';
+import '../domain/novel_tts_storyboard_service.dart';
 
 enum NovelTtsState {
   stopped,
@@ -23,8 +37,38 @@ enum NovelTtsState {
   paused,
 }
 
+/// 系统链路的一个待读句（段落号 + 分句结果）。
+class _SystemEntry {
+  const _SystemEntry(this.paragraphIndex, this.segment);
+
+  final int paragraphIndex;
+  final SpeechSegment segment;
+}
+
+/// 一次朗读会话的多角色上下文。
+class _MultiRoleSession {
+  _MultiRoleSession({
+    required this.novelId,
+    this.chapterId,
+    required this.router,
+    required this.knownGenders,
+  });
+
+  final String novelId;
+  final String? chapterId;
+  final NovelTtsRouter router;
+  final Map<String, String> knownGenders;
+
+  /// AI 分镜结果（后台归因完成后赋值；null = 仍用本地结果）。
+  ChapterStoryboard? storyboard;
+}
+
 class NovelTtsController extends ChangeNotifier {
-  NovelTtsController();
+  NovelTtsController({NovelTtsEngine Function()? engineFactory})
+      : _engineFactory = engineFactory ?? createNovelTtsEngine;
+
+  /// 引擎工厂（测试注入假引擎）。
+  final NovelTtsEngine Function() _engineFactory;
 
   NovelTtsEngine? _tts;
   NovelTtsState _state = NovelTtsState.stopped;
@@ -33,6 +77,28 @@ class NovelTtsController extends ChangeNotifier {
 
   /// 在线引擎的活跃播放会话（朗读中非空，用于取消）。
   NovelHttpTtsPlayer? _onlinePlayer;
+
+  /// 当前会话多角色上下文（null = 单音色模式）。
+  _MultiRoleSession? _session;
+
+  /// 会话代次：跨章续读/重新开始递增，防止旧会话回调串台。
+  int _sessionGeneration = 0;
+
+  /// 跨章连播开关：章末回调 [onChapterFinished] 而不是停止。
+  bool autoNext = false;
+
+  /// 章末回调（[autoNext] 开启时触发；由阅读器翻章续读）。
+  Future<void> Function()? onChapterFinished;
+
+  /// 系统引擎声音表（名字 → 声音；懒加载）。
+  Map<String, NovelTtsVoice>? _systemVoicesByName;
+
+  /// 系统链路待读句列表与当前句下标。
+  List<_SystemEntry> _systemEntries = const <_SystemEntry>[];
+  int _systemIdx = 0;
+
+  /// 系统链路最近应用的声音名（避免重复 setVoice）。
+  String _lastAppliedSystemVoice = '';
 
   double _rate = 1.0;
   Timer? _sleepTimer;
@@ -56,6 +122,12 @@ class NovelTtsController extends ChangeNotifier {
   bool get hasSleepTimer => _sleepTimer != null;
   bool get backgroundMode => _backgroundMode;
 
+  /// 枚举系统引擎声音（角色面板「系统声音」下拉用）。
+  Future<List<NovelTtsVoice>> systemVoices() async {
+    await _ensureTts();
+    return _tts!.getVoices();
+  }
+
   /// 取走最近一次朗读错误（无错误返回 null）。
   String? takeLastError() {
     final String? error = _lastError;
@@ -74,7 +146,7 @@ class NovelTtsController extends ChangeNotifier {
   /// 初始化 TTS 引擎（懒加载）。
   Future<void> _ensureTts() async {
     if (_tts != null) return;
-    _tts = createNovelTtsEngine();
+    _tts = _engineFactory();
     // 先挂完成回调，确保初始化任何一步失败也不会漏掉（此前 setQueueMode
     // 在 4.2.5 无原生实现会抛 MissingPluginException，导致回调从未注册、
     // 读完一句即停）。
@@ -84,16 +156,65 @@ class NovelTtsController extends ChangeNotifier {
     await _tts!.setSpeechRate(_rate);
   }
 
+  /// 构建多角色会话上下文（角色卡 + 路由 + 性别表）。
+  Future<_MultiRoleSession?> _buildSession({
+    String? novelId,
+    String? chapterId,
+    NovelTtsSystemSlots? systemSlots,
+  }) async {
+    final httpCfg = await NovelHttpTtsConfigStore().load();
+    final id = novelId ?? '';
+    if (id.isEmpty && systemSlots == null) return null;
+    List<NovelCastCharacter> characters = const <NovelCastCharacter>[];
+    if (id.isNotEmpty) {
+      try {
+        characters = await NovelTtsCastStore.instance.loadCharacters(id);
+      } on Object {
+        // 角色卡存储异常不阻断朗读（退化为全局兜底路由）。
+        characters = const <NovelCastCharacter>[];
+      }
+    }
+    return _MultiRoleSession(
+      novelId: id,
+      chapterId: (chapterId ?? '').isNotEmpty ? chapterId : null,
+      router: NovelTtsRouter(
+        characters: characters,
+        httpConfig: httpCfg,
+        systemSlots: systemSlots ?? const NovelTtsSystemSlots(),
+      ),
+      knownGenders: <String, String>{
+        for (final c in characters)
+          if (c.gender != SpeechGender.unknown) c.name: c.gender,
+        for (final c in characters)
+          for (final a in c.aliases)
+            if (c.gender != SpeechGender.unknown) a: c.gender,
+      },
+    );
+  }
+
   /// 开始朗读段落列表，从指定索引开始。
   ///
   /// [sleepTimer] 为睡眠定时（分钟）；> 0 时启动后自动开启定时器，
   /// 到时停止朗读。用于 prefs.ttsSleepTimer 持久化恢复。
   ///
-  /// 优先使用在线 HTTP TTS 引擎（配置启用且有模板时）。
+  /// [novelId]/[chapterId] 提供时启用多角色：角色卡路由 + AI 分镜后台
+  /// 归因（仅在线链路）。优先使用在线 HTTP TTS 引擎（配置启用且有模板）。
   Future<void> speak(List<String> paragraphs,
-      {int startIndex = 0, int sleepTimer = 0}) async {
+      {int startIndex = 0,
+      int sleepTimer = 0,
+      String? novelId,
+      String? chapterId,
+      NovelTtsSystemSlots? systemSlots,
+      bool autoNextChapter = false}) async {
+    // 新会话：作废旧在线播放与系统句列表。
+    _sessionGeneration++;
+    _onlinePlayer?.cancel();
+    _onlinePlayer = null;
+    _systemEntries = const <_SystemEntry>[];
+    autoNext = autoNextChapter;
+
     _paragraphs = paragraphs;
-    _currentIndex = startIndex.clamp(0, _paragraphs.length - 1);
+    _currentIndex = startIndex.clamp(0, paragraphs.length - 1);
     _lastError = null;
     _state = NovelTtsState.playing;
     notifyListeners();
@@ -101,40 +222,149 @@ class NovelTtsController extends ChangeNotifier {
     if (sleepTimer > 0) {
       startSleepTimer(sleepTimer);
     }
+
+    _session = await _buildSession(
+        novelId: novelId, chapterId: chapterId, systemSlots: systemSlots);
+
     // 在线引擎优先。
     final cfg = await NovelHttpTtsConfigStore().load();
     if (cfg.enabled && cfg.urlTemplate.isNotEmpty) {
-      _onlinePlayer = NovelHttpTtsPlayer(
-        config: cfg,
-        player: buildDefaultTtsSentencePlayer(
-          cancelled: () => _state == NovelTtsState.stopped,
-        ),
-      );
-      _onlinePlayer!.onCompleted = () {
-        if (_state == NovelTtsState.stopped) return;
-        _state = NovelTtsState.stopped;
-        _isSpeaking = false;
-        notifyListeners();
-      };
-      await _onlinePlayer!.speak(paragraphs);
-      _onlinePlayer = null;
+      await _startOnline(cfg, paragraphs, startIndex: startIndex, chapterId: chapterId);
       return;
     }
     await _ensureTts();
-    await _speakCurrent();
+    await _startSystem(paragraphs, startIndex: startIndex, chapterId: chapterId);
   }
 
-  /// 朗读当前段落。
-  ///
-  /// 若已在朗读（点按切换 / 上一段下一段），先 [FlutterTts.stop] 打断旧句
-  /// 再朗读新句，使切换立即生效（替代不可用 setQueueMode 的 QUEUE_FLUSH）。
-  Future<void> _speakCurrent() async {
-    if (_tts == null ||
-        _currentIndex < 0 ||
-        _currentIndex >= _paragraphs.length) {
-      _state = NovelTtsState.stopped;
-      _isSpeaking = false;
-      notifyListeners();
+  /// 在线链路：滑动窗口管线 + 音频缓存 + 动态角色 provider + 后台 AI 归因。
+  Future<void> _startOnline(
+    NovelHttpTtsConfig cfg,
+    List<String> paragraphs, {
+    int startIndex = 0,
+    String? chapterId,
+  }) async {
+    final session = _session;
+    final generation = _sessionGeneration;
+    final cache = await TtsAudioFileCache.createDefault();
+    final preloader = HttpTtsPreloader(config: cfg, rate: _rate, cache: cache);
+    final player = NovelHttpTtsPlayer(
+      config: cfg,
+      rate: _rate,
+      engine: preloader,
+      player: buildDefaultTtsSentencePlayer(
+        cancelled: () => _state == NovelTtsState.stopped || generation != _sessionGeneration,
+      ),
+    );
+    _onlinePlayer = player;
+    player.onCompleted = () {
+      if (_state == NovelTtsState.stopped ||
+          generation != _sessionGeneration) {
+        return;
+      }
+      if (autoNext && onChapterFinished != null) {
+        // 保持 playing 态，交给阅读器翻章续读；回调失败由其兜底 stop。
+        scheduleMicrotask(() {
+          if (_state != NovelTtsState.stopped &&
+              generation == _sessionGeneration) {
+            onChapterFinished!();
+          }
+        });
+      } else {
+        _state = NovelTtsState.stopped;
+        _isSpeaking = false;
+        notifyListeners();
+      }
+    };
+
+    // AI 分镜后台归因（无配置/失败静默降级；完成后剩余句自动升级）。
+    if (session != null &&
+        session.novelId.isNotEmpty &&
+        chapterId != null &&
+        chapterId.isNotEmpty) {
+      final novelId = session.novelId;
+      unawaited(() async {
+        final storyboard = await NovelTtsStoryboardService()
+            .attributeChapter(
+                novelId: novelId, chapterId: chapterId, paragraphs: paragraphs);
+        if (storyboard != null &&
+            generation == _sessionGeneration &&
+            _session == session) {
+          session.storyboard = storyboard;
+        }
+      }());
+    }
+
+    await player.speak(
+      paragraphs,
+      startParagraphIndex: startIndex,
+      knownGenders: session?.knownGenders ?? const {},
+      segmentProvider: session == null
+          ? null
+          : (unit) => session.storyboard?.segmentFor(unit) ?? unit.segment,
+      voiceResolver:
+          session == null ? null : (role, gender) => session.router.route(role, gender).httpVoice,
+    );
+    if (generation == _sessionGeneration) {
+      _onlinePlayer = null;
+    }
+  }
+
+  /// 系统链路：逐句朗读 + 按路由切换系统声音。
+  Future<void> _startSystem(
+    List<String> paragraphs, {
+    int startIndex = 0,
+    String? chapterId,
+  }) async {
+    final session = _session;
+    final generation = _sessionGeneration;
+    final entries = <_SystemEntry>[];
+    for (var p = 0; p < paragraphs.length; p++) {
+      if (p < startIndex) continue;
+      for (final seg
+          in segmentSpeech(paragraphs[p], knownGenders: session?.knownGenders ?? const {})) {
+        entries.add(_SystemEntry(p, seg));
+      }
+    }
+    _systemEntries = entries;
+    _systemIdx = 0;
+    _lastAppliedSystemVoice = '';
+    _systemVoicesByName ??= <String, NovelTtsVoice>{
+      for (final v in await _tts!.getVoices()) v.name: v,
+    };
+
+    // AI 归因后台任务（系统链路同样受益：剩余句的角色/性别升级）。
+    if (session != null &&
+        session.novelId.isNotEmpty &&
+        chapterId != null &&
+        chapterId.isNotEmpty) {
+      final novelId = session.novelId;
+      unawaited(() async {
+        final storyboard = await NovelTtsStoryboardService()
+            .attributeChapter(
+                novelId: novelId, chapterId: chapterId, paragraphs: paragraphs);
+        if (storyboard != null &&
+            generation == _sessionGeneration &&
+            _session == session) {
+          session.storyboard = storyboard;
+        }
+      }());
+    }
+
+    if (entries.isEmpty) {
+      _onChapterEnd(generation);
+      return;
+    }
+    await _speakSystemCurrent(generation);
+  }
+
+  /// 朗读当前系统句（含声音切换）。
+  Future<void> _speakSystemCurrent(int generation) async {
+    if (generation != _sessionGeneration ||
+        _state == NovelTtsState.stopped) {
+      return;
+    }
+    if (_systemIdx < 0 || _systemIdx >= _systemEntries.length) {
+      _onChapterEnd(generation);
       return;
     }
     if (_isSpeaking) {
@@ -144,8 +374,65 @@ class NovelTtsController extends ChangeNotifier {
         // 部分平台 stop 可能抛错，忽略后继续朗读新句。
       }
     }
+    final entry = _systemEntries[_systemIdx];
+    // AI 分镜升级（合成/朗读时刻动态查询）。
+    var segment = entry.segment;
+    final storyboard = _session?.storyboard;
+    if (storyboard != null) {
+      segment = storyboard.segmentFor(TtsSentenceUnit(
+        paragraphIndex: entry.paragraphIndex,
+        segIndex: _segIndexOf(entry),
+        segment: entry.segment,
+      ));
+    }
+    // 声音路由：解析到名字才切换；解析不出保持当前声音。
+    final voiceName =
+        _session?.router.route(segment.role, segment.gender).systemVoice ?? '';
+    if (voiceName.isNotEmpty && voiceName != _lastAppliedSystemVoice) {
+      final voice = _systemVoicesByName?[voiceName] ??
+          NovelTtsVoice(name: voiceName);
+      final ok = await _tts!.setVoice(voice);
+      if (ok) _lastAppliedSystemVoice = voiceName;
+    }
+    if (entry.paragraphIndex != _currentIndex) {
+      _currentIndex = entry.paragraphIndex;
+      notifyListeners();
+    }
     _isSpeaking = true;
-    await _tts!.speak(_paragraphs[_currentIndex]);
+    await _tts!.speak(segment.text);
+  }
+
+  /// 句在其段落内的序号（AI 分镜 unitKey 对位用）。
+  int _segIndexOf(_SystemEntry entry) {
+    var idx = 0;
+    for (final e in _systemEntries) {
+      if (e.paragraphIndex != entry.paragraphIndex) continue;
+      if (identical(e, entry)) return idx;
+      idx++;
+    }
+    return 0;
+  }
+
+  /// 章末处理：跨章续读或停止。
+  void _onChapterEnd(int generation) {
+    if (_state == NovelTtsState.stopped || generation != _sessionGeneration) {
+      return;
+    }
+    if (autoNext && onChapterFinished != null) {
+      scheduleMicrotask(() {
+        if (_state != NovelTtsState.stopped &&
+            generation == _sessionGeneration) {
+          onChapterFinished!();
+        }
+      });
+    } else {
+      _state = NovelTtsState.stopped;
+      _isSpeaking = false;
+      _cancelSleepTimer();
+      _sleepRemaining = null;
+      _setAwake(false);
+      notifyListeners();
+    }
   }
 
   /// 暂停朗读。
@@ -163,13 +450,26 @@ class NovelTtsController extends ChangeNotifier {
     _state = NovelTtsState.playing;
     notifyListeners();
     await _setAwake(true);
-    await _speakCurrent();
+    if (_onlinePlayer != null) {
+      // 在线链路：重新起播剩余句（从当前段起重复合成会命中缓存）。
+      final session = _session;
+      await speak(_paragraphs,
+          startIndex: _currentIndex,
+          novelId:
+              (session == null || session.novelId.isEmpty) ? null : session.novelId,
+          chapterId: session?.chapterId,
+          systemSlots: session?.router.systemSlots);
+      return;
+    }
+    await _speakSystemCurrent(_sessionGeneration);
   }
 
   /// 停止朗读。
   Future<void> stop() async {
+    _sessionGeneration++;
     _onlinePlayer?.cancel();
     _onlinePlayer = null;
+    _systemEntries = const <_SystemEntry>[];
     if (_tts == null) {
       _state = NovelTtsState.stopped;
       _isSpeaking = false;
@@ -190,22 +490,53 @@ class NovelTtsController extends ChangeNotifier {
 
   /// 朗读下一段。
   Future<void> next() async {
-    if (_currentIndex < _paragraphs.length - 1) {
-      _currentIndex++;
-      _state = NovelTtsState.playing;
-      notifyListeners();
-      await _speakCurrent();
-    }
+    if (_onlinePlayer != null) return; // 在线链路整章连续，不支持段落跳转
+    final nextIdx = _nextParagraphBoundary(_currentIndex, forward: true);
+    if (nextIdx == null) return;
+    _currentIndex = nextIdx;
+    _systemIdx = _firstEntryIndexOfParagraph(nextIdx);
+    _state = NovelTtsState.playing;
+    notifyListeners();
+    await _speakSystemCurrent(_sessionGeneration);
   }
 
   /// 朗读上一段。
   Future<void> prev() async {
-    if (_currentIndex > 0) {
-      _currentIndex--;
-      _state = NovelTtsState.playing;
-      notifyListeners();
-      await _speakCurrent();
+    if (_onlinePlayer != null) return;
+    final prevIdx = _nextParagraphBoundary(_currentIndex, forward: false);
+    if (prevIdx == null) return;
+    _currentIndex = prevIdx;
+    _systemIdx = _firstEntryIndexOfParagraph(prevIdx);
+    _state = NovelTtsState.playing;
+    notifyListeners();
+    await _speakSystemCurrent(_sessionGeneration);
+  }
+
+  int? _nextParagraphBoundary(int from, {required bool forward}) {
+    if (_systemEntries.isEmpty) {
+      // 无分段信息（异常态）按段落表兜底。
+      final target = forward ? from + 1 : from - 1;
+      return (target >= 0 && target < _paragraphs.length) ? target : null;
     }
+    if (forward) {
+      for (final e in _systemEntries) {
+        if (e.paragraphIndex > from) return e.paragraphIndex;
+      }
+      return null;
+    }
+    int? result;
+    for (final e in _systemEntries) {
+      if (e.paragraphIndex >= from) break;
+      result = e.paragraphIndex;
+    }
+    return result;
+  }
+
+  int _firstEntryIndexOfParagraph(int paragraphIndex) {
+    for (var i = 0; i < _systemEntries.length; i++) {
+      if (_systemEntries[i].paragraphIndex == paragraphIndex) return i;
+    }
+    return 0;
   }
 
   /// 设置语速（0.5–2.0）。
@@ -277,22 +608,20 @@ class NovelTtsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 当前段落朗读完毕回调：自动朗读下一段。
+  /// 当前句朗读完毕回调：自动朗读下一句；章末走 [_onChapterEnd]。
   void _onComplete() {
     if (_state != NovelTtsState.playing) return;
-    if (_currentIndex < _paragraphs.length - 1) {
-      _currentIndex++;
-      _isSpeaking = false;
-      notifyListeners();
-      // 完成事件可能由原生在非平台线程回调，延后到事件循环再朗读下一段，
-      // 规避 flutter_tts 通道线程告警（shell.cc: The ... channel sent a
-      // message ... on a non-platform thread）。
-      Future.microtask(() => _speakCurrent());
-    } else {
-      _state = NovelTtsState.stopped;
-      _isSpeaking = false;
-      notifyListeners();
+    if (_onlinePlayer != null) return; // 在线链路由 player 自行推进
+    _isSpeaking = false;
+    _systemIdx++;
+    if (_systemIdx >= _systemEntries.length) {
+      _onChapterEnd(_sessionGeneration);
+      return;
     }
+    // 完成事件可能由原生在非平台线程回调，延后到事件循环再朗读下一句，
+    // 规避 flutter_tts 通道线程告警（shell.cc: The ... channel sent a
+    // message ... on a non-platform thread）。
+    Future.microtask(() => _speakSystemCurrent(_sessionGeneration));
   }
 
   @override
@@ -301,11 +630,8 @@ class NovelTtsController extends ChangeNotifier {
     _onlinePlayer?.cancel();
     _onlinePlayer = null;
     _tts?.dispose();
-    try {
-      WakelockPlus.disable();
-    } on Object {
-      // 忽略
-    }
+    // dispose 不能 await：异步吞掉平台异常（测试环境无插件通道）。
+    WakelockPlus.disable().catchError((Object _) {});
     super.dispose();
   }
 }

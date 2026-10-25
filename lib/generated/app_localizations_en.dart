@@ -9954,4 +9954,120 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageLocationSystemScreenshotsHint =>
       'Visible in Files and kept after uninstall';
+
+  @override
+  String get ttsAutoNext => 'Auto-continue chapters';
+
+  @override
+  String get ttsAutoNextDesc =>
+      'Load and read the next chapter automatically when one finishes';
+
+  @override
+  String get ttsCastTitle => 'Characters & voices';
+
+  @override
+  String get ttsCastSubtitle =>
+      'Assign different voices per character; unassigned roles fall back to narrator/gender slots';
+
+  @override
+  String get ttsCastHttpSlots => 'Online voice fallback (HTTP TTS)';
+
+  @override
+  String get ttsCastSystemSlots => 'System voices (device engine)';
+
+  @override
+  String get ttsCastNarratorVoice => 'Narrator voice';
+
+  @override
+  String get ttsCastMaleVoice => 'Male fallback voice';
+
+  @override
+  String get ttsCastFemaleVoice => 'Female fallback voice';
+
+  @override
+  String get ttsCastHttpVoice => 'Online voice ID (HTTP TTS)';
+
+  @override
+  String get ttsCastSystemVoice => 'System voice';
+
+  @override
+  String get ttsCastEngineDefault => 'Engine default';
+
+  @override
+  String get ttsCastCharacters => 'Characters in this book';
+
+  @override
+  String get ttsCastEmpty =>
+      'No character cards yet. AI identifies speakers while reading; you can also add manually.';
+
+  @override
+  String get ttsCastAddRole => 'Add character';
+
+  @override
+  String get ttsCastEditRole => 'Edit character';
+
+  @override
+  String get ttsCastRoleName => 'Name';
+
+  @override
+  String get ttsCastAliases => 'Aliases (optional)';
+
+  @override
+  String get ttsCastAliasesHint => 'Separate multiple aliases with commas';
+
+  @override
+  String get ttsCastMale => 'Male';
+
+  @override
+  String get ttsCastFemale => 'Female';
+
+  @override
+  String get ttsCastGenderUnknown => 'Unknown';
+
+  @override
+  String get ttsCastEnable => 'Enable';
+
+  @override
+  String get ttsCastDisable => 'Disable';
+
+  @override
+  String get ttsCastDelete => 'Delete';
+
+  @override
+  String get ttsCastAiRelabel => 'AI attribution for this chapter';
+
+  @override
+  String get ttsCastAiRunning => 'AI attributing…';
+
+  @override
+  String ttsCastAiDone(int count) {
+    return 'AI attribution done: $count lines labeled';
+  }
+
+  @override
+  String get ttsCastAiNoConfig =>
+      'No AI endpoint configured. Set the novel-overview or default endpoint in Settings → AI first.';
+
+  @override
+  String get ttsCastAiFailed => 'AI attribution failed; local results kept';
+
+  @override
+  String get ttsCastVoiceMapHint =>
+      'Global fallback map (name=voiceId, one per line); per-book setup lives in the reader\'s Characters & voices panel';
+
+  @override
+  String get ttsCacheClear => 'Clear TTS audio cache';
+
+  @override
+  String get ttsCacheEmpty => 'No cached audio';
+
+  @override
+  String ttsCacheCount(int count) {
+    return '$count audio clips cached';
+  }
+
+  @override
+  String ttsCacheCleared(int count) {
+    return 'Cleared $count TTS audio clips';
+  }
 }

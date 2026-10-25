@@ -11,6 +11,11 @@
 ///
 /// 角色名解析（简化）：cue 匹配到的说话人取「前缀最长匹配」候选；
 /// 引擎层用配置的音色表（角色名 → voice id）映射音色，未配置角色回退默认音色。
+///
+/// 性别推断（[SpeechGender]）：说话人已知性别（调用方传入 [knownGenders]
+/// 角色卡平铺表）优先；其次 cue 窗口里的「她/他 + 动词」代词句式；
+/// 再次说话人或窗口里的称谓词（姑娘/公子等）。判不出为 unknown，
+/// 由路由层走默认音色。
 library;
 
 /// 单条 TTS 句段。
@@ -23,11 +28,29 @@ class SpeechSegment {
 
   final String sourceRole;
 
+  /// 说话人性别（[SpeechGender]；旁白/判不出为 unknown）。
+  final String gender;
+
   const SpeechSegment({
     required this.text,
     required this.role,
     required this.sourceRole,
+    this.gender = SpeechGender.unknown,
   });
+
+  SpeechSegment copyWith({String? role, String? gender}) => SpeechSegment(
+        text: text,
+        role: role ?? this.role,
+        sourceRole: sourceRole,
+        gender: gender ?? this.gender,
+      );
+}
+
+/// 说话人性别常量。
+abstract final class SpeechGender {
+  static const String male = 'male';
+  static const String female = 'female';
+  static const String unknown = 'unknown';
 }
 
 /// 旁白角色名。
@@ -35,6 +58,21 @@ const String narratorRole = '旁白';
 
 /// 无 cue 对话的默认角色名。
 const String quoteRole = '对话';
+
+/// 女性称谓词（说话人名或 cue 窗口命中即判女声）。
+const List<String> kFemaleAddressTerms = <String>[
+  '小妹妹', '妹妹', '小姑娘', '姑娘', '大小姐', '小姐', '女士', '女侠', '夫人',
+  '娘子', '大姐姐', '姐姐', '阿姨', '大婶', '老奶奶', '奶奶', '婆婆', '大妈',
+  '婶婶', '丫头', '小丫头', '丫鬟', '姑姑', '嫂子', '大娘', '婆姨', '女娃',
+];
+
+/// 男性称谓词（同上，判男声）。
+const List<String> kMaleAddressTerms = <String>[
+  '小弟弟', '弟弟', '小公子', '公子', '少爷', '先生', '小哥', '大哥', '大叔',
+  '老爷', '爷爷', '老伯', '伯伯', '大爷', '叔叔', '老哥', '壮士', '侠士',
+  '小子', '少年', '道长', '大师', '师父', '师傅', '掌柜', '官人', '相公',
+  '郎君', '小生', '老朽', '老夫', '贫道', '洒家',
+];
 
 /// cue 关键词（说话/心理活动动词短语），用于匹配开口引号前的说话人。
 const List<String> kSpeechCueWords = <String>[
@@ -74,11 +112,21 @@ const List<(String, String)> kQuotePairs = <(String, String)>[
 /// 段落结束标点（旁白切句）。
 const List<String> kSentencePunctuation = <String>['。', '！', '？', '…', '；'];
 
+/// cue 词交替模式（长词优先，供代词性别推断复用；均为纯文字无需转义）。
+final String cueAlternation = () {
+  final cues = [...kSpeechCueWords]..sort((a, b) => b.length.compareTo(a.length));
+  return cues.map(RegExp.escape).join('|');
+}();
+
 /// 把一段文本切分为 TTS 句段。
 ///
 /// [text] 为原始段落。实现：先按引号对切分「旁白区/对话区」，对话区
 /// 用 cue 提取角色并整体作为一句；旁白区按结束标点切句（role=旁白）。
-List<SpeechSegment> segmentSpeech(String text) {
+///
+/// [knownGenders] 为说话人 → 性别平铺表（调用方把角色卡的名字与别名
+/// 都展平进来）；未命中时退回称谓词/代词推断。
+List<SpeechSegment> segmentSpeech(String text,
+    {Map<String, String> knownGenders = const <String, String>{}}) {
   if (text.isEmpty) return const <SpeechSegment>[];
   final segments = <SpeechSegment>[];
 
@@ -113,7 +161,7 @@ List<SpeechSegment> segmentSpeech(String text) {
     // 引导语属引号句的 cue 上下文，不单独朗读）。
     if (q.start > cursor) {
       final lead = _stripSpeechLead(text.substring(cursor, q.start));
-      _appendNarration(lead, segments);
+      _appendNarration(lead, segments, knownGenders: knownGenders);
     }
     // 引号内容：用 cue 判角色。
     final role = _detectRole(text, q.windowStart, q.start, q.content);
@@ -121,11 +169,17 @@ List<SpeechSegment> segmentSpeech(String text) {
       text: q.content,
       role: role,
       sourceRole: role,
+      gender: _detectGender(
+        window: text.substring(q.windowStart, q.start),
+        role: role,
+        knownGenders: knownGenders,
+      ),
     ));
     cursor = q.end;
   }
   if (cursor < text.length) {
-    _appendNarration(text.substring(cursor), segments);
+    _appendNarration(text.substring(cursor), segments,
+        knownGenders: knownGenders);
   }
   return segments;
 }
@@ -204,23 +258,27 @@ bool _isNameChar(String c) {
 /// 旁白切句：按结束标点切短句。句首若命中「角色 + 冒号」句式
 /// （如 `他说：xxx` / `小王心想：xxx`），以冒号前文本为角色、冒号后为
 /// 内容切分（无引号句式也支持角色判定）。
-void _appendNarration(String text, List<SpeechSegment> out) {
+void _appendNarration(String text, List<SpeechSegment> out,
+    {Map<String, String> knownGenders = const <String, String>{}}) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return;
   var start = 0;
   for (var i = 0; i < trimmed.length; i++) {
     if (kSentencePunctuation.contains(trimmed[i])) {
-      _appendNarrationSentence(trimmed.substring(start, i + 1), out);
+      _appendNarrationSentence(trimmed.substring(start, i + 1), out,
+          knownGenders: knownGenders);
       start = i + 1;
     }
   }
   if (start < trimmed.length) {
-    _appendNarrationSentence(trimmed.substring(start), out);
+    _appendNarrationSentence(trimmed.substring(start), out,
+        knownGenders: knownGenders);
   }
 }
 
 /// 追加一条旁白句（或拆为角色+内容）。
-void _appendNarrationSentence(String raw, List<SpeechSegment> out) {
+void _appendNarrationSentence(String raw, List<SpeechSegment> out,
+    {Map<String, String> knownGenders = const <String, String>{}}) {
   final s = raw.trim();
   if (s.isEmpty) return;
   // 冒号句式：[说话人][：:][内容]。说话人限 ≤12 字符、不含标点。
@@ -235,6 +293,11 @@ void _appendNarrationSentence(String raw, List<SpeechSegment> out) {
           text: content,
           role: role,
           sourceRole: role,
+          gender: _detectGender(
+            window: s.substring(0, colon),
+            role: role,
+            knownGenders: knownGenders,
+          ),
         ));
         return;
       }
@@ -245,6 +308,55 @@ void _appendNarrationSentence(String raw, List<SpeechSegment> out) {
     role: narratorRole,
     sourceRole: narratorRole,
   ));
+}
+
+/// 推断说话人性别。
+///
+/// 优先级：角色卡已知性别（[knownGenders]）> cue 窗口「她/他 + 动词」
+/// 代词句式 > 说话人名内的称谓词 > 窗口文本内的称谓词。全部未命中
+/// 返回 [SpeechGender.unknown]（路由层走默认/性别槽兜底）。
+String _detectGender({
+  required String window,
+  required String role,
+  required Map<String, String> knownGenders,
+}) {
+  // 1) 角色卡已知性别（名字精确命中）。
+  final known = knownGenders[role.trim()];
+  if (known == SpeechGender.male) return SpeechGender.male;
+  if (known == SpeechGender.female) return SpeechGender.female;
+  // 2) 代词句式：紧邻引号前出现「她/他 + cue 动词」。
+  final pronounCue =
+      RegExp('(她|他)([^。！？；，,]{0,6})($cueAlternation)[：:]?\$');
+  final m = pronounCue.firstMatch(window.trimRight());
+  if (m != null) {
+    return m.group(1) == '她' ? SpeechGender.female : SpeechGender.male;
+  }
+  // 3) 说话人名本身是称谓（「姑娘」「公子」等）。
+  final byRole = _genderByAddressTerms(role);
+  if (byRole != SpeechGender.unknown) return byRole;
+  // 4) cue 窗口内的称谓（「那位姑娘说道：」）。
+  return _genderByAddressTerms(window);
+}
+
+/// 称谓词表判性别；未命中返回 unknown。
+String _genderByAddressTerms(String text) {
+  var female = false;
+  var male = false;
+  for (final t in kFemaleAddressTerms) {
+    if (text.contains(t)) {
+      female = true;
+      break;
+    }
+  }
+  for (final t in kMaleAddressTerms) {
+    if (text.contains(t)) {
+      male = true;
+      break;
+    }
+  }
+  // 两性称谓同时命中视为不可判（如「姐弟」）。
+  if (female == male) return SpeechGender.unknown;
+  return female ? SpeechGender.female : SpeechGender.male;
 }
 
 /// 去除说话人候选末尾的 cue 动词词尾（「说道/问/喊/心想」等），

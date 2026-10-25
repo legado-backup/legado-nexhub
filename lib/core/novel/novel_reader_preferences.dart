@@ -360,6 +360,18 @@ class NovelReaderPreferences {
   /// 监听，见 `NovelTtsController`）；false 时进入后台即暂停。
   final bool ttsBackground;
 
+  /// 跨章连播开关：一章读完自动加载下一章继续朗读。
+  final bool ttsAutoNext;
+
+  /// 系统 TTS 旁白声音名（空 = 引擎默认）。
+  final String ttsSystemNarratorVoice;
+
+  /// 系统 TTS 男性角色兜底声音名（空 = 引擎默认）。
+  final String ttsSystemMaleVoice;
+
+  /// 系统 TTS 女性角色兜底声音名（空 = 引擎默认）。
+  final String ttsSystemFemaleVoice;
+
   // ─────────────── 字体 / 颜色 / 阴影 / 下划线 ───────────────
   /// 自定义字体文件路径（.ttf / .otf；null = 不指定，用 [fontFamily]）。
   final String? customFontPath;
@@ -502,6 +514,10 @@ class NovelReaderPreferences {
     this.ttsSpeechRate = 1.0,
     this.ttsSleepTimer = 0,
     this.ttsBackground = false,
+    this.ttsAutoNext = false,
+    this.ttsSystemNarratorVoice = '',
+    this.ttsSystemMaleVoice = '',
+    this.ttsSystemFemaleVoice = '',
     // 字体/阴影/下划线
     this.customFontPath,
     this.shadowBlur = 0.5,
@@ -576,6 +592,10 @@ class NovelReaderPreferences {
     double? ttsSpeechRate,
     int? ttsSleepTimer,
     bool? ttsBackground,
+    bool? ttsAutoNext,
+    String? ttsSystemNarratorVoice,
+    String? ttsSystemMaleVoice,
+    String? ttsSystemFemaleVoice,
     // 字体/阴影/下划线
     Object? customFontPath = _kNovelPrefsPathUnset,
     double? shadowBlur,
@@ -664,6 +684,11 @@ class NovelReaderPreferences {
       ttsSpeechRate: ttsSpeechRate ?? this.ttsSpeechRate,
       ttsSleepTimer: ttsSleepTimer ?? this.ttsSleepTimer,
       ttsBackground: ttsBackground ?? this.ttsBackground,
+      ttsAutoNext: ttsAutoNext ?? this.ttsAutoNext,
+      ttsSystemNarratorVoice:
+          ttsSystemNarratorVoice ?? this.ttsSystemNarratorVoice,
+      ttsSystemMaleVoice: ttsSystemMaleVoice ?? this.ttsSystemMaleVoice,
+      ttsSystemFemaleVoice: ttsSystemFemaleVoice ?? this.ttsSystemFemaleVoice,
       // 字体/阴影/下划线
       customFontPath: identical(customFontPath, _kNovelPrefsPathUnset)
           ? this.customFontPath
@@ -807,6 +832,18 @@ class NovelReaderPreferences {
       ttsBackground: identical(ttsBackground, def.ttsBackground)
           ? base.ttsBackground
           : ttsBackground,
+      ttsAutoNext: identical(ttsAutoNext, def.ttsAutoNext)
+          ? base.ttsAutoNext
+          : ttsAutoNext,
+      ttsSystemNarratorVoice: ttsSystemNarratorVoice == def.ttsSystemNarratorVoice
+          ? base.ttsSystemNarratorVoice
+          : ttsSystemNarratorVoice,
+      ttsSystemMaleVoice: ttsSystemMaleVoice == def.ttsSystemMaleVoice
+          ? base.ttsSystemMaleVoice
+          : ttsSystemMaleVoice,
+      ttsSystemFemaleVoice: ttsSystemFemaleVoice == def.ttsSystemFemaleVoice
+          ? base.ttsSystemFemaleVoice
+          : ttsSystemFemaleVoice,
       // 字体/阴影/下划线
       customFontPath: identical(customFontPath, def.customFontPath)
           ? base.customFontPath
@@ -1126,6 +1163,10 @@ class NovelReaderPreferences {
         'ttsSpeechRate': ttsSpeechRate,
         'ttsSleepTimer': ttsSleepTimer,
         'ttsBackground': ttsBackground,
+        'ttsAutoNext': ttsAutoNext,
+        'ttsSystemNarratorVoice': ttsSystemNarratorVoice,
+        'ttsSystemMaleVoice': ttsSystemMaleVoice,
+        'ttsSystemFemaleVoice': ttsSystemFemaleVoice,
         // 字体/阴影/下划线
         if (customFontPath != null) 'customFontPath': customFontPath,
         'shadowBlur': shadowBlur,
@@ -1210,6 +1251,10 @@ class NovelReaderPreferences {
       ttsSpeechRate: (json['ttsSpeechRate'] as num?)?.toDouble() ?? 1.0,
       ttsSleepTimer: (json['ttsSleepTimer'] as num?)?.toInt() ?? 0,
       ttsBackground: json['ttsBackground'] as bool? ?? false,
+      ttsAutoNext: json['ttsAutoNext'] as bool? ?? false,
+      ttsSystemNarratorVoice: json['ttsSystemNarratorVoice'] as String? ?? '',
+      ttsSystemMaleVoice: json['ttsSystemMaleVoice'] as String? ?? '',
+      ttsSystemFemaleVoice: json['ttsSystemFemaleVoice'] as String? ?? '',
       // 字体/阴影/下划线
       customFontPath: json['customFontPath'] as String?,
       shadowBlur: (json['shadowBlur'] as num?)?.toDouble() ?? 0.5,

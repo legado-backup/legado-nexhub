@@ -1,17 +1,19 @@
-/// 在线 TTS 播放管线。
+/// 在线 TTS 播放管线（滑动窗口版）。
 ///
-/// 流程：段落 → [segmentSpeech] 分句 → [HttpTtsPreloader] 受限并发预下载
-/// （无网络拉取能力时由业务侧重试/降级）→ 顺序播放每个成功句 → 全部播完
-/// 触发续章回调。
+/// 流程：段落 → [segmentSpeech] 分句（本地角色/性别）→ 并发合成
+/// （worker 池，上限 [NovelHttpTtsConfig.concurrency]）→ **按句序**播放，
+/// 首句合成完即开播、后续边播边合成（替代旧版「整章合成完才播」）。
 ///
-/// 顺应「默认不内置云端密钥」的约束（用户自建端点模板），本管线只消费
-/// [NovelHttpTtsConfig.urlTemplate]，不绑定任何厂商 SDK。
+/// 多角色动态路由：每句在**合成时刻**经 [TtsSegmentProvider]（AI 归因
+/// provider，可空）解析最终角色与性别、经 [TtsVoiceResolver]（路由器，
+/// 可空）解析音色——AI 归因在朗读开始后后台完成时，剩余未合成句子自动
+/// 使用新结果，无需重启朗读。
 ///
-/// 播放内核：media_kit（项目既有播放内核）。应用层传递 [playBytes]，
-/// 由调用方决定写入临时文件/流式播音——这里保留纯 Dart 可测的核心：
-/// 分句 + 预下载调度 + 失败降级策略 + 顺序播放循环。
+/// 失败语义（与旧版一致）：单句合成失败按配置静音占位跳过或立即终止；
+/// 连续失败达 [NovelHttpTtsConfig.maxConsecutiveFailures] 终止剩余。
 library;
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'novel_http_tts_config.dart';
@@ -34,17 +36,43 @@ enum TtsSentenceOutcome {
 /// （回调内部实现实际播放：media_kit / 系统播放器等）。
 typedef TtsSentencePlayer = Future<bool> Function(Uint8List bytes);
 
+/// 一条待合成句（带段落/句序号，供 AI 归因 provider 对位）。
+class TtsSentenceUnit {
+  const TtsSentenceUnit({
+    required this.paragraphIndex,
+    required this.segIndex,
+    required this.segment,
+  });
+
+  /// 所属段落下标（与输入 paragraphs 对齐）。
+  final int paragraphIndex;
+
+  /// 段内句序号。
+  final int segIndex;
+
+  final SpeechSegment segment;
+}
+
+/// 合成时刻的段级解析器：输入本地分句结果，返回最终段（AI 归因完成后
+/// 由 provider 内部切换数据源，角色与性别都可被升级）。
+typedef TtsSegmentProvider = SpeechSegment Function(TtsSentenceUnit unit);
+
+/// 音色解析器：角色 + 性别 → HTTP voice id。
+typedef TtsVoiceResolver = String Function(String role, String gender);
+
 /// 在线 TTS 播放控制器（与播放内核解耦，核心调度可单测）。
 class NovelHttpTtsPlayer {
   NovelHttpTtsPlayer({
     required this.config,
     required this.player,
-    HttpTtsPreloader? preloader,
-  }) : _preloader = preloader ?? HttpTtsPreloader(config: config);
+    this.rate = 1.0,
+    TtsSynthesisEngine? engine,
+  }) : engine = engine ?? HttpTtsPreloader(config: config, rate: rate);
 
   final NovelHttpTtsConfig config;
   final TtsSentencePlayer player;
-  final HttpTtsPreloader _preloader;
+  final double rate;
+  final TtsSynthesisEngine engine;
 
   /// 全部段落播完回调（自动续章 的触发点）。
   void Function()? onCompleted;
@@ -54,53 +82,121 @@ class NovelHttpTtsPlayer {
 
   bool _cancelled = false;
 
+  /// 连续合成失败句数（成功复位；达阈值后 worker 不再领取新句）。
+  int _consecutiveFailures = 0;
+
+  bool get _halted => _consecutiveFailures >= config.maxConsecutiveFailures;
+
   /// 取消本轮朗读（停止后续合成与播放）。
   void cancel() => _cancelled = true;
 
-  /// 朗读一组段落。
-  ///
-  /// 1. 逐段分句（[segmentSpeech]）；
-  /// 2. 统一受限并发预下载（Semaphore 1-8）；
-  /// 3. 按句调 [player] 播放字节；
-  /// 4. 连续失败达阈值 → 终止剩余；单句失败且允许占位 → 跳过。
-  Future<void> speak(List<String> paragraphs) async {
+  /// 朗读一组段落（[startParagraphIndex] 起的段落参与合成，之前的跳过——
+  /// 章中开始朗读时不重读前文）。
+  Future<void> speak(
+    List<String> paragraphs, {
+    int startParagraphIndex = 0,
+    Map<String, String> knownGenders = const <String, String>{},
+    TtsSegmentProvider? segmentProvider,
+    TtsVoiceResolver? voiceResolver,
+  }) async {
     _cancelled = false;
     currentIndex = 0;
-    // 1) 分句。
-    final sentences = <(String, String)>[];
-    for (final p in paragraphs) {
-      for (final seg in segmentSpeech(p)) {
-        sentences.add((seg.text, seg.role));
+    _consecutiveFailures = 0;
+
+    // 1) 分句（本地角色 + 性别推断）。
+    final units = <TtsSentenceUnit>[];
+    for (var p = 0; p < paragraphs.length; p++) {
+      if (p < startParagraphIndex) continue;
+      var segIdx = 0;
+      for (final seg
+          in segmentSpeech(paragraphs[p], knownGenders: knownGenders)) {
+        units.add(TtsSentenceUnit(
+            paragraphIndex: p, segIndex: segIdx++, segment: seg));
       }
     }
-    if (sentences.isEmpty) return;
+    if (units.isEmpty) {
+      // 整章无内容（且从头开始）视为播完，触发续章；跳读导致的无句则
+      // 静默结束（调用方传入的区间有误，不应连锁翻章）。
+      if (startParagraphIndex <= 0) onCompleted?.call();
+      return;
+    }
 
-    // 2) 预下载（受限并发；失败计入连续计数）。
-    final results =
-        await _preloader.synthesizeAll(sentences: sentences);
+    SpeechSegment segmentOf(TtsSentenceUnit u) =>
+        segmentProvider?.call(u) ?? u.segment;
+    String roleOf(TtsSentenceUnit u) => segmentOf(u).role;
+    String voiceOf(TtsSentenceUnit u) =>
+        voiceResolver?.call(roleOf(u), segmentOf(u).gender) ??
+        config.voiceForRole(roleOf(u));
 
-    // 3) 顺序播放。
-    for (var i = 0; i < sentences.length; i++) {
+    // 2) 并发合成（worker 池）+ 按序播放。
+    // completers 预先建满：worker 领句即 complete，播放循环按序 await，
+    // 两端互不等待对方推进（首句就绪即开播）。
+    final results = <Completer<TtsSynthesisResult>>[
+      for (var i = 0; i < units.length; i++) Completer<TtsSynthesisResult>(),
+    ];
+    var nextIndex = 0;
+
+    Future<void> workerLoop() async {
+      while (!_cancelled) {
+        final i = nextIndex++;
+        if (i >= units.length) return;
+        if (_halted) {
+          results[i].complete(
+              TtsSynthesisResult(bytes: null, role: roleOf(units[i])));
+          continue;
+        }
+        final u = units[i];
+        TtsSynthesisResult r;
+        try {
+          r = await engine.synthesize(
+              text: u.segment.text, voice: voiceOf(u), role: roleOf(u));
+        } on Object {
+          r = TtsSynthesisResult(bytes: null, role: roleOf(u));
+        }
+        if (_cancelled) return;
+        results[i].complete(r);
+      }
+    }
+
+    final workerCount = config.concurrency.clamp(1, 8);
+    final workers = <Future<void>>[
+      for (var w = 0; w < workerCount && w < units.length; w++) workerLoop(),
+    ];
+
+    // 3) 按句序播放。
+    var aborted = false;
+    for (var i = 0; i < units.length; i++) {
       if (_cancelled) return;
       currentIndex = i;
-      final bytes = results[i].bytes;
+      final bytes = (await results[i].future).bytes;
       if (bytes == null) {
-        // 合成失败：（顺带计入 `_preloader.consecutiveFailures`，见
-        // synthesizeOne 内部递增）。
-        if (!config.silentPlaceholderOnFailure) {
-          // 关闭静音占位 → 严格模式：单句失败立即终止本轮。
-          return;
+        _consecutiveFailures++;
+        if (!config.silentPlaceholderOnFailure || _halted) {
+          aborted = true;
+          break;
         }
-        // 连续失败达阈值 → 终止剩余（兜底，即使占位开启）。
-        if (_preloader.halted) return;
-        // 静音占位：跳过该句继续。
         continue;
       }
+      _consecutiveFailures = 0;
       final ok = await player(bytes);
+      if (_cancelled) return;
       if (!ok) {
         // 播放失败按合成失败同策略降级。
-        if (config.silentPlaceholderOnFailure) continue;
-        return;
+        _consecutiveFailures++;
+        if (!config.silentPlaceholderOnFailure || _halted) {
+          aborted = true;
+          break;
+        }
+      }
+    }
+    if (aborted) return;
+    // 合成 worker 与播放循环共享 cancel 位；正常走完时等 workers 收尾，
+    // 防止泄漏未完成的 dio 请求（cancel 时由调用方生命周期兜底）。
+    if (!_cancelled) {
+      try {
+        await Future.wait<void>(workers);
+      } on Object {
+        // worker 异常已在内部转为失败结果，这里只是收尾。
       }
     }
     onCompleted?.call();

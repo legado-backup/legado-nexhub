@@ -18572,6 +18572,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Visible in Files and kept after uninstall'**
   String get storageLocationSystemScreenshotsHint;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-continue chapters'**
+  String get ttsAutoNext;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Load and read the next chapter automatically when one finishes'**
+  String get ttsAutoNextDesc;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Characters & voices'**
+  String get ttsCastTitle;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Assign different voices per character; unassigned roles fall back to narrator/gender slots'**
+  String get ttsCastSubtitle;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Online voice fallback (HTTP TTS)'**
+  String get ttsCastHttpSlots;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'System voices (device engine)'**
+  String get ttsCastSystemSlots;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Narrator voice'**
+  String get ttsCastNarratorVoice;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Male fallback voice'**
+  String get ttsCastMaleVoice;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Female fallback voice'**
+  String get ttsCastFemaleVoice;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Online voice ID (HTTP TTS)'**
+  String get ttsCastHttpVoice;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'System voice'**
+  String get ttsCastSystemVoice;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Engine default'**
+  String get ttsCastEngineDefault;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Characters in this book'**
+  String get ttsCastCharacters;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'No character cards yet. AI identifies speakers while reading; you can also add manually.'**
+  String get ttsCastEmpty;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Add character'**
+  String get ttsCastAddRole;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Edit character'**
+  String get ttsCastEditRole;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get ttsCastRoleName;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Aliases (optional)'**
+  String get ttsCastAliases;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Separate multiple aliases with commas'**
+  String get ttsCastAliasesHint;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get ttsCastMale;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get ttsCastFemale;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get ttsCastGenderUnknown;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get ttsCastEnable;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get ttsCastDisable;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get ttsCastDelete;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'AI attribution for this chapter'**
+  String get ttsCastAiRelabel;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'AI attributing…'**
+  String get ttsCastAiRunning;
+
+  /// AI 归因完成句数提示
+  ///
+  /// In en, this message translates to:
+  /// **'AI attribution done: {count} lines labeled'**
+  String ttsCastAiDone(int count);
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'No AI endpoint configured. Set the novel-overview or default endpoint in Settings → AI first.'**
+  String get ttsCastAiNoConfig;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'AI attribution failed; local results kept'**
+  String get ttsCastAiFailed;
+
+  /// TTS cast sheet string
+  ///
+  /// In en, this message translates to:
+  /// **'Global fallback map (name=voiceId, one per line); per-book setup lives in the reader\'s Characters & voices panel'**
+  String get ttsCastVoiceMapHint;
+
+  /// TTS audio cache settings entry
+  ///
+  /// In en, this message translates to:
+  /// **'Clear TTS audio cache'**
+  String get ttsCacheClear;
+
+  /// TTS audio cache settings entry
+  ///
+  /// In en, this message translates to:
+  /// **'No cached audio'**
+  String get ttsCacheEmpty;
+
+  /// TTS audio cache settings entry
+  ///
+  /// In en, this message translates to:
+  /// **'{count} audio clips cached'**
+  String ttsCacheCount(int count);
+
+  /// TTS audio cache settings entry
+  ///
+  /// In en, this message translates to:
+  /// **'Cleared {count} TTS audio clips'**
+  String ttsCacheCleared(int count);
 }
 
 class _AppLocalizationsDelegate

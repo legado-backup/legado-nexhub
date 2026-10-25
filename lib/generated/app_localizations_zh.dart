@@ -9703,4 +9703,115 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageLocationSystemScreenshotsHint => '「文件」应用中可见，卸载应用后仍保留';
+
+  @override
+  String get ttsAutoNext => '跨章连播';
+
+  @override
+  String get ttsAutoNextDesc => '一章读完自动加载下一章继续朗读';
+
+  @override
+  String get ttsCastTitle => '角色与声音';
+
+  @override
+  String get ttsCastSubtitle => '为本书角色分配不同朗读音色，未配置角色走旁白/性别兜底';
+
+  @override
+  String get ttsCastHttpSlots => '在线音色兜底（HTTP TTS）';
+
+  @override
+  String get ttsCastSystemSlots => '系统声音（本机引擎）';
+
+  @override
+  String get ttsCastNarratorVoice => '旁白音色';
+
+  @override
+  String get ttsCastMaleVoice => '男性兜底音色';
+
+  @override
+  String get ttsCastFemaleVoice => '女性兜底音色';
+
+  @override
+  String get ttsCastHttpVoice => '在线音色 ID（HTTP TTS）';
+
+  @override
+  String get ttsCastSystemVoice => '系统声音';
+
+  @override
+  String get ttsCastEngineDefault => '引擎默认';
+
+  @override
+  String get ttsCastCharacters => '本书角色';
+
+  @override
+  String get ttsCastEmpty => '暂无角色卡。朗读时 AI 会自动识别说话人建卡，也可手动添加。';
+
+  @override
+  String get ttsCastAddRole => '添加角色';
+
+  @override
+  String get ttsCastEditRole => '编辑角色';
+
+  @override
+  String get ttsCastRoleName => '角色名';
+
+  @override
+  String get ttsCastAliases => '别名（选填）';
+
+  @override
+  String get ttsCastAliasesHint => '多个别名用逗号分隔';
+
+  @override
+  String get ttsCastMale => '男';
+
+  @override
+  String get ttsCastFemale => '女';
+
+  @override
+  String get ttsCastGenderUnknown => '未知';
+
+  @override
+  String get ttsCastEnable => '启用';
+
+  @override
+  String get ttsCastDisable => '停用';
+
+  @override
+  String get ttsCastDelete => '删除';
+
+  @override
+  String get ttsCastAiRelabel => 'AI 归因本章';
+
+  @override
+  String get ttsCastAiRunning => 'AI 归因中…';
+
+  @override
+  String ttsCastAiDone(int count) {
+    return 'AI 归因完成：$count 句已标注';
+  }
+
+  @override
+  String get ttsCastAiNoConfig => '未配置 AI 接口，请先在设置 → AI 中配置小说总览或通用接口';
+
+  @override
+  String get ttsCastAiFailed => 'AI 归因失败，已保留本地判定';
+
+  @override
+  String get ttsCastVoiceMapHint => '全局兜底映射（角色名=音色 ID，每行一条）；按书配置请在阅读器「角色与声音」面板';
+
+  @override
+  String get ttsCacheClear => '清空朗读音频缓存';
+
+  @override
+  String get ttsCacheEmpty => '暂无缓存';
+
+  @override
+  String ttsCacheCount(int count) {
+    return '已缓存 $count 条音频';
+  }
+
+  @override
+  String ttsCacheCleared(int count) {
+    return '已清理 $count 条朗读音频';
+  }
 }

@@ -31,6 +31,24 @@ abstract class NovelTtsEngine {
   Future<void> pause();
 
   Future<void> dispose();
+
+  /// 枚举可用声音（多角色朗读用）。引擎不支持时返回空列表。
+  Future<List<NovelTtsVoice>> getVoices();
+
+  /// 切换声音（null = 恢复引擎默认）。返回是否切换成功；不支持或名字
+  /// 不存在返回 false，调用方保持默认声音继续朗读。
+  Future<bool> setVoice(NovelTtsVoice? voice);
+}
+
+/// 引擎声音描述（Android 需 name+locale 组合唯一定位；Windows 按 name）。
+class NovelTtsVoice {
+  const NovelTtsVoice({required this.name, this.locale = ''});
+
+  final String name;
+  final String locale;
+
+  @override
+  String toString() => locale.isEmpty ? name : '$name ($locale)';
 }
 
 /// 按平台创建默认朗读引擎。
@@ -73,6 +91,38 @@ class FlutterTtsEngine implements NovelTtsEngine {
   @override
   Future<void> dispose() async {
     await _tts.stop();
+  }
+
+  @override
+  Future<List<NovelTtsVoice>> getVoices() async {
+    try {
+      final voices = await _tts.getVoices;
+      return <NovelTtsVoice>[
+        for (final v in voices)
+          if (v is Map<dynamic, dynamic>)
+            NovelTtsVoice(
+              name: '${v['name'] ?? ''}',
+              locale: '${v['locale'] ?? ''}',
+            ),
+      ]..removeWhere((v) => v.name.isEmpty);
+    } on Object {
+      // 部分平台未实现 getVoices：视为无多声音能力。
+      return const <NovelTtsVoice>[];
+    }
+  }
+
+  @override
+  Future<bool> setVoice(NovelTtsVoice? voice) async {
+    if (voice == null) return false;
+    try {
+      return await _tts.setVoice(<String, String>{
+        'name': voice.name,
+        if (voice.locale.isNotEmpty) 'locale': voice.locale,
+      });
+    } on Object {
+      // 平台不支持或声音不存在：保持默认声音。
+      return false;
+    }
   }
 }
 
@@ -144,6 +194,13 @@ class OhosTtsEngine implements NovelTtsEngine {
 
   @override
   Future<void> pause() => stop();
+
+  /// 鸿蒙 CoreSpeechKit 单声音引擎：无声音枚举与切换能力。
+  @override
+  Future<List<NovelTtsVoice>> getVoices() async => const <NovelTtsVoice>[];
+
+  @override
+  Future<bool> setVoice(NovelTtsVoice? voice) async => false;
 
   @override
   Future<void> dispose() async {

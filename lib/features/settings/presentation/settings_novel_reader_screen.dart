@@ -12,6 +12,7 @@ import 'package:nexhub/generated/app_localizations.dart';
 
 import '../../../core/comic/models/reader_preferences.dart';
 import '../../../core/novel/novel_http_tts_config.dart';
+import '../../../core/novel/novel_tts_audio_cache.dart';
 import '../../../core/novel/novel_page_animation.dart';
 import '../../../core/novel/novel_pre_download_preferences.dart';
 import '../../../core/novel/novel_reader_preferences.dart';
@@ -49,6 +50,9 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
   /// 在线 HTTP TTS 配置（独立持久化，直接读写）。
   NovelHttpTtsConfig _httpTts = const NovelHttpTtsConfig();
 
+  /// 朗读音频缓存条数（惰性统计）。
+  int _ttsCacheCount = 0;
+
   /// EPUB 导出模板（全局配置，直接读写）。
   NovelExportTemplate _exportTemplate = const NovelExportTemplate();
   final TextEditingController _exportCssController = TextEditingController();
@@ -72,6 +76,10 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
     });
     NovelHttpTtsConfigStore().load().then((c) {
       if (mounted) setState(() => _httpTts = c);
+    });
+    TtsAudioFileCache.createDefault().then((cache) async {
+      final (count, _) = await cache.stats();
+      if (mounted) setState(() => _ttsCacheCount = count);
     });
     NovelExportTemplateStore.instance.load().then((t) {
       if (!mounted) return;
@@ -1787,6 +1795,13 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                         onChanged: (v) =>
                             _update(_settings.copyWith(novelTtsBackground: v)),
                       ),
+                      SettingsSwitchTile(
+                        title: l10n.ttsAutoNext,
+                        subtitle: l10n.ttsAutoNextDesc,
+                        value: _settings.novelTtsAutoNext,
+                        onChanged: (v) =>
+                            _update(_settings.copyWith(novelTtsAutoNext: v)),
+                      ),
                       const SizedBox(height: AppTokens.spaceMd),
                       const Divider(height: 1),
                       const SizedBox(height: AppTokens.spaceMd),
@@ -1829,6 +1844,54 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                               _httpTts.copyWith(defaultVoice: v)),
                         ),
                         const SizedBox(height: AppTokens.spaceSm),
+                        _label(l10n.ttsCastNarratorVoice),
+                        const SizedBox(height: AppTokens.spaceXs),
+                        TextField(
+                          controller: TextEditingController(
+                              text: _httpTts.narratorVoice),
+                          decoration: InputDecoration(
+                            hintText: _httpTts.defaultVoice.isEmpty
+                                ? null
+                                : _httpTts.defaultVoice,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          onSubmitted: (v) => _updateHttpTts(
+                              _httpTts.copyWith(narratorVoice: v)),
+                        ),
+                        const SizedBox(height: AppTokens.spaceSm),
+                        _label(l10n.ttsCastMaleVoice),
+                        const SizedBox(height: AppTokens.spaceXs),
+                        TextField(
+                          controller:
+                              TextEditingController(text: _httpTts.maleVoice),
+                          decoration: InputDecoration(
+                            hintText: _httpTts.defaultVoice.isEmpty
+                                ? null
+                                : _httpTts.defaultVoice,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          onSubmitted: (v) =>
+                              _updateHttpTts(_httpTts.copyWith(maleVoice: v)),
+                        ),
+                        const SizedBox(height: AppTokens.spaceSm),
+                        _label(l10n.ttsCastFemaleVoice),
+                        const SizedBox(height: AppTokens.spaceXs),
+                        TextField(
+                          controller: TextEditingController(
+                              text: _httpTts.femaleVoice),
+                          decoration: InputDecoration(
+                            hintText: _httpTts.defaultVoice.isEmpty
+                                ? null
+                                : _httpTts.defaultVoice,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                          onSubmitted: (v) => _updateHttpTts(
+                              _httpTts.copyWith(femaleVoice: v)),
+                        ),
+                        const SizedBox(height: AppTokens.spaceSm),
                         _label(l10n.httpTtsVoiceMap),
                         const SizedBox(height: AppTokens.spaceXs),
                         TextField(
@@ -1845,6 +1908,15 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                           onSubmitted: (v) => _updateHttpTts(_httpTts.copyWith(
                               voiceByRole: _parseVoiceMap(v))),
                         ),
+                        const SizedBox(height: AppTokens.spaceXs),
+                        Text(l10n.ttsCastVoiceMapHint,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant)),
                         const SizedBox(height: AppTokens.spaceMd),
                         SettingsSliderTile(
                           key: const ValueKey<String>('novel.ttsConcurrency'),
@@ -1875,6 +1947,28 @@ class _SettingsNovelReaderScreenState extends State<SettingsNovelReaderScreen> {
                           value: _httpTts.silentPlaceholderOnFailure,
                           onChanged: (v) => _updateHttpTts(
                               _httpTts.copyWith(silentPlaceholderOnFailure: v)),
+                        ),
+                        const SizedBox(height: AppTokens.spaceSm),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.cleaning_services_rounded),
+                          title: Text(l10n.ttsCacheClear),
+                          subtitle: _ttsCacheCount > 0
+                              ? Text(l10n.ttsCacheCount(_ttsCacheCount))
+                              : Text(l10n.ttsCacheEmpty),
+                          onTap: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final cache =
+                                await TtsAudioFileCache.createDefault();
+                            final removed = await cache.clear();
+                            if (!mounted) return;
+                            setState(() => _ttsCacheCount = 0);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text(l10n.ttsCacheCleared(removed))),
+                            );
+                          },
                         ),
                       ],
                     ],
