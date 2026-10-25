@@ -5468,6 +5468,7 @@
   "bingTranslationTesting": "测试中...",
   "bingTranslationTestOk": "Bing 翻译可用",
   "bingTranslationTestFail": "Bing 当前不可用，将使用 AI 兜底",
+  "translationNotNeeded": "该内容已是目标语言，无需翻译",
   "bingTranslationPrivacy": "文本会发送到 Microsoft 翻译服务；该接口非官方公开接口，可能随时调整或失效。",
   "translationCacheUiText": "详情页与评论翻译",
   "storageLocationAppPrivate": "应用私有目录",

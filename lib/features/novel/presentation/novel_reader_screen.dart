@@ -77,6 +77,7 @@ import '../../../core/widgets/detail_action_utils.dart';
 import '../../../core/widgets/web_favorite_action.dart';
 import '../../../core/widgets/source_image.dart';
 import '../../../core/widgets/translatable_text.dart';
+import '../../../core/widgets/tolerant_long_press.dart';
 import '../../../core/novel/novel_chinese_converter.dart';
 import '../../verification/presentation/webview_verification_screen.dart';
 import '../../../core/resolver/webview_resolver.dart';
@@ -10983,22 +10984,6 @@ class _AdaptiveScrollImageState extends State<_AdaptiveScrollImage> {
   }
 }
 
-/// 长按选区识别器：放宽「接受前位移容忍度」。
-///
-/// Flutter 默认 touch slop 仅 18 逻辑像素，手机上手指按住时的自然抖动即可
-/// 超限——长按被判失败、指针落回外层翻页/滚动拖拽手势，页面轻微平移后
-/// 回弹，表现为「长按闪一下」。放宽到 40px 后抖动不再打断长按；真正的
-/// 滑动翻页位移通常在 deadline（500ms）内远超 40px，仍由拖拽手势获胜。
-class _TolerantLongPressGestureRecognizer extends LongPressGestureRecognizer {
-  _TolerantLongPressGestureRecognizer({this.preAcceptTolerance = 40});
-
-  /// 接受前允许的漂移上限（逻辑像素）。
-  final double preAcceptTolerance;
-
-  @override
-  double? get preAcceptSlopTolerance => preAcceptTolerance;
-}
-
 /// 稳定长按选区手势容器：把 [RawGestureDetector] 及其识别器工厂封装成
 /// StatefulWidget，**在 State 生命周期内持有同一份 gestures 配置实例**。
 ///
@@ -11037,13 +11022,15 @@ class _StableLongPressDetectorState extends State<_StableLongPressDetector> {
   void initState() {
     super.initState();
     // 只创建一次：识别器实例恒定，长按期间外层如何重建都不会被替换/重置。
+    // 识别器用公共大容忍版（core/widgets/tolerant_long_press.dart）：
+    // 40px 预接受容忍，手指自然抖动不打断长按。
     _gestures = <Type, GestureRecognizerFactory>{
-      _TolerantLongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<
-          _TolerantLongPressGestureRecognizer>(
-        () => _TolerantLongPressGestureRecognizer(),
+      TolerantLongPressGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<TolerantLongPressGestureRecognizer>(
+        () => TolerantLongPressGestureRecognizer(),
         // initializer 每次 _syncAll 都会执行；回调读取 widget 最新配置，
         // 因此组件重建（换行/换块）后长按仍绑定到新的行/块。
-        (_TolerantLongPressGestureRecognizer instance) {
+        (TolerantLongPressGestureRecognizer instance) {
           instance.onLongPressStart = (d) => widget.onLongPressStart?.call(d);
           instance.onLongPressMoveUpdate =
               (d) => widget.onLongPressMoveUpdate?.call(d);

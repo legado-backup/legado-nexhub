@@ -667,14 +667,23 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                   title: l10n.bingTranslationEnable,
                   subtitle: l10n.bingTranslationEnableHint,
                   value: _bingEnabled,
-                  onChanged: (v) => setState(() => _bingEnabled = v),
+                  // 开关即时落盘：底部「保存」按钮只覆盖接口配置，开关若只
+                  // 改内存极易漏点保存，重进页面回弹旧值（表现为"不持久化"
+                  // 且详情页自动翻译不生效）。
+                  onChanged: (v) {
+                    setState(() => _bingEnabled = v);
+                    TranslationFeatureFlags.instance.update(bingEnabled: v);
+                  },
                 ),
                 SettingsChoiceChips<String>(
                   title: l10n.bingTranslationPriority,
                   boxed: false,
                   selected: _bingFirst ? 'bingFirst' : 'aiFirst',
-                  onSelected: (v) =>
-                      setState(() => _bingFirst = v == 'bingFirst'),
+                  onSelected: (v) {
+                    setState(() => _bingFirst = v == 'bingFirst');
+                    TranslationFeatureFlags.instance
+                        .update(bingFirst: v == 'bingFirst');
+                  },
                   options: <SettingsChoiceChipData<String>>[
                     SettingsChoiceChipData<String>(
                       value: 'bingFirst',
@@ -689,22 +698,35 @@ class _SettingsAiScreenState extends State<SettingsAiScreen> {
                 SettingsSwitchTile(
                   title: l10n.bingTranslationAutoTitle,
                   value: _autoTitle,
-                  onChanged: (v) => setState(() => _autoTitle = v),
+                  // 自动翻译开关即时落盘（同上：不依赖底部保存按钮）。
+                  onChanged: (v) {
+                    setState(() => _autoTitle = v);
+                    TranslationFeatureFlags.instance.update(autoTitle: v);
+                  },
                 ),
                 SettingsSwitchTile(
                   title: l10n.bingTranslationAutoTags,
                   value: _autoTags,
-                  onChanged: (v) => setState(() => _autoTags = v),
+                  onChanged: (v) {
+                    setState(() => _autoTags = v);
+                    TranslationFeatureFlags.instance.update(autoTags: v);
+                  },
                 ),
                 SettingsSwitchTile(
                   title: l10n.bingTranslationAutoSummary,
                   value: _autoSummary,
-                  onChanged: (v) => setState(() => _autoSummary = v),
+                  onChanged: (v) {
+                    setState(() => _autoSummary = v);
+                    TranslationFeatureFlags.instance.update(autoSummary: v);
+                  },
                 ),
                 SettingsSwitchTile(
                   title: l10n.bingTranslationAutoComments,
                   value: _autoComments,
-                  onChanged: (v) => setState(() => _autoComments = v),
+                  onChanged: (v) {
+                    setState(() => _autoComments = v);
+                    TranslationFeatureFlags.instance.update(autoComments: v);
+                  },
                 ),
                 const SizedBox(height: AppTokens.spaceMd),
                 OutlinedButton.icon(

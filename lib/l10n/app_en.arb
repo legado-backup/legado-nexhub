@@ -5512,6 +5512,7 @@
   "bingTranslationTesting": "Testing...",
   "bingTranslationTestOk": "Bing translation is available",
   "bingTranslationTestFail": "Bing is unavailable right now; AI fallback will be used",
+  "translationNotNeeded": "Already in the target language; no translation needed",
   "bingTranslationPrivacy": "Text is sent to Microsoft's translation service. This is an unofficial endpoint and may change or stop working at any time.",
   "translationCacheUiText": "Detail page & comment translation",
   "storageLocationAppPrivate": "App private folder",

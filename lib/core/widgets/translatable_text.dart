@@ -4,11 +4,13 @@ library;
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:nexhub/generated/app_localizations.dart';
 
 import '../ai/translation_exception.dart';
 import '../ai/translation_feature_flags.dart';
 import '../ai/translation_language.dart';
 import '../ai/ui_text_translator.dart';
+import 'tolerant_long_press.dart';
 
 enum TranslatableTextKind { title, tag, summary, comment }
 
@@ -132,9 +134,21 @@ class _AutoTranslatedTextState extends State<AutoTranslatedText> {
     }
   }
 
+  /// 长按：已有译文→切换原文；否则触发翻译。已是目标语言时给出提示，
+  /// 避免「长按毫无反应」（真机手指自然抖动 > 默认 touch slop 也会吞掉
+  /// 标准长按手势，故用大容忍识别器）。
   Future<void> _onLongPress() async {
     if (_translation != null) {
       setState(() => _showOriginal = !_showOriginal);
+      return;
+    }
+    final target = _targetLang;
+    if (target == null) return;
+    if (!TranslationLanguage.shouldTranslate(widget.text, target)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+            content: Text(AppLocalizations.of(context).translationNotNeeded)),
+      );
       return;
     }
     _requested = true;
@@ -144,8 +158,7 @@ class _AutoTranslatedTextState extends State<AutoTranslatedText> {
   @override
   Widget build(BuildContext context) {
     final showTranslation = _translation != null && !_showOriginal;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return TolerantLongPress(
       onLongPress: _onLongPress,
       child: Text(
         showTranslation ? _translation! : widget.text,
@@ -286,6 +299,15 @@ class _BilingualTranslatedTextState extends State<BilingualTranslatedText> {
       setState(() => _hideTranslation = !_hideTranslation);
       return;
     }
+    final target = _targetLang;
+    if (target == null) return;
+    if (!TranslationLanguage.shouldTranslate(widget.text, target)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+            content: Text(AppLocalizations.of(context).translationNotNeeded)),
+      );
+      return;
+    }
     _requested = true;
     await _request(manual: true);
   }
@@ -302,8 +324,7 @@ class _BilingualTranslatedTextState extends State<BilingualTranslatedText> {
             ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final showTranslation =
         _translation != null && !_hideTranslation && widget.maxLines == null;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return TolerantLongPress(
       onLongPress: _onLongPress,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -345,6 +366,10 @@ class _BilingualTranslatedTextState extends State<BilingualTranslatedText> {
 }
 
 /// 题材标签：保留点按行为，长按触发/切换译文。
+///
+/// 不给 ActionChip 传 tooltip——Chip 会用 Tooltip（长按触发）包住整个
+/// 标签，与 label 内的翻译长按在手势竞技场抢事件；提示语义改由
+/// [Semantics] 承载，长按唯一归属翻译。
 class TranslatableTagChip extends StatelessWidget {
   const TranslatableTagChip({
     super.key,
@@ -359,13 +384,17 @@ class TranslatableTagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ActionChip(
-      label: AutoTranslatedText(
-        text: label,
-        kind: TranslatableTextKind.tag,
+    final hint = tooltip;
+    return Semantics(
+      button: true,
+      tooltip: hint,
+      child: ActionChip(
+        label: AutoTranslatedText(
+          text: label,
+          kind: TranslatableTextKind.tag,
+        ),
+        onPressed: onPressed,
       ),
-      tooltip: tooltip,
-      onPressed: onPressed,
     );
   }
 }
