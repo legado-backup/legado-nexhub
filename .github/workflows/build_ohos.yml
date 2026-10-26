@@ -74,6 +74,22 @@ jobs:
           ls "$HOME/flutter-ohos/bin" | head -5
           echo "$HOME/flutter-ohos/bin" >> "$GITHUB_PATH"
 
+      - name: 预热 SDK 工件（容忍 OBS 域名 DNS 抖动）
+        # flutter-ohos 的 engine 工件托管在华为云 OBS（海外 runner 偶发 DNS 解析失败），
+        # 这里先带退避重试把工件拉齐，避免后续 doctor / pub get / 编译被同一次抖动打断。
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do
+            if flutter precache 2>&1; then
+              echo "::notice::SDK artifacts precached"
+              exit 0
+            fi
+            echo "precache failed (attempt $i/5), retrying in $((i*10))s..."
+            sleep $((i*10))
+          done
+          echo "::error::flutter-ohos SDK 工件下载连续失败（检查 OBS 域名可达性）"
+          exit 1
+
       - name: Flutter doctor
         shell: bash
         run: |

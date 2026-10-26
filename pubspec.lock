@@ -339,7 +339,7 @@ packages:
   comic_motion_flutter:
     dependency: "direct main"
     description:
-      path: "../comic motion effects/comic-motion-backend/comic_motion_flutter"
+      path: "third_party/comic_motion_flutter"
       relative: true
     source: path
     version: "0.3.0"
